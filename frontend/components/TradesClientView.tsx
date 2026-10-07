@@ -80,14 +80,14 @@ interface TradesClientViewProps {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; badgeClass: string; icon: string }> = {
-  PENDING: { label: "Čaká na potvrdenie", badgeClass: "bg-amber-500/15 text-amber-300 border-amber-500/30", icon: "⏳" },
-  ACCEPTED: { label: "Dokončená", badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30", icon: "✓" },
-  COMPLETED: { label: "Dokončená", badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30", icon: "✓" },
-  AWAITING_COMMISH: { label: "V schvaľovaní (Komisia)", badgeClass: "bg-purple-500/15 text-purple-300 border-purple-500/30", icon: "⚖️" },
-  MODIFY: { label: "Vrátená na úpravu", badgeClass: "bg-sky-500/15 text-sky-300 border-sky-500/30", icon: "✏️" },
-  MODIFIED: { label: "Upravená (Prebieha revízia)", badgeClass: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30", icon: "✏️" },
-  DECLINED: { label: "Odmietnutá", badgeClass: "bg-rose-500/15 text-rose-400 border-rose-500/30", icon: "✕" },
-  CANCELLED: { label: "Zrušená", badgeClass: "bg-slate-700/40 text-slate-400 border-slate-700/50", icon: "—" },
+  PENDING: { label: "Awaiting confirmation", badgeClass: "bg-amber-500/15 text-amber-300 border-amber-500/30", icon: "⏳" },
+  ACCEPTED: { label: "Completed", badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30", icon: "✓" },
+  COMPLETED: { label: "Completed", badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30", icon: "✓" },
+  AWAITING_COMMISH: { label: "Under review (Commission)", badgeClass: "bg-purple-500/15 text-purple-300 border-purple-500/30", icon: "⚖️" },
+  MODIFY: { label: "Returned for changes", badgeClass: "bg-sky-500/15 text-sky-300 border-sky-500/30", icon: "✏️" },
+  MODIFIED: { label: "Modified (under re-review)", badgeClass: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30", icon: "✏️" },
+  DECLINED: { label: "Declined", badgeClass: "bg-rose-500/15 text-rose-400 border-rose-500/30", icon: "✕" },
+  CANCELLED: { label: "Cancelled", badgeClass: "bg-slate-700/40 text-slate-400 border-slate-700/50", icon: "—" },
 };
 
 function formatCap(cap?: number | null) {
@@ -244,20 +244,20 @@ export default function TradesClientView({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-black text-amber-300 uppercase tracking-wide">
-                  Komisia pre dohľad nad výmenami (Trade Commission)
+                  Trade Commission
                 </h3>
                 {commishQueueCount > 0 ? (
                   <span className="px-2 py-0.5 rounded-full bg-amber-500/25 text-amber-200 border border-amber-500/40 text-[10px] font-bold animate-pulse">
-                    {commishQueueCount} čaká na posúdenie
+                    {commishQueueCount} awaiting review
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-semibold">
-                    0 čakajúcich výmen
+                    0 pending trades
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Posudzovanie a schvaľovanie výmen nováčikov (Rookie GM oversight) a dohľad nad ligovým balansom.
+                Review and approval of rookie trades (Rookie GM oversight) and oversight of league balance.
               </p>
             </div>
           </div>
@@ -265,7 +265,7 @@ export default function TradesClientView({
             href="/trades/commish"
             className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors shrink-0 shadow-lg shadow-amber-500/20"
           >
-            {commishQueueCount > 0 ? `Posúdiť výmeny (${commishQueueCount}) →` : "Otvoriť komisiu →"}
+            {commishQueueCount > 0 ? `Review trades (${commishQueueCount}) →` : "Open commission →"}
           </Link>
         </div>
       )}
@@ -283,7 +283,7 @@ export default function TradesClientView({
                   : "bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
               }`}
             >
-              Všetky výmeny <span className="ml-1 opacity-80 font-mono">({trades.length + groups.length})</span>
+              All trades <span className="ml-1 opacity-80 font-mono">({trades.length + groups.length})</span>
             </button>
 
             {sessionTeamId != null && (
@@ -295,7 +295,7 @@ export default function TradesClientView({
                     : "bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
                 }`}
               >
-                <span>Moje výmeny</span>
+                <span>My trades</span>
                 {myTradesCount > 0 && (
                   <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
                     activeTab === "MY" ? "bg-slate-950/30 text-slate-950" : "bg-cyan-500/20 text-cyan-300"
@@ -314,7 +314,7 @@ export default function TradesClientView({
                   : "bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
               }`}
             >
-              <span>V schvaľovaní</span>
+              <span>Under review</span>
               {commishTradesCount > 0 && (
                 <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
                   activeTab === "COMMISH" ? "bg-slate-950/30 text-slate-950" : "bg-purple-500/20 text-purple-300"
@@ -332,7 +332,7 @@ export default function TradesClientView({
                   : "bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
               }`}
             >
-              3-Tímové <span className="ml-1 opacity-80 font-mono">({groups.length})</span>
+              3-Team <span className="ml-1 opacity-80 font-mono">({groups.length})</span>
             </button>
           </div>
 
@@ -344,13 +344,13 @@ export default function TradesClientView({
                   href="/trades/build"
                   className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-900/30 flex items-center gap-1.5 transition-all"
                 >
-                  <span>+</span> Navrhnúť výmenu
+                  <span>+</span> Propose trade
                 </Link>
                 <Link
                   href="/trades/build3"
                   className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800 transition-colors"
                 >
-                  + 3-Tímová
+                  + 3-Team
                 </Link>
               </>
             )}
@@ -364,7 +364,7 @@ export default function TradesClientView({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filtrovať podľa hráča, tímu, picku..."
+              placeholder="Filter by player, team, pick..."
               className="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1.5 pl-8 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 transition-colors"
             />
             <span className="absolute left-2.5 top-2 text-xs text-slate-500">🔍</span>
@@ -379,13 +379,13 @@ export default function TradesClientView({
           </div>
 
           <div className="w-full sm:w-auto shrink-0 flex items-center gap-2">
-            <span className="text-xs text-slate-400 shrink-0 font-medium">Tím:</span>
+            <span className="text-xs text-slate-400 shrink-0 font-medium">Team:</span>
             <select
               value={teamFilter}
               onChange={(e) => setTeamFilter(e.target.value)}
               className="w-full sm:w-48 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/60 cursor-pointer"
             >
-              <option value="ALL">Všetky tímy</option>
+              <option value="ALL">All teams</option>
               {allTeams.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} ({t.code})
@@ -404,7 +404,7 @@ export default function TradesClientView({
             <div className="flex items-center justify-between pb-2 border-b border-purple-500/25">
               <h2 className="text-sm font-black uppercase tracking-wider text-purple-300 flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse" />
-                <span>Na posúdenie komisiou (With the Commission)</span>
+                <span>With the Commission</span>
                 <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/40 text-[10px] font-mono">
                   {inReviewTrades.length + inReviewGroups.length}
                 </span>
@@ -414,7 +414,7 @@ export default function TradesClientView({
                   href="/trades/commish"
                   className="text-xs text-purple-300 hover:text-purple-100 font-bold underline-offset-2 hover:underline"
                 >
-                  Otvoriť komisiu →
+                  Open commission →
                 </Link>
               )}
             </div>
@@ -446,7 +446,7 @@ export default function TradesClientView({
           <div className="space-y-4">
             <h2 className="text-sm font-black uppercase tracking-wider text-amber-400 flex items-center gap-2 pt-2">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              Čakajúce návrhy výmen ({pendingTrades.length})
+              Pending trade proposals ({pendingTrades.length})
             </h2>
             <div className="space-y-4">
               {pendingTrades.map((t) => (
@@ -467,7 +467,7 @@ export default function TradesClientView({
           <div className="space-y-4">
             {activeTab === "ALL" && regularGroups.length > 0 && (
               <h2 className="text-sm font-black uppercase tracking-wider text-sky-400 flex items-center gap-2 pt-2">
-                <span>🔄</span> 3-Tímové výmeny ({regularGroups.length})
+                <span>🔄</span> 3-Team trades ({regularGroups.length})
               </h2>
             )}
             <div className="space-y-4">
@@ -487,7 +487,7 @@ export default function TradesClientView({
           <div className="space-y-4">
             {activeTab === "ALL" && regularTrades.length > 0 && (
               <h2 className="text-sm font-black uppercase tracking-wider text-slate-300 flex items-center gap-2 pt-2">
-                <span>🔁</span> História výmen ({regularTrades.length})
+                <span>🔁</span> Trade history ({regularTrades.length})
               </h2>
             )}
 
@@ -511,9 +511,9 @@ export default function TradesClientView({
             <div className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 mx-auto flex items-center justify-center text-xl text-slate-400">
               🏒
             </div>
-            <h3 className="text-base font-bold text-slate-200">Nenašli sa žiadne výmeny</h3>
+            <h3 className="text-base font-bold text-slate-200">No trades found</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Pre zadané kritériá alebo vyhľadávanie nie sú k dispozícii žiadne záznamy o výmenách.
+              No trade records are available for the given criteria or search.
             </p>
             {(search || teamFilter !== "ALL" || activeTab !== "ALL") && (
               <button
@@ -524,7 +524,7 @@ export default function TradesClientView({
                 }}
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-400 transition-colors"
               >
-                Resetovať filtre
+                Reset filters
               </button>
             )}
           </div>
@@ -578,7 +578,7 @@ function TradeCardComponent({
             <div className="min-w-0">
               <div className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 truncate">
                 <Link href={trade.fromTeam?.slug ? `/teams/${trade.fromTeam.slug}` : "/teams"} className="hover:text-cyan-300 transition-colors">
-                  {trade.fromTeam?.name ?? "Tím"}
+                  {trade.fromTeam?.name ?? "Team"}
                 </Link>
                 {trade.fromTeam?.rookieGm && (
                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30" title="Rookie GM">
@@ -611,7 +611,7 @@ function TradeCardComponent({
             <div className="min-w-0">
               <div className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 truncate">
                 <Link href={trade.toTeam?.slug ? `/teams/${trade.toTeam.slug}` : "/teams"} className="hover:text-cyan-300 transition-colors">
-                  {trade.toTeam?.name ?? "Tím"}
+                  {trade.toTeam?.name ?? "Team"}
                 </Link>
                 {trade.toTeam?.rookieGm && (
                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30" title="Rookie GM">
@@ -648,11 +648,11 @@ function TradeCardComponent({
           <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/60">
             <span className="text-xs font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-              <span>{trade.fromTeam?.name ?? "Tím"}</span>
-              <span className="text-slate-400 font-medium lowercase">({isDone ? "získal" : "posiela"}):</span>
+              <span>{trade.fromTeam?.name ?? "Team"}</span>
+              <span className="text-slate-400 font-medium lowercase">({isDone ? "received" : "sends"}):</span>
             </span>
             <span className="text-[11px] text-slate-500 font-mono">
-              {(isDone ? trade.toLabels : trade.fromLabels).length} aktív
+              {(isDone ? trade.toLabels : trade.fromLabels).length} assets
             </span>
           </div>
 
@@ -672,11 +672,11 @@ function TradeCardComponent({
           <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/60">
             <span className="text-xs font-black uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-              <span>{trade.toTeam?.name ?? "Tím"}</span>
-              <span className="text-slate-400 font-medium lowercase">({isDone ? "získal" : "posiela"}):</span>
+              <span>{trade.toTeam?.name ?? "Team"}</span>
+              <span className="text-slate-400 font-medium lowercase">({isDone ? "received" : "sends"}):</span>
             </span>
             <span className="text-[11px] text-slate-500 font-mono">
-              {(isDone ? trade.fromLabels : trade.toLabels).length} aktív
+              {(isDone ? trade.fromLabels : trade.toLabels).length} assets
             </span>
           </div>
 
@@ -697,7 +697,7 @@ function TradeCardComponent({
         <div className="mx-4 sm:mx-5 mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200/90 flex items-start gap-2">
           <span className="shrink-0 text-amber-400">📎</span>
           <div>
-            <strong className="text-amber-300 font-bold">Podmienka výmeny:</strong> {trade.condition}
+            <strong className="text-amber-300 font-bold">Trade condition:</strong> {trade.condition}
           </div>
         </div>
       )}
@@ -706,24 +706,24 @@ function TradeCardComponent({
       {trade.status === "AWAITING_COMMISH" && (
         <div className="mx-4 sm:mx-5 mb-4 p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-xs text-purple-200/90 flex items-center gap-2">
           <span>🕵️</span>
-          <span>Dohodnuté oboma manažérmi — čaká na finálne schválenie ligovou komisiou (ochrana rookie-GM).</span>
+          <span>Agreed by both managers — awaiting final approval by the league commission (rookie-GM protection).</span>
         </div>
       )}
       {trade.status === "MODIFY" && (
         <div className="mx-4 sm:mx-5 mb-4 p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/25 text-xs text-sky-200/90 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span>✏️</span>
-            <span>Komisia požiadala o prebalancovanie výmeny pred schválením.</span>
+            <span>The commission asked for the trade to be rebalanced before approval.</span>
           </div>
           <Link href={`/trades/build?edit=${trade.id}`} className="underline font-bold text-sky-300 hover:text-white shrink-0">
-            Upraviť a znovu odoslať →
+            Edit and resubmit →
           </Link>
         </div>
       )}
       {trade.status === "MODIFIED" && (
         <div className="mx-4 sm:mx-5 mb-4 p-2.5 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/25 text-xs text-fuchsia-200/90 flex items-center gap-2">
           <span>✏️</span>
-          <span>Výmena bola upravená manažérom a vrátená komisii na opätovné posúdenie.</span>
+          <span>The trade was modified by the manager and returned to the commission for re-review.</span>
         </div>
       )}
 
@@ -735,7 +735,7 @@ function TradeCardComponent({
           </span>
           <span className="text-slate-600">·</span>
           <span className="text-slate-500 font-mono">
-            {isDone ? `Dokončené: ${trade.respondedAtStr ?? trade.createdAtStr}` : `Navrhnuté: ${trade.createdAtStr}`}
+            {isDone ? `Completed: ${trade.respondedAtStr ?? trade.createdAtStr}` : `Proposed: ${trade.createdAtStr}`}
           </span>
           <span className="text-slate-600">·</span>
           <span className="text-slate-500 font-mono">#{trade.id}</span>
@@ -759,7 +759,7 @@ function TradeCardComponent({
                 <span>⚖️</span> Komisia:
               </span>
               {isConflicted ? (
-                <span className="text-xs text-slate-400 italic">Váš tím je vo výmene (rozhoduje iný člen)</span>
+                <span className="text-xs text-slate-400 italic">Your team is in the trade (another member decides)</span>
               ) : (
                 <CommishTradeActions tradeId={trade.id} status={trade.status} />
               )}
@@ -835,7 +835,7 @@ function TradeAssetRow({ asset }: { asset: EnrichedTradeAsset }) {
                 <img src={asset.origTeamLogo} alt="" className="w-3.5 h-3.5 object-contain" />
               )}
               {asset.origTeamCode ? (
-                <span className="font-mono text-slate-300 font-medium">pôvodný výber {asset.origTeamCode}</span>
+                <span className="font-mono text-slate-300 font-medium">original pick {asset.origTeamCode}</span>
               ) : null}
             </div>
           </div>
@@ -862,7 +862,7 @@ function TradeAssetRow({ asset }: { asset: EnrichedTradeAsset }) {
               {asset.name ?? asset.text}
             </div>
             <div className="text-[10px] text-purple-300/80 font-mono">
-              Prospect · {asset.position ?? "Nádej"}
+              Prospect · {asset.position ?? "Prospect"}
             </div>
           </div>
         </div>
@@ -944,7 +944,7 @@ function TradeGroupCardComponent({
               : "bg-sky-500/20 text-sky-300 border-sky-500/30"
           }`}
         >
-          {group.status === "AWAITING_COMMISH" ? "⚖️ V SCHVAĽOVANÍ" : "🔄 3-TÍMOVÁ VÝMENA"}
+          {group.status === "AWAITING_COMMISH" ? "⚖️ UNDER REVIEW" : "🔄 3-TEAM TRADE"}
         </span>
       </div>
 
@@ -998,7 +998,7 @@ function TradeGroupCardComponent({
 
       {/* Footer */}
       <div className="px-4 sm:px-5 py-3 bg-slate-950/70 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <span className="text-slate-500 font-mono">Dátum návrhu: {group.createdAtStr}</span>
+        <span className="text-slate-500 font-mono">Proposed on: {group.createdAtStr}</span>
         <TradeGroupActions
           groupId={group.id}
           canRespond={group.canRespond || (!!isCommission && isCommishReview)}

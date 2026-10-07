@@ -399,7 +399,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const cls = fit >= 80 ? "bg-emerald-500/20 text-emerald-300" : fit >= 60 ? "bg-sky-500/20 text-sky-300" : fit >= 45 ? "bg-amber-500/20 text-amber-300" : "bg-rose-500/20 text-rose-300";
     return (
       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
-        title="Tactical Fit — rovnaký výpočet ako v Lines Builderi: skladba rolí, správne pozície alebo držanie hokejky, vhodnosť hráčov pre zvolený systém a typy hráčov vhodné pre danú lajnu/pár (napr. 4. lajna chce checking forwarda + defenzívnych krídelníkov).">
+        title="Tactical Fit — the same calculation as in the Lines Builder: role mix, correct positions or stick hand, player suitability for the selected system and player types suited to the given line/pair (e.g. the 4th line wants a checking forward + defensive wingers).">
         ♟ Fit {fit}
       </span>
     );
@@ -795,8 +795,8 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     return (
       <div className="space-y-4">
         <p className="text-xs text-slate-500 px-1">💡 {roleInfo
-          ? "Rola pod menom hráča ukazuje, koho miesto na ľade v aktuálne zvolenej taktike zaberá (mení sa podľa PP/PK formation vyššie). O buly sa vždy automaticky pokúša hráč s najvyšším FO na ľade — bez ohľadu na to, kde je zaradený."
-          : "Buly berie automaticky hráč s najvyšším FO na ľade, bez ohľadu na pozíciu/slot."}</p>
+          ? "The role under a player's name shows whose spot on the ice he takes in the currently selected tactic (it changes with the PP/PK formation above). The player with the highest FO on the ice always automatically takes the faceoff — regardless of where he is placed."
+          : "The player with the highest FO on the ice automatically takes faceoffs, regardless of position/slot."}</p>
         {dHint && <p className="text-xs text-slate-500 px-1">{dHint}</p>}
         {units.map((u, ui) => {
           const roles = rolesFor(ui);
@@ -824,7 +824,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
                 <div>
                   <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                    <span>Útočníci ({nF})</span>
+                    <span>Forwards ({nF})</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                     {Array.from({ length: nF }).map((_, si) => {
@@ -870,7 +870,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
               {/* Tactical Controls */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/60">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-400">Útok:</span>
+                  <span className="text-[11px] font-bold text-slate-400">Offense:</span>
                   <TacStep label="PHY" value={tFwd.phy} onSet={(v) => setUnitTac(key, ui, "phy", v)} />
                   <TacStep label="DF" value={tFwd.df} onSet={(v) => setUnitTac(key, ui, "df", v)} />
                   <TacStep label="OF" value={tFwd.of} onSet={(v) => setUnitTac(key, ui, "of", v)} />
@@ -960,7 +960,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           {onSuggest && (
             <button onClick={runAi} disabled={aiPending}
               className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold disabled:opacity-50"
-              title="GM Assist — navrhne zostavy, taktiku a systém podľa tvojich hráčov">
+              title="GM Assist — suggests lineups, tactics and system based on your players">
               {aiPending ? "Analyzujem…" : "🤖 GM Assist"}
             </button>
           )}
@@ -979,15 +979,15 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
               <p className="text-rose-400 text-sm">{ai.error}</p>
             ) : (
               <>
-                <p className="text-sm text-slate-400 mb-3">Návrh zostáv, taktiky a systému podľa parametrov tvojich hráčov. Môžeš ho prijať (nahradí aktuálne nastavenie, uložíš cez <b>Save Lines</b>) alebo zrušiť.</p>
+                <p className="text-sm text-slate-400 mb-3">A suggestion for lineups, tactics and system based on your players' parameters. You can accept it (it replaces the current setup, save via <b>Save Lines</b>) or cancel.</p>
                 <ul className="space-y-1.5 mb-4">
                   {ai.rationale.map((r, i) => (
                     <li key={i} className="text-sm text-slate-200 flex gap-2"><span className="text-violet-400">•</span><span dangerouslySetInnerHTML={{ __html: r }} /></li>
                   ))}
                 </ul>
                 <div className="flex items-center gap-3">
-                  <button onClick={applyAi} className="px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 font-semibold text-sm">Prijať návrh</button>
-                  <button onClick={() => setAi(null)} className="px-5 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 font-semibold text-sm">Zrušiť</button>
+                  <button onClick={applyAi} className="px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 font-semibold text-sm">Accept suggestion</button>
+                  <button onClick={() => setAi(null)} className="px-5 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 font-semibold text-sm">Cancel</button>
                 </div>
               </>
             )}
@@ -1052,18 +1052,18 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           <UnitFormationBlock unitKey="pp" ui={0} dial="ppStyle" label="PP1" layouts={PP_LAYOUTS} dStartIndex={3} accent="#3b82f6" />
           <UnitFormationBlock unitKey="pp" ui={1} dial="ppStyle" label="PP2" layouts={PP_LAYOUTS} dStartIndex={3} accent="#a855f7" />
         </div>
-        {SplitUnitSection("pp", "Power Play (5 on 4)", ["F1", "F2", "F3"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje, takže sa dá hrať aj 4 útočníci + 1 obranca alebo naopak.", { dial: "ppStyle", layouts: PP_LAYOUTS }, allSkatersPool)}
+        {SplitUnitSection("pp", "Power Play (5 on 4)", ["F1", "F2", "F3"], ["D1", "D2"], stPointPool, "💡 Any slot can hold a forward or a defenseman — the dropdown offers both, so you can also play 4 forwards + 1 defenseman or vice versa.", { dial: "ppStyle", layouts: PP_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "PP 4v3" && <>
         <div className="lines-info-card mb-4">
           <span className="lines-info-icon">4v3</span>
-          <div><strong>Power play 4 na 3</strong><p>Viac priestoru, jeden hráč na pointe a tri útočné pozície. Jednotka používa tímový PP systém, ale rozostavenie je prispôsobené štyrom korčuliarom.</p></div>
+          <div><strong>Power play 4 on 3</strong><p>More space, one player on the point and three offensive positions. The unit uses the team PP system, but the formation is adapted to four skaters.</p></div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <UnitFormationBlock unitKey="pp4" ui={0} dial="ppStyle" label="PP 4v3 — Unit 1" layouts={PP4_LAYOUTS} dStartIndex={3} accent="#22d3ee" />
           <UnitFormationBlock unitKey="pp4" ui={1} dial="ppStyle" label="PP 4v3 — Unit 2" layouts={PP4_LAYOUTS} dStartIndex={3} accent="#8b5cf6" />
         </div>
-        {SplitUnitSection("pp4", "Power Play (4 on 3)", ["F1", "F2", "F3"], ["D1"], stPointPool, "💡 Všetky štyri sloty ponúkajú oblečených korčuliarov. Rozostavenie počíta s tromi útočnými pozíciami a jedným quarterbackom na pointe.", { dial: "ppStyle", layouts: PP4_LAYOUTS }, allSkatersPool)}
+        {SplitUnitSection("pp4", "Power Play (4 on 3)", ["F1", "F2", "F3"], ["D1"], stPointPool, "💡 All four slots offer dressed skaters. The formation assumes three offensive positions and one quarterback on the point.", { dial: "ppStyle", layouts: PP4_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "4 vs 4" && (
         <section className="space-y-4">
@@ -1080,22 +1080,22 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           <UnitFormationBlock unitKey="pk4" ui={0} dial="pkStyle" label="PK1" layouts={PK_LAYOUTS} dStartIndex={2} accent="#ef4444" />
           <UnitFormationBlock unitKey="pk4" ui={1} dial="pkStyle" label="PK2" layouts={PK_LAYOUTS} dStartIndex={2} accent="#f97316" />
         </div>
-        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje na oboch pozíciách.", { dial: "pkStyle", layouts: PK_LAYOUTS }, allSkatersPool)}
+        {SplitUnitSection("pk4", "Penalty Kill (4 on 5)", ["F1", "F2"], ["D1", "D2"], stPointPool, "💡 Any slot can hold a forward or a defenseman — the dropdown offers both at both positions.", { dial: "pkStyle", layouts: PK_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "PK3" && <>
-        <p className="text-xs text-slate-500 px-1 mb-3">Zdieľa systém (Box/Diamond/Aggressive) s PK4 — pri 3 hráčoch niet 4. rohu, takže sa mení hlavne to, ako vysoko/agresívne hrá útočník. Zmeň to na karte <strong className="text-slate-300">PK4</strong> vyššie.</p>
+        <p className="text-xs text-slate-500 px-1 mb-3">Shares the system (Box/Diamond/Aggressive) with PK4 — with 3 players there is no 4th corner, so mostly what changes is how high/aggressively the forward plays. Change it on the <strong className="text-slate-300">PK4</strong> card above.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <UnitFormationBlock unitKey="pk3" ui={0} dial="pkStyle" label="PK3-1" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#facc15" />
           <UnitFormationBlock unitKey="pk3" ui={1} dial="pkStyle" label="PK3-2" layouts={PK3_LAYOUTS} dStartIndex={1} accent="#eab308" />
         </div>
-        {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], stPointPool, "💡 Ktorýkoľvek slot môže mať útočníka aj obrancu — dropdown ponúka oboje na oboch pozíciách.", { dial: "pkStyle", layouts: PK3_LAYOUTS }, allSkatersPool)}
+        {SplitUnitSection("pk3", "Penalty Kill (3 on 5)", ["F1"], ["D1", "D2"], stPointPool, "💡 Any slot can hold a forward or a defenseman — the dropdown offers both at both positions.", { dial: "pkStyle", layouts: PK3_LAYOUTS }, allSkatersPool)}
       </>}
       {tab === "Overtime" && (
         <section className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-2">
-            <UnitFormationBlock unitKey="overtime" ui={0} label="OT1 — 3v3 Útok" layouts={OT_LAYOUTS} dStartIndex={2} accent="#22d3ee" goalAtTop />
-            <UnitFormationBlock unitKey="overtime" ui={1} label="OT2 — 3v3 Útok" layouts={OT_LAYOUTS} dStartIndex={2} accent="#38bdf8" goalAtTop />
-            <UnitFormationBlock unitKey="overtime" ui={2} label="OT3 — 3v3 Útok" layouts={OT_LAYOUTS} dStartIndex={2} accent="#0284c7" goalAtTop />
+            <UnitFormationBlock unitKey="overtime" ui={0} label="OT1 — 3v3 Offense" layouts={OT_LAYOUTS} dStartIndex={2} accent="#22d3ee" goalAtTop />
+            <UnitFormationBlock unitKey="overtime" ui={1} label="OT2 — 3v3 Offense" layouts={OT_LAYOUTS} dStartIndex={2} accent="#38bdf8" goalAtTop />
+            <UnitFormationBlock unitKey="overtime" ui={2} label="OT3 — 3v3 Offense" layouts={OT_LAYOUTS} dStartIndex={2} accent="#0284c7" goalAtTop />
           </div>
           {UnitSection("overtime", "Overtime (3 vs 3)", ["OT1 (C)", "OT2 (W)", "OT3 (D)"], () => dressedPlayers)}
         </section>
@@ -1111,7 +1111,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
                   <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wide">Extra Forwards</h3>
                 </div>
-                <span className="text-xs text-slate-400">Náhradní útočníci</span>
+                <span className="text-xs text-slate-400">Extra forwards</span>
               </div>
               <div className="space-y-2">
                 {others.extraForwards.map((val, i) => (
@@ -1127,7 +1127,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
                   <span className="w-2 h-2 rounded-full bg-rose-500"></span>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wide">Extra Defense</h3>
                 </div>
-                <span className="text-xs text-slate-400">Náhradní obrancovia</span>
+                <span className="text-xs text-slate-400">Extra defensemen</span>
               </div>
               <div className="space-y-2">
                 {others.extraDefense.map((val, i) => (
@@ -1142,9 +1142,9 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                <h3 className="text-sm font-bold text-white uppercase tracking-wide">Substitutes (Striedania pri únave / vylúčení)</h3>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wide">Substitutes (changes on fatigue / penalties)</h3>
               </div>
-              <span className="text-xs text-slate-400">Špeciálne tímy</span>
+              <span className="text-xs text-slate-400">Special teams</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Slot label="Power-play sub" value={others.subPP} onChange={(v) => setOther("subPP", v)} pool={dressedPlayers} />
@@ -1158,9 +1158,9 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-                <h3 className="text-sm font-bold text-white uppercase tracking-wide">Shootout order (Samostatné nájazdy 1 → 5)</h3>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wide">Shootout order (shootout attempts 1 → 5)</h3>
               </div>
-              <span className="text-xs text-slate-400">Poradie exekútorov</span>
+              <span className="text-xs text-slate-400">Shooter order</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
               {others.shootout.map((val, i) => (
@@ -1174,7 +1174,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
       {tab === "Last Min" && (
         <div className="space-y-6">
           <p className="text-xs text-slate-500 px-1">
-            💡 Taktika a rozostavenie pre záverečný tlak: 6v5 s odvolaným brankárom na vyrovnanie skóre, alebo 5v5 defenzívny lockdown na udržanie tesného vedenia.
+            💡 Tactics and formation for the final push: 6v5 with the goalie pulled to tie the score, or a 5v5 defensive lockdown to protect a narrow lead.
           </p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 6v5 Offensive */}
@@ -1184,7 +1184,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
                   <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800">
                     6 na 5 Extra Attacker
                   </span>
-                  <h3 className="text-sm font-bold text-white mt-1">Offensive — Odvolaný brankár</h3>
+                  <h3 className="text-sm font-bold text-white mt-1">Offensive — Goalie pulled</h3>
                 </div>
                 <span className="text-xs text-slate-400 font-semibold">Vabank hra</span>
               </div>
@@ -1202,7 +1202,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
                 <div>
                   <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                    <span>Útočníci (4)</span>
+                    <span>Forwards (4)</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Slot label="Center" value={data.situations.lastMin.off[0]} onChange={(v) => setLastMin("off", 0, v)} pool={dressedForwards} />
@@ -1230,11 +1230,11 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                 <div>
                   <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                    5 na 5 Defenzívny Lockdown
+                    5 on 5 Defensive Lockdown
                   </span>
-                  <h3 className="text-sm font-bold text-white mt-1">Defensive — Udržanie vedenia</h3>
+                  <h3 className="text-sm font-bold text-white mt-1">Defensive — Protecting the lead</h3>
                 </div>
-                <span className="text-xs text-slate-400 font-semibold">Chránenie bránkoviska</span>
+                <span className="text-xs text-slate-400 font-semibold">Protecting the crease</span>
               </div>
 
               <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2 overflow-hidden">
@@ -1250,7 +1250,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
                 <div>
                   <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                    <span>Útočníci (3)</span>
+                    <span>Forwards (3)</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <Slot label="Center" value={data.situations.lastMin.def[0]} onChange={(v) => setLastMin("def", 0, v)} pool={dressedForwards} />

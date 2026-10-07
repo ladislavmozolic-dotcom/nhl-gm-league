@@ -45,14 +45,14 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Pokročilá heuristická analýza výmeny a dopadu na zostavu
+                Advanced heuristic analysis of the trade and its impact on the lineup
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors text-lg"
-            title="Zavrieť (Esc)"
+            title="Close (Esc)"
           >
             ×
           </button>
@@ -80,7 +80,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                       {data.tilt === "even" ? "⚖️" : "📊"}
                     </span>
                     <span className="text-xs font-black uppercase tracking-wider text-slate-300">
-                      Verdikt výmeny
+                      Trade verdict
                     </span>
                   </div>
                   {data.archetype && (
@@ -179,7 +179,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                             />
                           </div>
                         )}
-                        <span>{data.fromName} dáva:</span>
+                        <span>{data.fromName} gives:</span>
                       </div>
                       <span className="text-xs font-mono font-bold text-indigo-400 bg-indigo-950/40 border border-indigo-900/50 px-2 py-0.5 rounded-lg">
                         {data.meGives} pts
@@ -189,7 +189,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                     <div className="space-y-1.5">
                       {data.fromItems.length === 0 ? (
                         <div className="text-xs text-slate-600 italic py-2">
-                          — žiadne aktíva —
+                          — no assets —
                         </div>
                       ) : (
                         data.fromItems.map((it, i) => (
@@ -241,7 +241,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                             />
                           </div>
                         )}
-                        <span>{data.toName} dáva:</span>
+                        <span>{data.toName} gives:</span>
                       </div>
                       <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-900/50 px-2 py-0.5 rounded-lg">
                         {data.meGets} pts
@@ -251,7 +251,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                     <div className="space-y-1.5">
                       {data.toItems.length === 0 ? (
                         <div className="text-xs text-slate-600 italic py-2">
-                          — žiadne aktíva —
+                          — no assets —
                         </div>
                       ) : (
                         data.toItems.map((it, i) => (
@@ -295,7 +295,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🎙️</span>
                     <h4 className="text-xs font-black uppercase tracking-wider text-indigo-300">
-                      Pohľad analytika (AI GM Komentár)
+                      Analyst view (AI GM commentary)
                     </h4>
                   </div>
                   <p className="text-sm text-slate-200 leading-relaxed font-sans">
@@ -308,7 +308,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                       <span className="text-amber-400 text-sm mt-0.5">💡</span>
                       <div>
                         <span className="font-bold block text-amber-300 mb-0.5">
-                          Návrh na vyrovnanie hodnoty:
+                          Suggestion to even out the value:
                         </span>
                         <span>{data.gapCloser}</span>
                       </div>
@@ -323,7 +323,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🧩</span>
                     <h4 className="text-xs font-black uppercase tracking-wider text-sky-400">
-                      Zapadnutie do tímu a hierarchia zostavy
+                      Team fit and lineup hierarchy
                     </h4>
                   </div>
                   <ul className="space-y-2">
@@ -348,7 +348,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
                   <div className="flex items-center gap-2">
                     <span className="text-lg">⚡</span>
                     <h4 className="text-xs font-black uppercase tracking-wider text-violet-400">
-                      Strategické faktory a platový dopad
+                      Strategic factors and salary impact
                     </h4>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -372,9 +372,9 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
 
               {/* FOOTER NOTE */}
               <p className="text-[11px] text-slate-500 leading-normal">
-                Heuristická analýza (parametre CK/PA/SC/DF, vek, reálny NHL/AHL
-                vývoj, platový strop, hodnota draftových pickov a prospektov) —
-                slúži ako poradný nástroj pred potvrdením trejdu.
+                Heuristic analysis (CK/PA/SC/DF parameters, age, real NHL/AHL
+                development, salary cap, value of draft picks and prospects) —
+                serves as an advisory tool before confirming a trade.
               </p>
             </>
           )}
@@ -386,7 +386,7 @@ export default function GMAssistModal({ data, onClose }: GMAssistModalProps) {
             onClick={onClose}
             className="px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm transition-all shadow-md hover:shadow-slate-700/20"
           >
-            Zavrieť
+            Close
           </button>
         </div>
       </div>

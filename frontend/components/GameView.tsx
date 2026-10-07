@@ -164,7 +164,7 @@ function Linescore({ title, sub, side, home, field }: { title: string; sub: stri
       <table className="w-full text-sm">
         <thead>
           <tr className="text-slate-500 text-xs border-b border-slate-800/80">
-            <th className="text-left font-medium pb-2 text-slate-400">Tím</th>
+            <th className="text-left font-medium pb-2 text-slate-400">Team</th>
             {heads.map((x) => <th key={x} className="text-center font-medium pb-2 px-3 w-10">{x}</th>)}
             <th className="text-center font-black pb-2 pl-3 w-12 text-slate-200">T</th>
           </tr>
@@ -194,7 +194,7 @@ function GoalieBlock({ side }: { side: Side }) {
               {!g.started && <span className="text-[10px] uppercase text-slate-500 border border-slate-700 rounded px-1">backup</span>}
               {g.fatigued && <span className="text-[10px] uppercase text-amber-500 border border-amber-700/50 rounded px-1">b2b</span>}
               {g.isSteal && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-300 bg-amber-500/20 border border-amber-500/40 rounded px-1.5 py-0.5 shadow-sm" title="Ukradnutý zápas (Steal) — brankárov GSAx prevýšil gólový náskok tímu (bez gólov do prázdnej brány).">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-amber-300 bg-amber-500/20 border border-amber-500/40 rounded px-1.5 py-0.5 shadow-sm" title="Stolen game (Steal) — the goalie's GSAx exceeded the team's goal margin (excluding empty-net goals).">
                   🧤 Steal
                 </span>
               )}
@@ -686,13 +686,13 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
 
   const metricData = (() => {
     switch (metric) {
-      case "goals": return { title: "Góly (Goals)", valA: data.away.goals, valH: data.home.goals, rawA: data.away.goals, rawH: data.home.goals };
+      case "goals": return { title: "Goals", valA: data.away.goals, valH: data.home.goals, rawA: data.away.goals, rawH: data.home.goals };
       case "pp": return { title: "Presilovky (Power Play)", valA: `${ppFor(data.awayTeamId)}/${ppOpp(data.awayTeamId)}`, valH: `${ppFor(data.homeTeamId)}/${ppOpp(data.homeTeamId)}`, rawA: ppFor(data.awayTeamId), rawH: ppFor(data.homeTeamId) };
-      case "hits": return { title: "Bodyčeky (Hits)", valA: teamSum(data.away, "hits"), valH: teamSum(data.home, "hits"), rawA: teamSum(data.away, "hits"), rawH: teamSum(data.home, "hits") };
+      case "hits": return { title: "Hits", valA: teamSum(data.away, "hits"), valH: teamSum(data.home, "hits"), rawA: teamSum(data.away, "hits"), rawH: teamSum(data.home, "hits") };
       case "fo": return { title: "Vhadzovania (Faceoff %)", valA: foPct(data.away), valH: foPct(data.home), rawA: teamSum(data.away, "faceoffWins"), rawH: teamSum(data.home, "faceoffWins") };
-      case "blocks": return { title: "Zblokované strely (Blocks)", valA: teamSum(data.away, "blocks"), valH: teamSum(data.home, "blocks"), rawA: teamSum(data.away, "blocks"), rawH: teamSum(data.home, "blocks") };
-      case "xg": return { title: "Očakávané góly (xG)", valA: (data.away.xg ?? 0).toFixed(2), valH: (data.home.xg ?? 0).toFixed(2), rawA: data.away.xg ?? 0, rawH: data.home.xg ?? 0 };
-      default: return { title: "Strely na bránu (Shots on Goal)", valA: data.away.shots, valH: data.home.shots, rawA: data.away.shots, rawH: data.home.shots };
+      case "blocks": return { title: "Blocked Shots", valA: teamSum(data.away, "blocks"), valH: teamSum(data.home, "blocks"), rawA: teamSum(data.away, "blocks"), rawH: teamSum(data.home, "blocks") };
+      case "xg": return { title: "Expected Goals (xG)", valA: (data.away.xg ?? 0).toFixed(2), valH: (data.home.xg ?? 0).toFixed(2), rawA: data.away.xg ?? 0, rawH: data.home.xg ?? 0 };
+      default: return { title: "Shots on Goal", valA: data.away.shots, valH: data.home.shots, rawA: data.away.shots, rawH: data.home.shots };
     }
   })();
   const mTot = (Number(metricData.rawA) || 0) + (Number(metricData.rawH) || 0);
@@ -709,7 +709,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
         <button
           onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) router.back(); else router.push("/scores"); }}
           className="hover:text-sky-400 transition-colors flex items-center gap-1 font-semibold"
-        >← Späť na Zápasy</button>
+        >← Back to Games</button>
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[11px] font-semibold">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> {finalTag}
         </span>
@@ -776,7 +776,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
         <div className="mt-6 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-center sm:justify-between text-xs text-slate-400 gap-3">
           <div className="flex items-center gap-4 flex-wrap">
             {data.arena && <span>🏟️ {data.arena}</span>}
-            {data.attendance != null && <span>👥 {data.attendance.toLocaleString()} fanúšikov</span>}
+            {data.attendance != null && <span>👥 {data.attendance.toLocaleString()} fans</span>}
           </div>
           {!!data.officials?.length && (
             <div className="text-[11px] text-slate-400 flex items-center gap-3 flex-wrap">
@@ -790,7 +790,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
       <div className="bg-[#0b1120]/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-            <span className="w-2 h-2 rounded bg-sky-400"></span> Kľúčové tímové porovnanie
+            <span className="w-2 h-2 rounded bg-sky-400"></span> Key team comparison
           </div>
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {(["shots", "goals", "pp", "hits", "fo", "blocks", "xg"] as const).map((m) => (
@@ -848,7 +848,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0b1120]/80 border border-slate-800 rounded-2xl p-5 shadow-lg md:divide-x md:divide-slate-800">
             <div className="pr-0 md:pr-4">
-              <Linescore title="GOALS BY PERIOD" sub="GÓLY" side={data} home={data.home} field="goalsByPeriod" />
+              <Linescore title="GOALS BY PERIOD" sub="GOALS" side={data} home={data.home} field="goalsByPeriod" />
             </div>
             <div className="pt-4 md:pt-0 md:pl-6">
               <Linescore title="SHOTS BY PERIOD" sub="STRELY" side={data} home={data.home} field="shotsByPeriod" />
@@ -859,11 +859,11 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
           <div className="bg-[#0b1120]/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="grid grid-cols-2 bg-slate-900/95 text-xs font-black tracking-wider text-slate-300 border-b border-slate-800">
               <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between">
-                <span className="flex items-center gap-2"><span>🚨</span> GOALS (GÓLY)</span>
-                <span className="text-[11px] font-normal text-slate-500 font-mono hidden sm:inline">Priebežný stav & Hráči na ľade</span>
+                <span className="flex items-center gap-2"><span>🚨</span> GOALS</span>
+                <span className="text-[11px] font-normal text-slate-500 font-mono hidden sm:inline">Running score & players on ice</span>
               </div>
               <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-l border-slate-800 text-slate-300">
-                <span className="flex items-center gap-2"><span>⏱️</span> PENALTIES (VYLÚČENIA)</span>
+                <span className="flex items-center gap-2"><span>⏱️</span> PENALTIES</span>
                 <span className="text-[11px] font-normal text-slate-500 font-mono hidden sm:inline">Tresty & Presilovky</span>
               </div>
             </div>
@@ -887,7 +887,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
                   <div className="grid grid-cols-2 divide-x divide-slate-800 text-sm">
                     {/* Goals column */}
                     <div className="p-3 sm:p-5 space-y-3.5">
-                      {goals.length === 0 && <div className="text-slate-600 text-sm italic py-2 pl-2">V tejto tretine nepadol gól</div>}
+                      {goals.length === 0 && <div className="text-slate-600 text-sm italic py-2 pl-2">No goal in this period</div>}
                       {goals.map((g, i) => {
                         const tag = strengthTag(g);
                         const homeScored = g.teamId === data.home.teamId;
@@ -977,7 +977,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
 
                     {/* Penalties column */}
                     <div className="p-3 sm:p-5 bg-slate-950/20 space-y-3.5 text-xs">
-                      {pens.length === 0 && <div className="text-slate-600 text-sm italic py-2 pl-2">Žiadne tresty</div>}
+                      {pens.length === 0 && <div className="text-slate-600 text-sm italic py-2 pl-2">No penalties</div>}
                       {pens.map((x, i) => {
                         const penTeam = x.teamId === data.homeTeamId ? data.home : data.away;
                         const penCode = penTeam.code || penTeam.name;
@@ -1005,7 +1005,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
                                   )}
                                   {x.offsetting && (
                                     <span className="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
-                                      Vzájomný trest
+                                      Coincidental penalty
                                     </span>
                                   )}
                                 </div>
@@ -1087,7 +1087,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
 
           {/* GOALTENDING */}
           <div className="bg-[#0b1120]/80 border border-slate-800 rounded-2xl p-5 shadow-lg">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Brankári (Goaltending)</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Goaltending</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <GoalieBlock side={data.away} />
               <GoalieBlock side={data.home} />
