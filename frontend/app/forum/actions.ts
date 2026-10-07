@@ -101,11 +101,11 @@ export async function toggleReaction(postId: number, emoji: string) {
 /** Toggle pin status of a thread — admin or comish only. */
 export async function togglePinThread(threadId: number) {
   const me = await getTeamSession();
-  if (!me) return { ok: false as const, error: "Prihlás sa ako administrátor." };
-  if (!(await isAdmin())) return { ok: false as const, error: "Pripínať vlákna môže len komisár alebo administrátor." };
+  if (!me) return { ok: false as const, error: "Sign in as an administrator." };
+  if (!(await isAdmin())) return { ok: false as const, error: "Only the commissioner or an administrator can pin threads." };
 
   const thread = await prisma.forumThread.findUnique({ where: { id: threadId }, select: { pinned: true, category: true } });
-  if (!thread) return { ok: false as const, error: "Vlákno sa nenašlo." };
+  if (!thread) return { ok: false as const, error: "Thread not found." };
 
   await prisma.forumThread.update({
     where: { id: threadId },

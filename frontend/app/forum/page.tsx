@@ -8,13 +8,13 @@ export const dynamic = "force-dynamic";
 
 const ago = (d: Date) => {
   const s = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (s < 60) return "práve teraz";
-  if (s < 3600) return `pred ${Math.floor(s / 60)}m`;
-  if (s < 86400) return `pred ${Math.floor(s / 3600)}h`;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   const days = Math.floor(s / 86400);
-  if (days === 1) return "včera";
-  if (days < 30) return `pred ${days}d`;
-  return d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days}d ago`;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 };
 
 export default async function ForumPage() {
@@ -87,7 +87,7 @@ export default async function ForumPage() {
   const totalPosts = cats.reduce((n, c) => n + c.posts, 0);
   const totalUnread = cats.reduce((n, c) => n + c.unreadCount, 0);
 
-  const nowFormatted = new Date().toLocaleString("sk-SK", {
+  const nowFormatted = new Date().toLocaleString("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -104,16 +104,16 @@ export default async function ForumPage() {
             <div className="flex items-center gap-2.5">
               <span className="text-2xl">🏛️</span>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                UNHL Diskusné Fórum
+                UNHL Discussion Forum
               </h1>
               {totalUnread > 0 && (
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-rose-500 text-white shadow-md shadow-rose-900/50 animate-pulse">
-                  {totalUnread} {totalUnread === 1 ? "nová správa" : "nových správ"}
+                  {totalUnread} {totalUnread === 1 ? "new message" : "new messages"}
                 </span>
               )}
             </div>
             <p className="text-xs sm:text-sm text-slate-400">
-              Hlavný rozcestník ligových diskusií, vyjednávaní a oficiálnych oznamov.
+              The main hub for league discussions, negotiations and official announcements.
             </p>
           </div>
 
@@ -123,7 +123,7 @@ export default async function ForumPage() {
                 {totalTopics}
               </div>
               <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-1 font-semibold">
-                Tém
+                Threads
               </div>
             </div>
             <div className="rounded-xl bg-slate-800/60 border border-slate-700/60 px-4 py-2 text-center min-w-[80px]">
@@ -131,7 +131,7 @@ export default async function ForumPage() {
                 {totalPosts}
               </div>
               <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-1 font-semibold">
-                Príspevkov
+                Posts
               </div>
             </div>
           </div>
@@ -140,14 +140,14 @@ export default async function ForumPage() {
         <div className="mt-4 pt-3 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-500 flex-wrap gap-2">
           <div className="flex items-center gap-1.5">
             <span>🕒</span>
-            <span>Aktuálny čas na serveri:</span>
+            <span>Current server time:</span>
             <span className="text-slate-400 font-medium">{nowFormatted}</span>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
             {latestPostOverall && (
               <div className="flex items-center gap-1.5 truncate">
-                <span>Posledný príspevok v lige:</span>
+                <span>Latest post in the league:</span>
                 <Link
                   href={`/forum/${latestPostOverall.thread.id}`}
                   className="text-blue-400 hover:underline font-medium truncate max-w-[200px]"
@@ -168,7 +168,7 @@ export default async function ForumPage() {
         <div className="bg-slate-800/60 px-5 py-3 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm font-black uppercase tracking-wider text-slate-200">
-              🏒 Ligové sekcie a podfóra
+              🏒 League sections and sub-forums
             </span>
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
@@ -178,9 +178,9 @@ export default async function ForumPage() {
 
         {/* Table Column Headers */}
         <div className="hidden sm:flex items-center justify-between px-5 py-2.5 bg-slate-950/70 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-          <div className="flex-1">Podfórum / Popis</div>
-          <div className="w-32 text-center">Štatistika</div>
-          <div className="w-72 pl-5">Posledný príspevok</div>
+          <div className="flex-1">Sub-forum / Description</div>
+          <div className="w-32 text-center">Stats</div>
+          <div className="w-72 pl-5">Latest post</div>
         </div>
 
         {/* Category Rows */}
@@ -218,7 +218,7 @@ export default async function ForumPage() {
                     </Link>
                     {hasNew && (
                       <span
-                        title={`${unreadCount} nových príspevkov`}
+                        title={`${unreadCount} new posts`}
                         className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-slate-950 ring-1 ring-rose-400 shadow animate-pulse"
                       />
                     )}
@@ -237,14 +237,14 @@ export default async function ForumPage() {
 
                       {hasNew && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500 text-white shadow-sm flex items-center gap-1 animate-pulse">
-                          <span>NOVÉ</span>
+                          <span>NEW</span>
                           <span>({unreadCount})</span>
                         </span>
                       )}
 
                       {m.adminOnly && (
                         <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 rounded px-1.5 py-0.5">
-                          len komisár
+                          commissioner only
                         </span>
                       )}
                     </div>
@@ -261,7 +261,7 @@ export default async function ForumPage() {
                       {topics}
                     </div>
                     <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-1 font-semibold">
-                      Tém
+                      Threads
                     </div>
                   </div>
                   <div className="text-center">
@@ -269,7 +269,7 @@ export default async function ForumPage() {
                       {posts}
                     </div>
                     <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-1 font-semibold">
-                      Správ
+                      Messages
                     </div>
                   </div>
                 </div>
@@ -301,7 +301,7 @@ export default async function ForumPage() {
                           </Link>
                           {isLastPostNew && (
                             <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40">
-                              NOVÝ
+                              NEW
                             </span>
                           )}
                         </div>
@@ -316,14 +316,14 @@ export default async function ForumPage() {
                       <Link
                         href={`/forum/${last.thread.id}`}
                         className="text-slate-600 group-hover:text-blue-400 transition-colors text-base px-1"
-                        title="Zobraziť tému"
+                        title="View thread"
                       >
                         →
                       </Link>
                     </div>
                   ) : (
                     <div className="text-xs text-slate-600 italic">
-                      Zatiaľ žiadne príspevky.
+                      No posts yet.
                     </div>
                   )}
                 </div>
@@ -340,7 +340,7 @@ export default async function ForumPage() {
           <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
               <span>📊</span>
-              <span>Štatistiky fóra</span>
+              <span>Forum stats</span>
             </h2>
             <span className="text-[11px] text-slate-500">
               Celkovo {totalTeams} klubov v lige
@@ -351,13 +351,13 @@ export default async function ForumPage() {
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <div className="text-xl font-black text-white tabular-nums">{totalPosts}</div>
               <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
-                Príspevkov
+                Posts
               </div>
             </div>
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
               <div className="text-xl font-black text-white tabular-nums">{totalTopics}</div>
               <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
-                Vlákien
+                Threads
               </div>
             </div>
             <div className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
@@ -365,7 +365,7 @@ export default async function ForumPage() {
                 {activeTeams.length}
               </div>
               <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">
-                Aktívnych GM
+                Active GMs
               </div>
             </div>
           </div>
@@ -374,7 +374,7 @@ export default async function ForumPage() {
           <div className="pt-2 text-xs text-slate-400 space-y-1.5">
             <div className="font-semibold text-slate-300 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
               <span>🟢</span>
-              <span>Nedávno aktívni GM:</span>
+              <span>Recently active GMs:</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {activeTeams.map((t) => {
@@ -405,30 +405,30 @@ export default async function ForumPage() {
           <div className="pb-2.5 border-b border-slate-800">
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
               <span>ℹ️</span>
-              <span>Legenda fóra</span>
+              <span>Forum legend</span>
             </h2>
           </div>
 
           <div className="space-y-2 text-xs text-slate-400 pt-1">
             <div className="flex items-center gap-2.5">
               <span className="w-6 text-center text-sm">🔴</span>
-              <span className="text-rose-300 font-semibold">Nové neprečítané príspevky</span>
+              <span className="text-rose-300 font-semibold">New unread posts</span>
             </div>
             <div className="flex items-center gap-2.5">
               <span className="w-6 text-center text-sm">💬</span>
-              <span>Všetky príspevky prečítané</span>
+              <span>All posts read</span>
             </div>
             <div className="flex items-center gap-2.5">
               <span className="w-6 text-center text-sm">📌</span>
-              <span>Pripnuté oznámenie / pravidlá</span>
+              <span>Pinned announcement / rules</span>
             </div>
             <div className="flex items-center gap-2.5">
               <span className="w-6 text-center text-sm">🔥</span>
-              <span>Horúca téma (&gt; 10 odpovedí)</span>
+              <span>Hot topic (&gt; 10 replies)</span>
             </div>
             <div className="flex items-center gap-2.5">
               <span className="w-6 text-center text-sm">👑</span>
-              <span className="text-amber-300">Vedenie ligy / Komisár</span>
+              <span className="text-amber-300">League management / Commissioner</span>
             </div>
           </div>
         </div>

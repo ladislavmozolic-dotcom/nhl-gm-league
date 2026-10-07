@@ -26,11 +26,11 @@ const formatPostDate = (d: Date) => {
     d.getMonth() === yesterday.getMonth() &&
     d.getFullYear() === yesterday.getFullYear();
 
-  const timeStr = d.toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" });
+  const timeStr = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
-  if (isToday) return `Dnes o ${timeStr}`;
-  if (isYesterday) return `Včera o ${timeStr}`;
-  return d.toLocaleString("sk-SK", {
+  if (isToday) return `Today at ${timeStr}`;
+  if (isYesterday) return `Yesterday at ${timeStr}`;
+  return d.toLocaleString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -103,21 +103,21 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
 
     // Role badge determination
     let roleBadge = {
-      label: "Generálny Manažér",
+      label: "General Manager",
       bg: "bg-slate-800/80",
       text: "text-slate-300",
       border: "border-slate-700/80",
     };
     if (p.team.gmRole === "comish" || p.team.gmRole === "co_comish") {
       roleBadge = {
-        label: "👑 Komisár ligy",
+        label: "👑 League Commissioner",
         bg: "bg-amber-500/15",
         text: "text-amber-300",
         border: "border-amber-500/40",
       };
     } else if (p.team.isAdmin) {
       roleBadge = {
-        label: "🛡️ Administrátor",
+        label: "🛡️ Administrator",
         bg: "bg-purple-500/15",
         text: "text-purple-300",
         border: "border-purple-500/40",
@@ -131,7 +131,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       };
     } else if (p.team.rookieGm) {
       roleBadge = {
-        label: "🌱 Nováčik",
+        label: "🌱 Rookie",
         bg: "bg-sky-500/15",
         text: "text-sky-300",
         border: "border-sky-500/40",
@@ -146,7 +146,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       id: p.id,
       body: p.body,
       when: formatPostDate(p.createdAt),
-      fullDate: p.createdAt.toLocaleString("sk-SK", {
+      fullDate: p.createdAt.toLocaleString("en-GB", {
         day: "numeric",
         month: "long",
         year: "numeric",
@@ -198,7 +198,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
               {thread.pinned && (
                 <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
                   <span>📌</span>
-                  <span>Pripnutá téma</span>
+                  <span>Pinned thread</span>
                 </span>
               )}
             </div>
@@ -206,10 +206,10 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
               {thread.title}
             </h1>
             <div className="text-xs text-slate-400 flex items-center gap-2 flex-wrap">
-              <span>Založené {formatPostDate(thread.createdAt)}</span>
+              <span>Started {formatPostDate(thread.createdAt)}</span>
               <span>•</span>
               <span className="font-semibold text-slate-300 tabular-nums">
-                {posts.length} {posts.length === 1 ? "príspevok" : posts.length < 5 ? "príspevky" : "príspevkov"}
+                {posts.length} {posts.length === 1 ? "post" : "posts"}
               </span>
             </div>
           </div>
@@ -224,7 +224,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
                 className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow shadow-blue-900/40 flex items-center gap-1.5"
               >
                 <span>💬</span>
-                <span>Odpovedať</span>
+                <span>Reply</span>
               </a>
             )}
           </div>
@@ -250,7 +250,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
 
       {me ? (
         <Card
-          title="Rýchla odpoveď (Quick Reply)"
+          title="Quick Reply"
           accent="text-blue-400"
           className="border-slate-800 shadow-xl"
         >
@@ -260,14 +260,14 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
         <Card>
           <div className="text-center py-6 px-4 space-y-2">
             <p className="text-slate-300 text-sm font-medium">
-              Pre pridanie odpovede do tejto diskusie sa musíš prihlásiť ako GM.
+              You must sign in as a GM to reply to this discussion.
             </p>
             <div>
               <Link
                 href="/login"
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors"
               >
-                Prihlásiť sa do ligy →
+                Sign in to the league →
               </Link>
             </div>
           </div>

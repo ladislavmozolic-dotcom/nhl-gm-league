@@ -12,13 +12,13 @@ export const dynamic = "force-dynamic";
 
 const ago = (d: Date) => {
   const s = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (s < 60) return "práve teraz";
-  if (s < 3600) return `pred ${Math.floor(s / 60)}m`;
-  if (s < 86400) return `pred ${Math.floor(s / 3600)}h`;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   const days = Math.floor(s / 86400);
-  if (days === 1) return "včera";
-  if (days < 30) return `pred ${days}d`;
-  return d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days}d ago`;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 };
 
 export default async function CategoryPage({
@@ -114,28 +114,28 @@ export default async function CategoryPage({
           <div className="relative shrink-0 mt-0.5 sm:mt-0">
             {t.pinned ? (
               <div
-                title="Pripnutá téma"
+                title="Pinned thread"
                 className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 grid place-items-center text-sm shadow-sm"
               >
                 📌
               </div>
             ) : isUnread ? (
               <div
-                title="Nový neprečítaný príspevok"
+                title="New unread post"
                 className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-300 grid place-items-center text-sm shadow-[0_0_12px_-2px_rgba(244,63,94,0.4)] ring-1 ring-rose-500/40"
               >
                 💬
               </div>
             ) : isHot ? (
               <div
-                title="Horúca téma (> 10 odpovedí)"
+                title="Hot topic (> 10 replies)"
                 className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 grid place-items-center text-sm shadow-sm"
               >
                 🔥
               </div>
             ) : (
               <div
-                title="Diskusná téma"
+                title="Discussion thread"
                 className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700/60 text-slate-400 grid place-items-center text-sm shadow-sm"
               >
                 💬
@@ -143,7 +143,7 @@ export default async function CategoryPage({
             )}
             {isUnread && (
               <span
-                title="Nové príspevky"
+                title="New posts"
                 className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rose-500 border-2 border-slate-950 animate-pulse"
               />
             )}
@@ -153,12 +153,12 @@ export default async function CategoryPage({
             <div className="flex items-center gap-2 flex-wrap">
               {t.pinned && (
                 <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
-                  Pripnuté
+                  Pinned
                 </span>
               )}
               {isUnread && (
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500 text-white shadow-sm shrink-0 flex items-center gap-1 animate-pulse">
-                  <span>NOVÉ</span>
+                  <span>NEW</span>
                 </span>
               )}
               <Link
@@ -173,7 +173,7 @@ export default async function CategoryPage({
               </Link>
             </div>
             <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-              <span>Založil</span>
+              <span>Started by</span>
               <span className="font-medium text-slate-400">
                 {t.team.gmNickname || t.team.code || t.team.name}
               </span>
@@ -190,7 +190,7 @@ export default async function CategoryPage({
               {repliesCount}
             </div>
             <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-0.5">
-              Odpovedí
+              Replies
             </div>
           </div>
           <div className="text-center">
@@ -198,7 +198,7 @@ export default async function CategoryPage({
               {t._count.posts}
             </div>
             <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-0.5">
-              Príspevkov
+              Posts
             </div>
           </div>
         </div>
@@ -225,7 +225,7 @@ export default async function CategoryPage({
                   </span>
                   {isUnread && (
                     <span className="text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                      NOVÝ
+                      NEW
                     </span>
                   )}
                 </div>
@@ -236,13 +236,13 @@ export default async function CategoryPage({
               <Link
                 href={`/forum/${t.id}#post-${lastPost.team.code}`}
                 className="text-slate-500 group-hover:text-blue-400 transition-colors text-sm px-1"
-                title="Prejsť na tému"
+                title="Go to thread"
               >
                 →
               </Link>
             </div>
           ) : (
-            <div className="text-xs text-slate-600 italic">Žiadne odpovede</div>
+            <div className="text-xs text-slate-600 italic">No replies</div>
           )}
         </div>
       </div>
@@ -278,7 +278,7 @@ export default async function CategoryPage({
                 </h1>
                 {m.adminOnly && (
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 rounded px-2 py-0.5">
-                    len komisár
+                    commissioner only
                   </span>
                 )}
               </div>
@@ -292,7 +292,7 @@ export default async function CategoryPage({
                 {threads.length}
               </span>
               <span className="block text-[10px] uppercase tracking-wider text-slate-400">
-                Tém
+                Threads
               </span>
             </div>
           </div>
@@ -302,14 +302,14 @@ export default async function CategoryPage({
       {error === "admin" && (
         <Card>
           <p className="text-center text-amber-400 text-sm py-2">
-            Do tohto podfóra môže témy zakladať len komisár ligy.
+            Only the league commissioner can start threads in this sub-forum.
           </p>
         </Card>
       )}
       {error === "empty" && (
         <Card>
           <p className="text-center text-rose-400 text-sm py-2">
-            Téma musí mať vyplnený názov aj text.
+            The thread must have both a title and text.
           </p>
         </Card>
       )}
@@ -320,7 +320,7 @@ export default async function CategoryPage({
       {me != null && m.adminOnly && !admin && (
         <Card>
           <p className="text-center text-slate-400 text-xs py-2">
-            ℹ️ Do Comish Corner môže nové témy zakladať len vedenie ligy. Zapájať sa do diskusie a odpovedať však môže každý GM.
+            ℹ️ Only league management can start new threads in Comish Corner. Every GM can still join the discussion and reply.
           </p>
         </Card>
       )}
@@ -332,7 +332,7 @@ export default async function CategoryPage({
             <div className="flex items-center gap-2">
               <span className="text-amber-400 font-bold">📌</span>
               <span className="text-xs font-black uppercase tracking-wider text-amber-300">
-                Pripnuté témy a oznámenia
+                Pinned threads and announcements
               </span>
             </div>
             <span className="text-xs font-semibold text-amber-400/80 tabular-nums">
@@ -342,9 +342,9 @@ export default async function CategoryPage({
 
           {/* Table Header */}
           <div className="hidden sm:flex items-center justify-between px-4 py-2 bg-slate-950/60 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            <div className="flex-1">Téma / Autor</div>
-            <div className="w-36 text-center">Štatistika</div>
-            <div className="w-64 pl-4">Posledný príspevok</div>
+            <div className="flex-1">Thread / Author</div>
+            <div className="w-36 text-center">Stats</div>
+            <div className="w-64 pl-4">Latest post</div>
           </div>
 
           <div className="divide-y divide-slate-800/60">
@@ -359,7 +359,7 @@ export default async function CategoryPage({
           <div className="flex items-center gap-2">
             <span className="text-blue-400 font-bold">💬</span>
             <span className="text-xs font-black uppercase tracking-wider text-slate-300">
-              Diskusné témy
+              Discussion threads
             </span>
           </div>
           <span className="text-xs font-semibold text-slate-400 tabular-nums">
@@ -369,22 +369,22 @@ export default async function CategoryPage({
 
         {/* Table Header */}
         <div className="hidden sm:flex items-center justify-between px-4 py-2 bg-slate-950/60 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-          <div className="flex-1">Téma / Autor</div>
-          <div className="w-36 text-center">Štatistika</div>
-          <div className="w-64 pl-4">Posledný príspevok</div>
+          <div className="flex-1">Thread / Author</div>
+          <div className="w-36 text-center">Stats</div>
+          <div className="w-64 pl-4">Latest post</div>
         </div>
 
         {normalThreads.length === 0 && pinnedThreads.length === 0 ? (
           <div className="text-center py-14 px-4 space-y-2">
             <div className="text-3xl">📭</div>
-            <div className="text-slate-200 font-bold text-base">Zatiaľ žiadne témy</div>
+            <div className="text-slate-200 font-bold text-base">No threads yet</div>
             <p className="text-slate-400 text-xs max-w-sm mx-auto">
-              V tomto podfóre zatiaľ nikto nezaložil diskusiu. {canPost ? "Použi tlačidlo vyššie a buď prvý!" : ""}
+              Nobody has started a discussion in this sub-forum yet. {canPost ? "Use the button above and be the first!" : ""}
             </p>
           </div>
         ) : normalThreads.length === 0 ? (
           <div className="text-center py-8 text-slate-500 text-xs italic">
-            Všetky témy v tejto kategórii sú pripnuté vyššie.
+            All threads in this category are pinned above.
           </div>
         ) : (
           <div className="divide-y divide-slate-800/60">

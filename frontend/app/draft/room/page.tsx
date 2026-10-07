@@ -115,7 +115,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
       {/* round switcher */}
       <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-3 shadow-xl">
         <div className="flex items-center justify-between gap-3 mb-2.5">
-          <span className="text-xs font-extrabold uppercase tracking-widest text-slate-400">Výber kola:</span>
+          <span className="text-xs font-extrabold uppercase tracking-widest text-slate-400">Select round:</span>
           <div className="flex items-center gap-2 text-xs">
             <Link href="/around-the-world/draft" className="px-2.5 py-1 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 font-bold hover:bg-amber-500/20 transition-colors">
               🌍 Draft Board
@@ -137,7 +137,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                 : "bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
             }`}
           >
-            Kompletný Draft (Full)
+            Full Draft
           </Link>
           {allRounds.map((r) => {
             const slots = order.filter((p) => p.round === r && !p.deferred);
@@ -167,14 +167,14 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
 
       {round1Opens && Date.now() < round1Opens.getTime() && (
         <div className="rounded-xl border border-blue-700/40 bg-blue-950/20 px-4 py-3 text-sm text-slate-300">
-          🗓️ Draft sa začína <b>{round1Opens.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "long", timeStyle: "short" })}</b> — 1. kolo sa otvorí automaticky.
+          🗓️ Draft sa začína <b>{round1Opens.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "long", timeStyle: "short" })}</b> — 1. kolo sa otvorí automaticky.
         </div>
       )}
       {admin && <BonusPickManager teams={bonusTeams} bonus={bonusRows} />}
 
       {fullView ? (
         <div>
-          <div className="text-sm text-slate-400 mb-2">Full Draft — <span className="text-slate-200 font-bold">{allPicks.length}</span> výberov · aktualizované naživo</div>
+          <div className="text-sm text-slate-400 mb-2">Full Draft — <span className="text-slate-200 font-bold">{allPicks.length}</span> picks · updated live</div>
           {state.status === "LIVE" && (
             <Link
               href={`/draft/room?round=${state.liveRound}`}
@@ -184,16 +184,16 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
                 <span className="font-bold text-white">Prebieha {state.liveRound}. Kolo</span>
                 {onClockTeam && (
-                  <span className="text-slate-300 text-xs">— Na rade: <strong className="text-amber-400">{onClockTeam.name}</strong> (voľba #{state.currentPick})</span>
+                  <span className="text-slate-300 text-xs">— On the clock: <strong className="text-amber-400">{onClockTeam.name}</strong> (pick #{state.currentPick})</span>
                 )}
               </div>
               <span className="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">
-                Otvoriť {state.liveRound}. Kolo →
+                Open Round {state.liveRound} →
               </span>
             </Link>
           )}
           {allPicks.length === 0 ? (
-            <p className="text-sm text-slate-500 mb-3">Zatiaľ neboli uskutočnené žiadne výbery.</p>
+            <p className="text-sm text-slate-500 mb-3">No picks have been made yet.</p>
           ) : (
             <div className="space-y-1">
               {allPicks.map((p) => {
@@ -254,18 +254,18 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                         NA RADE · ON THE CLOCK
                       </span>
-                      <span className="text-xs text-slate-400 font-mono">{round}. KOLO · VOĽBA #{state.currentPick}</span>
+                      <span className="text-xs text-slate-400 font-mono">ROUND {round} · PICK #{state.currentPick}</span>
                     </div>
                     <div className="text-xl sm:text-2xl font-black text-white flex items-center gap-2 mt-1">
                       <span>{onClockTeam.name}</span>
                       {currentSlot.pickerTeamId !== currentSlot.originalTeamId && teamOf.get(currentSlot.originalTeamId)?.logoUrl && (
                         <span className="flex items-center text-slate-400 text-xs font-normal">
-                          (pôvodne <img src={teamOf.get(currentSlot.originalTeamId)!.logoUrl!} alt="" className="object-contain inline mx-1" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />)
+                          (originally <img src={teamOf.get(currentSlot.originalTeamId)!.logoUrl!} alt="" className="object-contain inline mx-1" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />)
                         </span>
                       )}
                     </div>
                     <span className="text-xs text-amber-300/80 font-medium mt-0.5 block">
-                      {canPick ? "Váš výber — zvoľte hráča nižšie v zozname" : "Čaká sa na výber tímu…"}
+                      {canPick ? "Your pick — choose a player from the list below" : "Waiting for the team to pick…"}
                     </span>
                   </div>
                 </div>
@@ -273,7 +273,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                 <div className="flex items-center gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl px-5 py-3 shadow-inner">
                   {pickDeadline && (
                     <div className="text-right">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Zostávajúci čas</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Time remaining</span>
                       <div className="text-xl sm:text-2xl font-black font-mono text-amber-400 flex items-center gap-1.5 mt-0.5">
                         <DraftPickTimer deadline={pickDeadline} />
                       </div>
@@ -307,43 +307,43 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                       }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${roundComplete ? "bg-emerald-400" : state.status === "LIVE" ? "bg-amber-400 animate-ping" : "bg-sky-400"}`} />
                         {roundComplete
-                          ? `${round}. KOLO DOKONČENÉ`
+                          ? `ROUND ${round} COMPLETE`
                           : state.status === "LIVE"
-                          ? `DRAFT PREBIEHA V ${state.liveRound}. KOLE`
-                          : `PRIPRAVENÉ · ${round}. KOLO`}
+                          ? `DRAFT LIVE IN ROUND ${state.liveRound}`
+                          : `READY · ROUND ${round}`}
                       </span>
                       <span className="text-xs text-slate-400 font-mono">
-                        {roundComplete ? `${roundPicks.length}/${roundSlots.length} VÝBEROV HOTOVÝCH` : `PRVÁ VOĽBA KOLA: #${firstSlotOfRound?.overallPick ?? roundLo}`}
+                        {roundComplete ? `${roundPicks.length}/${roundSlots.length} PICKS DONE` : `FIRST PICK OF THE ROUND: #${firstSlotOfRound?.overallPick ?? roundLo}`}
                       </span>
                     </div>
                     <div className="text-xl sm:text-2xl font-black text-white flex items-center gap-2 mt-1">
                       <span>{stageTeam ? stageTeam.name : `${DRAFT_YEAR} NHL Entry Draft`}</span>
                       {firstSlotOfRound && firstSlotOfRound.pickerTeamId !== firstSlotOfRound.originalTeamId && teamOf.get(firstSlotOfRound.originalTeamId)?.logoUrl && (
                         <span className="flex items-center text-slate-400 text-xs font-normal">
-                          (pôvodne <img src={teamOf.get(firstSlotOfRound.originalTeamId)!.logoUrl!} alt="" className="object-contain inline mx-1" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />)
+                          (originally <img src={teamOf.get(firstSlotOfRound.originalTeamId)!.logoUrl!} alt="" className="object-contain inline mx-1" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />)
                         </span>
                       )}
                     </div>
                     <span className="text-xs text-slate-400 font-medium mt-0.5 block">
                       {roundComplete
-                        ? `Všetky výbery v ${round}. kole boli úspešne odovzdané.`
+                        ? `All picks in round ${round} have been submitted.`
                         : state.status === "LIVE"
-                        ? `Prebieha výber #${state.currentPick}. Môžete prepnúť na živé ${state.liveRound}. kolo.`
+                        ? `Pick #${state.currentPick} is in progress. You can switch to the live round ${state.liveRound}.`
                         : round1Opens && Date.now() < round1Opens.getTime()
-                        ? `Začiatok kola: ${round1Opens.toLocaleString("sk-SK", { timeZone: "Europe/Bratislava", dateStyle: "long", timeStyle: "short" })}`
-                        : "Kolo zatiaľ nie je otvorené. Administrátor otvorí kolo alebo sa spustí podľa harmonogramu."}
+                        ? `Round starts: ${round1Opens.toLocaleString("en-GB", { timeZone: "Europe/Bratislava", dateStyle: "long", timeStyle: "short" })}`
+                        : "The round is not open yet. An administrator will open it, or it will start on schedule."}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3 shadow-inner">
                   <div className="text-left md:text-right">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Dostupných v triede</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Available in class</span>
                     <span className="text-base font-black text-slate-200">{availableRaw.length} talentov</span>
                   </div>
                   <div className="w-px h-8 bg-slate-800 hidden sm:block" />
                   <div className="text-left md:text-right">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Výbery v kole</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Picks in round</span>
                     <span className="text-base font-black text-slate-200">{roundPicks.length} / {roundSlots.length}</span>
                   </div>
                   {state.status === "LIVE" && (
@@ -351,7 +351,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                       href={`/draft/room?round=${state.liveRound}`}
                       className="ml-2 px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs hover:bg-amber-400 transition-colors shadow-md shadow-amber-500/20 shrink-0"
                     >
-                      Prejsť na LIVE ⚡
+                      Go to LIVE ⚡
                     </Link>
                   )}
                 </div>
@@ -364,7 +364,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
           <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_340px]">
             {/* draft order for this round */}
             <div className="rounded-2xl border border-slate-800 bg-[#0b1120] flex flex-col max-h-[580px] shadow-xl">
-              <div className="px-3.5 py-3 border-b border-slate-800 text-xs font-black uppercase tracking-wider text-slate-300">Poradie výberov · {round}. Kolo</div>
+              <div className="px-3.5 py-3 border-b border-slate-800 text-xs font-black uppercase tracking-wider text-slate-300">Pick order · Round {round}</div>
               <div className="overflow-y-auto p-2 space-y-1 custom-scroll">
                 {roundOrder.map((p) => {
                   const picker = teamOf.get(p.pickerTeamId);
@@ -420,9 +420,9 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                     <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2.5">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                        <span className="text-xs font-black uppercase tracking-wider text-slate-200">Vybraní hráči v {round}. kole</span>
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-200">Players picked in round {round}</span>
                       </div>
-                      <span className="text-xs font-mono text-emerald-400 font-bold">{roundPicks.length} výberov</span>
+                      <span className="text-xs font-mono text-emerald-400 font-bold">{roundPicks.length} picks</span>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 max-h-[500px] overflow-y-auto custom-scroll pr-1">
                       {roundPicks.map((p) => {
@@ -455,7 +455,7 @@ export default async function DraftRoomPage({ searchParams }: { searchParams: Pr
                     <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-xs font-bold text-slate-300 hover:text-white transition-colors">
                       <span className="flex items-center gap-2">
                         <span className="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
-                        Dostupné talenty na drafte ({board.length} hráčov)
+                        Available draft talent ({board.length} players)
                       </span>
                       <span className="text-[10px] text-slate-500">Kliknite pre zobrazenie</span>
                     </summary>
