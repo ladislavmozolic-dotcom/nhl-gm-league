@@ -32,9 +32,7 @@ export default function ClauseStar({ player }: { player: { tradeClause?: unknown
       <span role="button" tabIndex={0} onClick={show} onKeyDown={(e) => e.key === "Enter" && show(e as unknown as React.MouseEvent)}
         className="ml-1 text-amber-400 cursor-pointer hover:text-amber-300" title="Click for clause details" aria-label="Trade clause details">★</span>
       {open && (
-        <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-          <ClauseModal clause={clause} pending={!cur} effectiveFrom={from} teams={protectedTeams} playerName={cleanName(player.name ?? "")} onClose={() => setOpen(false)} />
-        </span>
+        <ClauseModal clause={clause} pending={!cur} effectiveFrom={from} teams={protectedTeams} playerName={cleanName(player.name ?? "")} onClose={() => setOpen(false)} />
       )}
     </>
   );

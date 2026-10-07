@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 
 export type ClauseTeam = { id: number; code: string | null; name: string; slug: string; logoUrl: string | null };
 
@@ -21,8 +22,9 @@ export function ClauseModal({ clause, pending, effectiveFrom, teams, playerName,
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 text-left whitespace-normal" onClick={() => onClose()}>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 text-left whitespace-normal" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }}>
       <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-800/80 to-slate-900 flex items-start justify-between gap-3">
           <div>
@@ -60,7 +62,8 @@ export function ClauseModal({ clause, pending, effectiveFrom, teams, playerName,
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
