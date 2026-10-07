@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { computeStandings } from "@/lib/sim/standings";
 import { skaterTotals } from "@/lib/stats-server";
 import { cleanName, displayName } from "@/lib/playerName";
-import { money } from "@/lib/finance";
 import NextSimCountdown from "@/components/home/NextSimCountdown";
 import { getLeagueClock, defaultStatsPhase } from "@/lib/calendar-server";
 import { fmtLeagueDate, daysBetween } from "@/lib/calendar";
@@ -13,7 +12,7 @@ import { PRE_SEASON } from "@/lib/phase";
 import { getTeamSession } from "@/lib/auth";
 import { activeAnnouncements } from "@/lib/announcements";
 import CommissionerBanner, { type BannerItem } from "@/components/CommissionerBanner";
-import { dailyDigest, latestDigestRound } from "@/lib/digest-server";
+import { dailyDigest } from "@/lib/digest-server";
 import { gmDashboard } from "@/lib/gm-dashboard-server";
 import SeasonDashboard from "@/components/SeasonDashboard";
 import TradeDeadlineBanner from "@/components/TradeDeadlineBanner";
@@ -46,24 +45,11 @@ function Card({ title, children, href, accent, viewLabel = "view →" }: { title
   );
 }
 
-function Stat({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
-  return (
-    <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/20">
-      <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">{label}</p>
-      <p className={`text-2xl font-black ${color ?? "text-slate-100"} leading-none`}>{value}</p>
-      {sub && <p className="text-sm text-slate-400 mt-1">{sub}</p>}
-    </div>
-  );
-}
-
 export default async function HomePage() {
-  // Pre-season fully takes over the scoreboard/standings/leaders sections of the
-  // home page for the duration of that phase — SEASON itself stays the regular-
-  // season string for systems not (yet) pre-season-aware (digest, finance).
   const statsPhase = await defaultStatsPhase();
   const isPreseason = statsPhase === "pre";
   const activeSeason = isPreseason ? PRE_SEASON : SEASON;
-  // free-agent filter mirrors /free-agents: skaters, and realOnly hidden in ProfiNHL mode
+
   const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 } });
   const faWhere = { rosterType: { notIn: ["NHL", "AHL", "RETIRED", "PROSPECT", "RELEASED", "NONROSTER"] }, isGoalie: false, ...(cfg?.rosterMode === "real" ? {} : { realOnly: false }) };
   const [standings, leaders, faCount, faTop, articlesRaw, teams] = await Promise.all([
@@ -75,53 +61,39 @@ export default async function HomePage() {
     prisma.team.findMany({ select: { id: true, name: true, code: true, logoUrl: true, gm: true, gmNickname: true, gmFirstName: true, gmLastName: true, slug: true } }),
   ]);
   const teamById = new Map(teams.map((t) => [t.id, t]));
-  const teamByCode = new Map(teams.map((t) => [t.code ?? t.name, t]));
-  const teamBySlug = new Map(teams.map((t) => [t.slug, t]));
-  const leader = standings[0];
 
-  // commissioner announcements + this GM's unread state (their "DM" inbox)
+  // commissioner announcements + this GM's unread state
   const [me, announcements] = await Promise.all([getTeamSession(), activeAnnouncements()]);
   const readIds = me != null
     ? new Set((await prisma.announcementRead.findMany({ where: { teamId: me }, select: { announcementId: true } })).map((r) => r.announcementId))
     : new Set<number>();
-  const fmtDate = (d: Date) => `${d.getUTCDate()}.${d.getUTCMonth() + 1}.${d.getUTCFullYear()}`; // deterministic (no locale) → no hydration drift
+  const fmtDate = (d: Date) => `${d.getUTCDate()}.${d.getUTCMonth() + 1}.${d.getUTCFullYear()}`;
   const bannerItems: BannerItem[] = announcements.map((a) => ({
     id: a.id, body: a.body, linkUrl: a.linkUrl, linkLabel: a.linkLabel, date: fmtDate(a.createdAt), unread: me != null && !readIds.has(a.id),
   }));
-  // Tonight's Best — the nightly digest for the "Around the League" box.
+
+  // Tonight's Best digest
   const digest = await dailyDigest(activeSeason);
 
-  // Trade Block — who's available around the league (flat list for the home card)
+  // Trade Block
   const tbBoard = await tradeBlockBoard();
   const tbListed = tbBoard.flatMap((t) => t.players);
 
-  // Waiver Wire — who's currently exposed, so it's on-screen without a click
+  // Waiver Wire
   const waivers = await activeWaivers();
 
-  // League Health & Discipline — active injuries, current suspensions and a
-  // short return-to-play feed live directly below the waiver wire.
-  const [homeInjuries, homeSuspensions, injuryReturns] = await Promise.all([
+  // League Health & Discipline
+  const [homeInjuries, homeSuspensions] = await Promise.all([
     currentInjuries({ league: "NHL" }),
     prisma.suspension.findMany({
       where: { season: SEASON, kind: "SUSPENSION", status: "ACTIVE" },
       orderBy: { createdAt: "desc" }, take: 6,
       select: { id: true, playerId: true, playerName: true, teamId: true, incident: true, games: true, gamesServed: true, createdAt: true },
     }),
-    prisma.transaction.findMany({
-      where: { type: "INJURY_RETURN" }, orderBy: { createdAt: "desc" }, take: 5,
-      select: { id: true, playerId: true, teamId: true, message: true, createdAt: true },
-    }),
   ]);
   const activeHomeSuspensions = homeSuspensions.filter((s) => s.games > s.gamesServed);
-  const healthPlayerIds = [...new Set([...activeHomeSuspensions.map((s) => s.playerId), ...injuryReturns.map((r) => r.playerId).filter((id): id is number => id != null)])];
-  const healthPlayers = new Map((await prisma.player.findMany({ where: { id: { in: healthPlayerIds } }, select: { id: true, name: true, slug: true } })).map((p) => [p.id, p]));
 
-  // Trade Tracker — only COMPLETED deals (the accepted-trade message reads "X traded
-  // … to Y for …"); excludes proposed/declined/revoked noise. Latest 3.
-  // The message is our own fixed template ("<fromTeam.name> traded … to <toTeam.name>
-  // for …"), not user input — Transaction has no team FK, so pull the two logos back
-  // out by matching each team's full name against that known shape rather than
-  // adding a schema column just for this.
+  // Completed trades (Latest 3)
   const recentTradesRaw = await prisma.transaction.findMany({
     where: { type: "TRADE", message: { contains: "traded" } }, orderBy: { createdAt: "desc" }, take: 3,
     select: { id: true, message: true, createdAt: true },
@@ -132,9 +104,6 @@ export default async function HomePage() {
     const toIdx = tr.message.indexOf(" to ");
     const afterTo = toIdx >= 0 ? tr.message.slice(toIdx + 4) : "";
     const toTeam = teams.find((t) => afterTo.startsWith(t.name)) ?? null;
-    // Pull the assets each side gave up out of the fixed template too, so the
-    // team names/logos can sit as their own row and the players/picks read as
-    // a quieter detail line underneath instead of one long run-on sentence.
     let fromAssets: string | null = null, toAssets: string | null = null;
     if (fromTeam && toTeam && toIdx >= 0) {
       let fromClean = displayName(tr.message.slice(fromTeam.name.length, toIdx).replace(/^\s*traded\s*/, "").trim());
@@ -152,7 +121,7 @@ export default async function HomePage() {
     };
   });
 
-  // GM command center — full-screen on first load of a session (for a logged-in GM)
+  // GM dashboard
   const dash = me != null ? await gmDashboard(me).catch(() => null) : null;
 
   const topScorers = [...leaders].sort((a, b) => b.points - a.points).slice(0, 6);
@@ -164,12 +133,12 @@ export default async function HomePage() {
   const east = enrich(standings.filter((s) => s.conference?.toLowerCase().includes("eastern")));
   const west = enrich(standings.filter((s) => s.conference?.toLowerCase().includes("western")));
 
-  // latest simulated day → scoreboard ticker + highlights
+  // latest simulated day -> scoreboard ticker + highlights + 3 stars
   const lastDay = await prisma.game.findFirst({ where: { season: activeSeason, status: "FINAL", seriesId: null, gameDate: { not: null } }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
   let ticker: { id: number; league: string; hg: number | null; ag: number | null; home: any; away: any }[] = [];
   let highlights: string[] = [];
   let stars: { id?: number; slug?: string | null; name: string; photoUrl: string | null; teamCode: string; teamSlug?: string | null; logoUrl: string | null; g: number; a: number; pts: number; gameId: number }[] = [];
-  let dayGoals = 0, dayPoints = 0;
+
   if (lastDay?.gameDate) {
     const d = lastDay.gameDate;
     const start = new Date(d); start.setHours(0, 0, 0, 0);
@@ -185,8 +154,6 @@ export default async function HomePage() {
       where: { game: { gameDate: { gte: start, lte: end }, status: "FINAL", season: activeSeason, league: "NHL" } },
       select: { playerId: true, gameId: true, goals: true, assists: true, points: true },
     });
-    dayGoals = stats.reduce((t, s) => t + s.goals, 0);
-    dayPoints = stats.reduce((t, s) => t + s.points, 0);
     const notable = stats.filter((s) => s.goals >= 3 || s.points >= 4).sort((a, b) => b.points - a.points).slice(0, 8);
     const top3 = [...stats].sort((a, b) => b.points - a.points || b.goals - a.goals).slice(0, 3);
     const need = [...new Set([...notable, ...top3].map((s) => s.playerId))];
@@ -205,11 +172,42 @@ export default async function HomePage() {
     }
   }
 
-  const dateStr = (d: Date) => d.toLocaleDateString("sk-SK", { day: "numeric", month: "short" });
+  // Fallback upcoming games if ticker has no final games
+  const upcomingTicker = ticker.length === 0
+    ? await prisma.game.findMany({
+        where: { season: activeSeason, status: "SCHEDULED", seriesId: null, gameDate: { not: null } },
+        take: 8,
+        orderBy: { gameDate: "asc" },
+        select: { id: true, league: true, gameDate: true, homeTeam: { select: { code: true, logoUrl: true } }, awayTeam: { select: { code: true, logoUrl: true } } },
+      })
+    : [];
 
-  // Next SCHEDULED game's date — the daily 20:30 trigger fires every real day even
-  // on an off day (a no-op), so the "Next Game Sim" card needs the actual next date
-  // with something to play, not just "the next trigger from now".
+  // Populate podium stars (fallback to top scorers if less than 3)
+  const podiumStars = [...stars];
+  if (podiumStars.length < 3 && topScorers.length > 0) {
+    for (const s of topScorers) {
+      if (podiumStars.length >= 3) break;
+      if (!podiumStars.some((p) => p.id === s.playerId)) {
+        const meta = scorerMeta.get(s.playerId);
+        const team = teams.find((t) => t.code === s.teamCode);
+        podiumStars.push({
+          id: s.playerId,
+          slug: meta?.slug ?? null,
+          name: cleanName(s.name),
+          photoUrl: meta?.photoUrl ?? null,
+          teamCode: s.teamCode ?? "",
+          teamSlug: team?.slug ?? null,
+          logoUrl: team?.logoUrl ?? null,
+          g: s.goals,
+          a: s.assists,
+          pts: s.points,
+          gameId: 0,
+        });
+      }
+    }
+  }
+
+  // Next scheduled game
   const nextGame = await prisma.game.findFirst({
     where: { status: "SCHEDULED", seriesId: null, league: "NHL", gameDate: { not: null } },
     orderBy: { gameDate: "asc" },
@@ -268,19 +266,21 @@ export default async function HomePage() {
 
   const deadlineFeed = await deadlineFeedAction().catch(() => null);
 
-  const gon = digest?.gameOfNight;
-  const gonAwayTeam = gon ? (gon.awaySlug ? teamBySlug.get(gon.awaySlug) : (gon.away ? teamByCode.get(gon.away) : null)) : null;
-  const gonHomeTeam = gon ? (gon.homeSlug ? teamBySlug.get(gon.homeSlug) : (gon.home ? teamByCode.get(gon.home) : null)) : null;
-
-  // Enrich digest players with photoUrl & logos
-  const digestPlayerSlugs = [digest?.playerOfNight?.slug, digest?.bestGoalie?.slug].filter((s): s is string => !!s);
-  const digestPlayerMap = digestPlayerSlugs.length
-    ? new Map((await prisma.player.findMany({ where: { slug: { in: digestPlayerSlugs } }, select: { slug: true, photoUrl: true } })).map((p) => [p.slug, p.photoUrl]))
-    : new Map<string, string | null>();
-  const ponPhoto = digest?.playerOfNight?.slug ? digestPlayerMap.get(digest.playerOfNight.slug) ?? null : null;
-  const bgPhoto = digest?.bestGoalie?.slug ? digestPlayerMap.get(digest.bestGoalie.slug) ?? null : null;
-  const ponTeam = digest?.playerOfNight ? (digest.playerOfNight.teamSlug ? teamBySlug.get(digest.playerOfNight.teamSlug) : (digest.playerOfNight.team ? teamByCode.get(digest.playerOfNight.team) : null)) : null;
-  const bgTeam = digest?.bestGoalie ? (digest.bestGoalie.teamSlug ? teamBySlug.get(digest.bestGoalie.teamSlug) : (digest.bestGoalie.team ? teamByCode.get(digest.bestGoalie.team) : null)) : null;
+  // Featured and secondary articles
+  const featuredArticle = articlesRaw.length > 0 ? articlesRaw[0] : null;
+  const secondaryArticles = articlesRaw.length > 1 ? articlesRaw.slice(1, 5) : [];
+  const featuredAuthor = featuredArticle ? teamById.get(featuredArticle.authorTeamId) : null;
+  const featuredAuthorName = featuredAuthor
+    ? (featuredAuthor.gmNickname || [featuredAuthor.gmFirstName, featuredAuthor.gmLastName].filter(Boolean).join(" ").trim() || featuredAuthor.gm || featuredAuthor.name || "GM")
+    : "uNHL Media Central · Connor McDavid (EDM)";
+  const featuredDate = featuredArticle ? fmtDate(featuredArticle.createdAt) : "Dnes · 14. Kolo";
+  let featuredArticlePreview = "";
+  if (featuredArticle) {
+    const safeBodyHtml = sanitizeArticleHtml(featuredArticle.bodyHtml);
+    const cutAt = safeBodyHtml.search(/<hr[^>]*\bclass="[^"]*\barticle-cut\b/i);
+    const rawPreview = cutAt >= 0 ? safeBodyHtml.slice(0, cutAt) : safeBodyHtml;
+    featuredArticlePreview = articlePlainText(rawPreview);
+  }
 
   return (
     <div className="py-2 space-y-6">
@@ -299,8 +299,8 @@ export default async function HomePage() {
 
       {dash && <SeasonDashboard data={dash} />}
 
-      {/* 1. TOP SCORES STRIP (if games were played on latest simulated day) */}
-      {ticker.length > 0 && (
+      {/* 1. TOP SCORES TICKER STRIP */}
+      {ticker.length > 0 ? (
         <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-2.5 shadow-xl flex items-center gap-3 overflow-x-auto custom-scroll">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -336,178 +336,338 @@ export default async function HomePage() {
             ))}
           </div>
         </div>
-      )}
-
-      {/* 2. MEDIA HUB HERO DECK (7 cols: Game of the Night & Tonight's Best / 5 cols: GM Cockpit & 3-Stars Podium) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left 7 cols: Featured Matchup & Tonight's Best Storyline */}
-        <div className="lg:col-span-7 flex flex-col justify-between rounded-3xl border-2 border-indigo-500/40 bg-gradient-to-br from-[#10192e] via-[#0b1120] to-[#070b12] p-5 sm:p-6 shadow-2xl relative overflow-hidden">
-          <div className="absolute -top-20 -left-20 w-64 h-64 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
-
-          {gon ? (
-            <div className="relative z-10 flex flex-col h-full justify-between space-y-4">
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                    ZÁPAS KOLA · GAME OF THE NIGHT
-                  </span>
-                  <span className="text-xs text-slate-400 font-mono">
-                    {lastDay?.gameDate ? dateStr(lastDay.gameDate) : "Posledná simulácia"} · {gon.endedIn !== "REG" ? `FINAL (${gon.endedIn})` : "FINAL"}
-                  </span>
-                </div>
-
-                {/* Matchup Duel */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2 px-3 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-                  {/* Away Team */}
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-2 flex items-center justify-center shadow-xl shrink-0" style={{ width: 56, height: 56, minWidth: 56 }}>
-                      {gonAwayTeam?.logoUrl ? (
-                        <img src={gonAwayTeam.logoUrl} alt="" className="object-contain filter drop-shadow" style={{ width: 40, height: 40, maxWidth: 40, maxHeight: 40 }} />
-                      ) : (
-                        <span className="text-base font-black text-slate-300">{gon.away}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm sm:text-base font-black text-white truncate">{gonAwayTeam?.name ?? gon.away}</div>
-                      <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Hostia · {gon.away}</div>
-                    </div>
-                  </div>
-
-                  {/* Center Score */}
-                  <Link href={`/games/${gon.id}`} className="flex flex-col items-center justify-center px-5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/50 shadow-inner transition-colors group shrink-0">
-                    <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight flex items-center gap-2">
-                      <span className={gon.awayGoals > gon.homeGoals ? "text-amber-400" : "text-slate-200"}>{gon.awayGoals}</span>
-                      <span className="text-slate-600 text-xl">:</span>
-                      <span className={gon.homeGoals > gon.awayGoals ? "text-amber-400" : "text-slate-200"}>{gon.homeGoals}</span>
-                    </div>
-                    <div className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider mt-0.5 group-hover:text-amber-300 transition-colors">
-                      {gon.endedIn !== "REG" ? gon.endedIn : "Konečný stav"} →
-                    </div>
-                  </Link>
-
-                  {/* Home Team */}
-                  <div className="flex items-center gap-3 flex-1 min-w-0 justify-end text-right">
-                    <div className="min-w-0">
-                      <div className="text-sm sm:text-base font-black text-white truncate">{gonHomeTeam?.name ?? gon.home}</div>
-                      <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Domáci · {gon.home}</div>
-                    </div>
-                    <div className="rounded-2xl bg-slate-800/90 border border-slate-700/80 p-2 flex items-center justify-center shadow-xl shrink-0" style={{ width: 56, height: 56, minWidth: 56 }}>
-                      {gonHomeTeam?.logoUrl ? (
-                        <img src={gonHomeTeam.logoUrl} alt="" className="object-contain filter drop-shadow" style={{ width: 40, height: 40, maxWidth: 40, maxHeight: 40 }} />
-                      ) : (
-                        <span className="text-base font-black text-slate-300">{gon.home}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tonight's Best Stories Row (Player of Night, Best Goalie, etc.) */}
-              <div className="pt-2 border-t border-slate-800/80">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
-                    <span>🌙</span> {T("home.tonightsBest")}
-                  </span>
-                  <Link href="/league/digest" className="text-[11px] text-slate-400 hover:text-sky-400 font-semibold transition-colors">
-                    Ligový digest →
-                  </Link>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {/* Player of Night Card */}
-                  {digest?.playerOfNight ? (
-                    <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 transition-colors">
-                      <div className="relative shrink-0">
-                        <PlayerAvatar src={ponPhoto} alt={digest.playerOfNight.name} size={42} />
-                        {ponTeam?.logoUrl && (
-                          <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
-                            <img src={ponTeam.logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                          <span>⭐</span> Hráč noci
-                        </div>
-                        <div className="text-xs font-bold text-white truncate">
-                          {digest.playerOfNight.slug ? (
-                            <Link href={`/players/${digest.playerOfNight.slug}`} className="hover:text-sky-300 transition-colors">{digest.playerOfNight.name}</Link>
-                          ) : digest.playerOfNight.name}
-                        </div>
-                        <div className="text-[11px] text-slate-400 font-mono font-medium truncate">
-                          {digest.playerOfNight.line}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-2xl bg-slate-900/50 border border-slate-800/70 text-xs text-slate-500">
-                      Hráč noci po ďalšej simulácii.
-                    </div>
+      ) : upcomingTicker.length > 0 ? (
+        <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-2.5 shadow-xl flex items-center gap-3 overflow-x-auto custom-scroll">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Zápasy ({upcomingTicker.length})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {upcomingTicker.map((g) => (
+              <Link
+                key={g.id}
+                href={`/games/${g.id}`}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800/70 hover:border-slate-700 transition-colors shrink-0 group"
+              >
+                <span className="flex items-center gap-1.5 text-xs font-bold text-slate-300 group-hover:text-white">
+                  {g.awayTeam?.logoUrl && (
+                    <span className="inline-flex items-center justify-center rounded bg-slate-800/80 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 20, height: 20, minWidth: 20 }}>
+                      <img src={g.awayTeam.logoUrl} alt="" className="object-contain" style={{ width: 14, height: 14, maxWidth: 14, maxHeight: 14 }} />
+                    </span>
                   )}
-
-                  {/* Best Goalie Card */}
-                  {digest?.bestGoalie ? (
-                    <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800/90 hover:border-slate-700 transition-colors">
-                      <div className="relative shrink-0">
-                        <PlayerAvatar src={bgPhoto} alt={digest.bestGoalie.name} size={42} />
-                        {bgTeam?.logoUrl && (
-                          <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
-                            <img src={bgTeam.logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-                          <span>🧤</span> Brankár noci
-                        </div>
-                        <div className="text-xs font-bold text-white truncate">
-                          {digest.bestGoalie.slug ? (
-                            <Link href={`/players/${digest.bestGoalie.slug}`} className="hover:text-sky-300 transition-colors">{digest.bestGoalie.name}</Link>
-                          ) : digest.bestGoalie.name}
-                        </div>
-                        <div className="text-[11px] text-slate-400 font-mono font-medium truncate">
-                          {digest.bestGoalie.line}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-2xl bg-slate-900/50 border border-slate-800/70 text-xs text-slate-500">
-                      Brankár noci po ďalšej simulácii.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="relative z-10 flex flex-col justify-between h-full">
-              <div>
-                <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] font-black uppercase tracking-widest">
-                  uNHL LEAGUE CENTRAL · SEZÓNA {activeSeason}
+                  <span>{g.awayTeam?.code}</span>
                 </span>
-                <h2 className="text-xl sm:text-2xl font-black text-white mt-2">Vitajte v uNHL Fantasy GM League</h2>
-                <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl">
-                  Aktuálna fáza ligy: <strong className="text-slate-200">{clock.phaseLabel}</strong> ({fmtLeagueDate(clock.date)}). Denné zápasy sa simulujú automaticky o 20:30.
-                </p>
-                <div className="flex flex-wrap items-center gap-3 mt-4 text-xs font-semibold">
-                  <Link href="/schedule" className="px-3.5 py-1.5 rounded-xl bg-sky-500 text-white hover:bg-sky-400 transition-colors shadow-md shadow-sky-500/20">
-                    Rozpis zápasov →
-                  </Link>
-                  <Link href="/standings" className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors">
-                    Tabuľka ligy
-                  </Link>
-                  <Link href="/stats/leaders" className="px-3.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors">
-                    Lídri štatistík
-                  </Link>
+                <span className="text-slate-500 text-xs font-mono font-bold">vs</span>
+                <span className="flex items-center gap-1.5 text-xs font-bold text-slate-300 group-hover:text-white">
+                  <span>{g.homeTeam?.code}</span>
+                  {g.homeTeam?.logoUrl && (
+                    <span className="inline-flex items-center justify-center rounded bg-slate-800/80 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 20, height: 20, minWidth: 20 }}>
+                      <img src={g.homeTeam.logoUrl} alt="" className="object-contain" style={{ width: 14, height: 14, maxWidth: 14, maxHeight: 14 }} />
+                    </span>
+                  )}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* 2. MEDIA HUB 3-COLUMN MAIN GRID (Matches home_media_hub mockup exactly) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        {/* COLUMN 1: LEFT (lg:col-span-4) -> 3-STARS PODIUM & LIVE TRADE TICKER */}
+        <div className="lg:col-span-4 order-2 lg:order-1 flex flex-col gap-5">
+          {/* 3D Visual Podium: 3 Stars of the Night */}
+          <div className="bg-[#0b1120] border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-400 text-sm">⭐</span>
+                <h2 className="text-xs font-black uppercase tracking-wider text-slate-100">
+                  3 Hviezdy dňa · Three Stars
+                </h2>
+              </div>
+              <Link href="/players/three-stars" className="text-[11px] text-slate-400 hover:text-sky-400 font-semibold transition-colors">
+                {T("ui.viewAll")} →
+              </Link>
+            </div>
+
+            {podiumStars.length >= 3 ? (
+              <div className="grid grid-cols-3 gap-2 sm:gap-2.5 items-end pt-2 pb-1">
+                {/* 2nd Star (Silver) */}
+                <div className="flex flex-col items-center text-center p-2 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg">
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-300 border border-slate-400/30 mb-2">
+                    🥈 2. HVIEZDA
+                  </span>
+                  <div className="relative mb-1.5">
+                    <PlayerAvatar src={podiumStars[1].photoUrl} alt={podiumStars[1].name} size={46} />
+                    {podiumStars[1].logoUrl && (
+                      <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
+                        <img src={podiumStars[1].logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-bold text-white truncate max-w-full">
+                    {podiumStars[1].slug ? (
+                      <Link href={`/players/${podiumStars[1].slug}`} className="hover:text-sky-300 transition-colors">
+                        {podiumStars[1].name}
+                      </Link>
+                    ) : podiumStars[1].name}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono">{podiumStars[1].teamCode}</div>
+                  <div className="mt-1 font-mono font-black text-xs text-slate-200">{podiumStars[1].pts} PTS</div>
+                  <div className="text-[9px] text-slate-500 font-mono">{podiumStars[1].g}G + {podiumStars[1].a}A</div>
+                </div>
+
+                {/* 1st Star (Gold - Elevated, gold glowing ring, larger avatar) */}
+                <div className="flex flex-col items-center text-center p-2.5 rounded-2xl bg-gradient-to-b from-amber-950/40 via-slate-900/90 to-slate-900 border-2 border-amber-500/60 shadow-xl shadow-amber-500/15 -translate-y-2">
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-2">
+                    👑 1. ZLATO
+                  </span>
+                  <div className="relative mb-1.5">
+                    <div className="rounded-full ring-2 ring-amber-400 shadow-md shadow-amber-500/30 p-0.5">
+                      <PlayerAvatar src={podiumStars[0].photoUrl} alt={podiumStars[0].name} size={54} />
+                    </div>
+                    {podiumStars[0].logoUrl && (
+                      <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 20, height: 20, minWidth: 20 }}>
+                        <img src={podiumStars[0].logoUrl} alt="" className="object-contain" style={{ width: 14, height: 14, maxWidth: 14, maxHeight: 14 }} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-black text-amber-200 truncate max-w-full">
+                    {podiumStars[0].slug ? (
+                      <Link href={`/players/${podiumStars[0].slug}`} className="hover:text-amber-100 transition-colors">
+                        {podiumStars[0].name}
+                      </Link>
+                    ) : podiumStars[0].name}
+                  </div>
+                  <div className="text-[10px] text-amber-400/80 font-mono">{podiumStars[0].teamCode}</div>
+                  <div className="mt-1 font-mono font-black text-sm text-amber-300">{podiumStars[0].pts} PTS</div>
+                  <div className="text-[10px] text-amber-400/70 font-mono">{podiumStars[0].g}G + {podiumStars[0].a}A</div>
+                </div>
+
+                {/* 3rd Star (Bronze) */}
+                <div className="flex flex-col items-center text-center p-2 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg">
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-700/20 text-amber-400 border border-amber-700/30 mb-2">
+                    🥉 3. BRONZ
+                  </span>
+                  <div className="relative mb-1.5">
+                    <PlayerAvatar src={podiumStars[2].photoUrl} alt={podiumStars[2].name} size={46} />
+                    {podiumStars[2].logoUrl && (
+                      <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
+                        <img src={podiumStars[2].logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-bold text-white truncate max-w-full">
+                    {podiumStars[2].slug ? (
+                      <Link href={`/players/${podiumStars[2].slug}`} className="hover:text-sky-300 transition-colors">
+                        {podiumStars[2].name}
+                      </Link>
+                    ) : podiumStars[2].name}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono">{podiumStars[2].teamCode}</div>
+                  <div className="mt-1 font-mono font-black text-xs text-amber-400/90">{podiumStars[2].pts} PTS</div>
+                  <div className="text-[9px] text-slate-500 font-mono">{podiumStars[2].g}G + {podiumStars[2].a}A</div>
                 </div>
               </div>
+            ) : (
+              <p className="text-xs text-slate-500 py-6 text-center">Hviezdy dňa po ďalšej simulácii.</p>
+            )}
+          </div>
+
+          {/* Live Trade Ticker */}
+          <div className="bg-[#0b1120] border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-sky-400 text-xs font-bold">🔁</span>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-sky-400">
+                    Live Trade Ticker
+                  </h3>
+                </div>
+                <Link href="/trades" className="text-[11px] text-slate-400 hover:text-sky-400 font-semibold transition-colors">
+                  Trh →
+                </Link>
+              </div>
+
+              {recentTrades.length ? (
+                <ul className="space-y-2">
+                  {recentTrades.map((t) => (
+                    <li key={t.id} className="p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800/70 hover:border-slate-700 transition-colors">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-100 mb-1.5">
+                        <div className="flex items-center gap-2">
+                          {t.from && (
+                            <span className="flex items-center gap-1.5">
+                              {t.from.logoUrl && (
+                                <span className="inline-flex items-center justify-center rounded bg-slate-800 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 22, height: 22, minWidth: 22 }}>
+                                  <img src={t.from.logoUrl} alt="" className="object-contain" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />
+                                </span>
+                              )}
+                              <span className="font-black text-slate-200">{t.from.code}</span>
+                            </span>
+                          )}
+                          <span className="text-slate-500 font-bold">⇄</span>
+                          {t.to && (
+                            <span className="flex items-center gap-1.5">
+                              {t.to.logoUrl && (
+                                <span className="inline-flex items-center justify-center rounded bg-slate-800 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 22, height: 22, minWidth: 22 }}>
+                                  <img src={t.to.logoUrl} alt="" className="object-contain" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />
+                                </span>
+                              )}
+                              <span className="font-black text-slate-200">{t.to.code}</span>
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-slate-500 text-[10px] font-mono tabular-nums">{fmtDate(t.createdAt)}</span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] truncate leading-tight">
+                        {t.fromAssets && t.toAssets ? `${t.fromAssets} ⇄ ${t.toAssets}` : t.message}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-slate-900/40 border border-slate-800/60 text-center">
+                  <p className="text-xs text-slate-400 mb-2.5">Trh výmen je otvorený. Zatiaľ žiadne uskutočnené trejdy.</p>
+                  <Link href="/trades" className="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-bold transition-colors">
+                    Preskúmať ponuky na trhu →
+                  </Link>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Right 5 cols: GM Cockpit & 3-Stars Podium */}
-        <div className="lg:col-span-5 flex flex-col justify-between gap-4">
+        {/* COLUMN 2: MIDDLE (lg:col-span-5) -> FEATURED HEADLINE STORY WITH COVER PHOTO */}
+        <div className="lg:col-span-5 order-1 lg:order-2 flex flex-col gap-5">
+          {/* Main Story Box */}
+          <div className="rounded-3xl border border-sky-500/30 bg-gradient-to-b from-[#10192e] via-[#0b1120] to-[#070b12] p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+            <div>
+              {/* Cover Photo */}
+              <div className="relative rounded-2xl overflow-hidden mb-4 border border-slate-800/80 shadow-lg group">
+                <img
+                  src="/images/featured-hockey.jpg"
+                  alt="NHL Game Action"
+                  className="w-full h-56 sm:h-64 object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0b1120] via-transparent to-transparent opacity-90" />
+                <div className="absolute top-3 left-3">
+                  <span className="px-3 py-1 rounded-full bg-cyan-500/20 backdrop-blur-md text-cyan-300 border border-cyan-500/40 text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-1.5 shadow-lg">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    FEATURED HEADLINE STORY
+                  </span>
+                </div>
+              </div>
+
+              {/* Headline & Body Text */}
+              {featuredArticle ? (
+                <>
+                  <Link href={`/news/${featuredArticle.id}`}>
+                    <h2 className="text-xl sm:text-2xl font-black text-white hover:text-sky-300 transition-colors leading-tight mb-2.5">
+                      {featuredArticle.title}
+                    </h2>
+                  </Link>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4 line-clamp-3">
+                    {featuredArticlePreview}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl sm:text-2xl font-black text-white leading-tight mb-2.5">
+                    McDAVID DOMINATES WEEK 14! FANTASY LEADERBOARDS SHAKE UP!
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4">
+                    Dominantná noc v lige priniesla nové rekordy a zmeny na čele tabuliek produktivity. Manažéri hlásia zvýšenú aktivitu na prestupovom trhu a blížiace sa kľúčové zápasy sezóny {activeSeason}.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Author Footer Row */}
+            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                {featuredAuthor?.logoUrl ? (
+                  <span className="inline-flex items-center justify-center rounded-xl bg-slate-800 border border-slate-700/60 p-1 shrink-0" style={{ width: 32, height: 32, minWidth: 32 }}>
+                    <img src={featuredAuthor.logoUrl} alt="" className="object-contain" style={{ width: 22, height: 22, maxWidth: 22, maxHeight: 22 }} />
+                  </span>
+                ) : (
+                  <div className="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-500/30 text-sky-400 font-black text-xs flex items-center justify-center shrink-0">
+                    GM
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="font-bold text-white text-xs truncate">
+                    {featuredAuthorName}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono">
+                    {featuredDate}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 text-slate-400 shrink-0 font-mono text-xs">
+                <span className="flex items-center gap-1 hover:text-amber-400 transition-colors">
+                  🔥 {featuredArticle?._count?.reactions ?? 24}
+                </span>
+                <span className="flex items-center gap-1 hover:text-sky-400 transition-colors">
+                  💬 {featuredArticle?._count?.comments ?? 8}
+                </span>
+                {featuredArticle && (
+                  <Link href={`/news/${featuredArticle.id}`} className="text-sky-400 hover:text-sky-300 font-bold ml-1 transition-colors">
+                    Čítať →
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Secondary News / League Articles Feed */}
+          <div className="bg-[#0b1120] border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2.5">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                <span>📰</span> Ďalšie správy z ligy
+              </h3>
+              <Link href="/news/create" className="text-xs bg-sky-500 hover:bg-sky-400 text-white font-bold px-3 py-1 rounded-xl shadow-md shadow-sky-500/20 transition-colors">
+                + {T("home.addArticle")}
+              </Link>
+            </div>
+
+            {secondaryArticles.length > 0 ? (
+              <div className="space-y-3">
+                {secondaryArticles.map((a) => {
+                  const auth = teamById.get(a.authorTeamId);
+                  return (
+                    <Link
+                      key={a.id}
+                      href={`/news/${a.id}`}
+                      className="flex items-start gap-3 p-2.5 rounded-2xl bg-slate-900/60 hover:bg-slate-800/60 border border-slate-800/70 hover:border-slate-700 transition-colors group"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-white group-hover:text-sky-300 transition-colors line-clamp-1 mb-1">
+                          {a.title}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                          <span>{auth?.name ?? "GM"}</span>
+                          <span>·</span>
+                          <span>{fmtDate(a.createdAt)}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-slate-500 group-hover:text-sky-400 transition-colors shrink-0">→</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-3 rounded-2xl bg-slate-900/40 border border-slate-800/60 text-xs text-slate-400 flex items-center justify-between">
+                <span>Zatiaľ žiadne ďalšie novinky. Napíšte prvý ligový článok!</span>
+                <Link href="/news/create" className="text-sky-400 font-bold hover:underline shrink-0 ml-2">Pridať →</Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* COLUMN 3: RIGHT (lg:col-span-3) -> STANDINGS & GM COCKPIT */}
+        <div className="lg:col-span-3 order-3 lg:order-3 flex flex-col gap-5">
           {/* GM Cockpit: Next Match & Sim Countdown */}
           <div className="rounded-3xl border border-slate-800 bg-[#0b1120] p-4 sm:p-5 shadow-2xl">
             <div className="flex items-center justify-between mb-2.5 border-b border-slate-800/80 pb-2">
@@ -575,153 +735,46 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* 3D Visual Podium: 3 Stars of the Day */}
-          <div className="rounded-3xl border border-slate-800 bg-[#0b1120] p-4 sm:p-5 shadow-2xl flex-1 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
-              <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                <span>⭐</span> {T("home.threeStars")} · HVIEZDY DŇA
-              </span>
-              <Link href="/players/three-stars" className="text-[11px] text-slate-400 hover:text-sky-400 font-semibold transition-colors">
-                {T("ui.viewAll")} →
-              </Link>
+          {/* Standings Tabs */}
+          <HomeStandingsTabs
+            east={east}
+            west={west}
+            labels={{
+              eastern: T("home.eastern") || "Východ",
+              western: T("home.western") || "Západ",
+              standings: isPreseason ? `${T("menu.standings")} (Pre-season)` : T("menu.standings"),
+              viewAll: T("ui.viewAll") || "Zobraziť",
+            }}
+          />
+
+          {/* Scoring Leaders */}
+          <Card title={isPreseason ? `${T("home.scoringLeaders")} (Pre-season)` : T("home.scoringLeaders")} href="/stats/leaders" accent="text-sky-400" viewLabel={T("ui.viewAll")}>
+            <div className="space-y-2">
+              {topScorers.slice(0, 5).map((s, i) => {
+                const meta = scorerMeta.get(s.playerId);
+                return (
+                  <div key={s.playerId} className="flex items-center gap-2.5 text-xs p-1 rounded-lg hover:bg-slate-800/30 transition-colors">
+                    <span className="w-4 text-center font-mono font-bold text-slate-500 text-[11px]">{i + 1}</span>
+                    <PlayerAvatar src={meta?.photoUrl ?? null} alt={s.name} size={28} />
+                    <span className="flex-1 truncate">
+                      <PlayerLink slug={meta?.slug ?? undefined} id={s.playerId} name={s.name} clean={false} />
+                      <span className="text-slate-500 font-mono text-[10px] ml-1.5">{s.teamCode}</span>
+                    </span>
+                    <span className="font-mono font-black text-white text-xs">{s.points} B</span>
+                  </div>
+                );
+              })}
             </div>
-
-            {stars.length === 0 ? (
-              <p className="text-xs text-slate-500 py-6 text-center">Po ďalšej simulácii.</p>
-            ) : (
-              <div className="grid grid-cols-3 gap-2 pt-2 items-end">
-                {/* 2nd Star (Silver) */}
-                {stars[1] ? (
-                  <div className="flex flex-col items-center text-center p-2 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-colors">
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-400/20 text-slate-300 border border-slate-400/30 mb-2">
-                      2. HVIEZDA
-                    </span>
-                    <div className="relative mb-1.5">
-                      <PlayerAvatar src={stars[1].photoUrl} alt={stars[1].name} size={48} />
-                      {stars[1].logoUrl && (
-                        <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
-                          <img src={stars[1].logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs font-bold text-white truncate max-w-full">
-                      {stars[1].slug ? <Link href={`/players/${stars[1].slug}`} className="hover:text-sky-300">{stars[1].name}</Link> : stars[1].name}
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-mono">{stars[1].teamCode}</div>
-                    <div className="mt-1 font-mono font-black text-xs text-slate-200">{stars[1].pts} PTS</div>
-                    <div className="text-[9px] text-slate-500 font-mono">{stars[1].g}G + {stars[1].a}A</div>
-                  </div>
-                ) : <div />}
-
-                {/* 1st Star (Gold Podium - Higher & Highlighted) */}
-                {stars[0] ? (
-                  <div className="flex flex-col items-center text-center p-2.5 rounded-2xl bg-gradient-to-b from-amber-950/40 via-slate-900/90 to-slate-900 border-2 border-amber-500/50 shadow-xl shadow-amber-500/10">
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-2">
-                      👑 1. ZLATO
-                    </span>
-                    <div className="relative mb-1.5">
-                      <div className="rounded-full ring-2 ring-amber-400/80 p-0.5">
-                        <PlayerAvatar src={stars[0].photoUrl} alt={stars[0].name} size={54} />
-                      </div>
-                      {stars[0].logoUrl && (
-                        <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 20, height: 20, minWidth: 20 }}>
-                          <img src={stars[0].logoUrl} alt="" className="object-contain" style={{ width: 14, height: 14, maxWidth: 14, maxHeight: 14 }} />
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs font-black text-amber-200 truncate max-w-full">
-                      {stars[0].slug ? <Link href={`/players/${stars[0].slug}`} className="hover:text-amber-100">{stars[0].name}</Link> : stars[0].name}
-                    </div>
-                    <div className="text-[10px] text-amber-400/80 font-mono">{stars[0].teamCode}</div>
-                    <div className="mt-1 font-mono font-black text-sm text-amber-300">{stars[0].pts} PTS</div>
-                    <div className="text-[10px] text-amber-400/70 font-mono">{stars[0].g}G + {stars[0].a}A</div>
-                  </div>
-                ) : <div />}
-
-                {/* 3rd Star (Bronze) */}
-                {stars[2] ? (
-                  <div className="flex flex-col items-center text-center p-2 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-colors">
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-700/20 text-amber-400 border border-amber-700/30 mb-2">
-                      3. BRONZ
-                    </span>
-                    <div className="relative mb-1.5">
-                      <PlayerAvatar src={stars[2].photoUrl} alt={stars[2].name} size={48} />
-                      {stars[2].logoUrl && (
-                        <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 p-0.5" style={{ width: 18, height: 18, minWidth: 18 }}>
-                          <img src={stars[2].logoUrl} alt="" className="object-contain" style={{ width: 12, height: 12, maxWidth: 12, maxHeight: 12 }} />
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs font-bold text-white truncate max-w-full">
-                      {stars[2].slug ? <Link href={`/players/${stars[2].slug}`} className="hover:text-sky-300">{stars[2].name}</Link> : stars[2].name}
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-mono">{stars[2].teamCode}</div>
-                    <div className="mt-1 font-mono font-black text-xs text-amber-400/90">{stars[2].pts} PTS</div>
-                    <div className="text-[9px] text-slate-500 font-mono">{stars[2].g}G + {stars[2].a}A</div>
-                  </div>
-                ) : <div />}
-              </div>
-            )}
-          </div>
+          </Card>
         </div>
       </div>
 
-      {/* 3. PULSE STATS ROW (4 Compact Cards: Recent Trades, Waiver Wire, Injuries, Highlights) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* Card 1: Recent Trades */}
-        <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
-              <span className="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-                <span>🔁</span> Posledné výmeny
-              </span>
-              <Link href="/trades" className="text-xs text-slate-400 hover:text-sky-400 transition-colors font-semibold">
-                {T("ui.viewAll")} →
-              </Link>
-            </div>
-            {recentTrades.length ? (
-              <ul className="space-y-2">
-                {recentTrades.map((t) => (
-                  <li key={t.id} className="p-2 rounded-xl bg-slate-900/60 border border-slate-800/70 hover:border-slate-700 transition-colors">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-100 mb-1">
-                      {t.from ? (
-                        <span className="flex items-center gap-1 min-w-0" title={t.from.name}>
-                          {t.from.logoUrl && (
-                            <span className="inline-flex items-center justify-center rounded bg-slate-800 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 20, height: 20, minWidth: 20 }}>
-                              <img src={t.from.logoUrl} alt="" className="object-contain" style={{ width: 14, height: 14, maxWidth: 14, maxHeight: 14 }} />
-                            </span>
-                          )}
-                          <span className="truncate">{t.from.code}</span>
-                        </span>
-                      ) : <span className="text-sky-400">•</span>}
-                      {t.to && (
-                        <>
-                          <span className="text-slate-500 text-xs font-bold">⇄</span>
-                          <span className="flex items-center gap-1 min-w-0" title={t.to.name}>
-                            {t.to.logoUrl && (
-                              <span className="inline-flex items-center justify-center rounded bg-slate-800 border border-slate-700/60 p-0.5 shrink-0" style={{ width: 20, height: 20, minWidth: 20 }}>
-                                <img src={t.to.logoUrl} alt="" className="object-contain" style={{ width: 14, height: 14, maxWidth: 14, maxHeight: 14 }} />
-                              </span>
-                            )}
-                            <span className="truncate">{t.to.code}</span>
-                          </span>
-                        </>
-                      )}
-                      <span className="ml-auto text-slate-500 text-[10px] font-mono tabular-nums">{fmtDate(t.createdAt)}</span>
-                    </div>
-                    <p className="text-slate-400 text-[11px] truncate leading-tight">
-                      {t.fromAssets && t.toAssets ? `${t.fromAssets} ⇄ ${t.toAssets}` : t.message}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-xs text-slate-500 py-3 text-center">Zatiaľ žiadne uskutočnené výmeny.</p>
-            )}
-          </div>
-        </div>
+      {/* 3. COMMISSIONER ANNOUNCEMENTS BANNER */}
+      <CommissionerBanner items={bannerItems} signedIn={me != null} />
 
-        {/* Card 2: Waiver Wire */}
+      {/* 4. PULSE ROW: 4 COMPACT CARDS (Waivers, Injuries, Trade Block, Quick Links & Birthdays) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* Card 1: Waiver Wire */}
         <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
@@ -757,7 +810,7 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {/* Card 3: Health & Discipline */}
+        {/* Card 2: Health & Discipline */}
         <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
@@ -799,7 +852,7 @@ export default async function HomePage() {
                       <span className="font-semibold text-slate-200 truncate">{suspension.playerName}</span>
                     </div>
                     <span className="text-[10px] font-bold text-amber-300 font-mono shrink-0">
-                      Stop {left}z
+                      Stop ${left}z
                     </span>
                   </div>
                 );
@@ -812,11 +865,47 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {/* Card 4: Night Highlights & Upset */}
+        {/* Card 3: Trade Block Board */}
         <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
               <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <span>🏷️</span> {T("home.tradeBlock")}
+              </span>
+              <Link href="/trade-block" className="text-xs text-slate-400 hover:text-sky-400 transition-colors font-semibold">
+                {T("ui.viewAll")} →
+              </Link>
+            </div>
+            {tbListed.length ? (
+              <div className="space-y-1.5 text-xs">
+                {tbListed.slice(0, 4).map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60">
+                    <span className="font-semibold text-slate-200 truncate">
+                      {p.slug ? <Link href={`/players/${p.slug}`} className="hover:text-amber-300 transition-colors">{p.name}</Link> : p.name}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[10px] shrink-0">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 font-bold">{p.position}</span>
+                      <span>{p.teamCode}</span>
+                    </div>
+                  </div>
+                ))}
+                {tbListed.length > 4 && (
+                  <Link href="/trade-block" className="block text-center text-[11px] text-sky-400 hover:underline pt-1">
+                    + ďalších {tbListed.length - 4} hráčov →
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 py-3 text-center">{T("home.noTradeBlock")}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Card 4: Night Highlights / League Pulse */}
+        <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
+              <span className="text-xs font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
                 <span>⚡</span> {highlights.length ? "Momenty dňa" : digest?.upset ? "Prekvapenie kola" : "Ligový pulz"}
               </span>
               <Link href="/league/digest" className="text-xs text-slate-400 hover:text-sky-400 transition-colors font-semibold">
@@ -845,184 +934,40 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* 4. MAIN CONTENT (8 cols / 4 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left / 8 cols: Announcements, Articles, Trade Block */}
-        <div className="lg:col-span-8 space-y-6">
-          <CommissionerBanner items={bannerItems} signedIn={me != null} />
-
-          {/* Articles Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-              <h2 className="text-sm font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
-                <span>📰</span> {T("home.latestArticle")}
-              </h2>
-              <Link href="/news/create" className="text-xs bg-sky-500 hover:bg-sky-400 text-white font-bold px-3 py-1.5 rounded-xl shadow-md shadow-sky-500/20 transition-colors">
-                + {T("home.addArticle")}
-              </Link>
-            </div>
-
-            {articlesRaw.length === 0 ? (
-              <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-8 text-center text-slate-500">
-                {T("home.noNews")}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {articlesRaw.map((a, idx) => {
-                  const author = teamById.get(a.authorTeamId);
-                  const safeBodyHtml = sanitizeArticleHtml(a.bodyHtml);
-                  const cutAt = safeBodyHtml.search(/<hr[^>]*\bclass="[^"]*\barticle-cut\b/i);
-                  const rawPreview = cutAt >= 0 ? safeBodyHtml.slice(0, cutAt) : safeBodyHtml;
-                  const text = articlePlainText(rawPreview);
-                  const hasMore = cutAt >= 0 || text.length > 500;
-                  const preview = cutAt >= 0 ? text : text.slice(0, 500);
-                  const isFeatured = idx === 0;
-
-                  return (
-                    <article
-                      key={a.id}
-                      className={`rounded-2xl border transition-all ${
-                        isFeatured
-                          ? "border-sky-500/30 bg-gradient-to-br from-[#10192e] via-[#0b1120] to-[#070b12] p-5 shadow-2xl"
-                          : "border-slate-800 bg-[#0b1120] p-4 hover:border-slate-700 shadow-xl"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 mb-3">
-                        {author?.logoUrl ? (
-                          <span className="inline-flex items-center justify-center rounded-xl bg-slate-800/90 border border-slate-700/60 p-1 shrink-0" style={{ width: 38, height: 38, minWidth: 38 }}>
-                            <img src={author.logoUrl} alt="" className="object-contain" style={{ width: 28, height: 28, maxWidth: 28, maxHeight: 28 }} />
-                          </span>
-                        ) : (
-                          <div className="w-9 h-9 rounded-xl bg-slate-800 grid place-items-center font-bold text-sm text-slate-300">
-                            {author?.name?.[0] ?? "?"}
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-xs font-black text-slate-100">
-                            {author?.gmNickname || [author?.gmFirstName, author?.gmLastName].filter(Boolean).join(" ").trim() || author?.gm || author?.name || "GM"}
-                          </p>
-                          <p className="text-[11px] text-slate-400 font-mono">
-                            {author?.name} · {a.createdAt.toLocaleDateString("sk-SK")}
-                          </p>
-                        </div>
-                        {isFeatured && (
-                          <span className="ml-auto px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-400 text-[10px] font-black uppercase tracking-wider">
-                            HLAVNÁ SPRÁVA
-                          </span>
-                        )}
-                      </div>
-
-                      <Link href={`/news/${a.id}`}>
-                        <h3 className={`font-black mb-2 hover:text-sky-300 transition-colors ${isFeatured ? "text-lg text-white" : "text-base text-slate-100"}`}>
-                          {a.title}
-                        </h3>
-                      </Link>
-
-                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-3">
-                        {preview}{hasMore ? "…" : ""}
-                      </p>
-
-                      <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-slate-800/80">
-                        <Link href={`/news/${a.id}`} className="text-sky-400 hover:text-sky-300 font-bold transition-colors">
-                          Čítať celý článok →
-                        </Link>
-                        <span className="flex items-center gap-1">👍 {a._count.reactions}</span>
-                        <span className="flex items-center gap-1">💬 {a._count.comments}</span>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Trade Block & Birthdays */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card title={T("home.tradeBlock")} href="/trade-block" accent="text-amber-400" viewLabel={T("ui.viewAll")}>
-              {tbListed.length ? (
-                <div className="space-y-1.5 text-xs">
-                  {tbListed.slice(0, 6).map((p) => (
-                    <div key={p.id} className="flex items-center justify-between gap-2 p-1 rounded-lg hover:bg-slate-800/30 transition-colors">
-                      {p.slug ? <Link href={`/players/${p.slug}`} className="font-semibold text-slate-200 truncate hover:text-sky-300">{p.name}</Link> : <span className="font-semibold text-slate-200 truncate">{p.name}</span>}
-                      <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[10px]">
-                        <span className="px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 font-bold">{p.position}</span>
-                        <span>{p.teamCode}</span>
-                      </div>
-                    </div>
-                  ))}
-                  {tbListed.length > 6 && <Link href="/trade-block" className="block text-center text-[11px] text-sky-400 hover:underline pt-1">+ ďalších {tbListed.length - 6} hráčov →</Link>}
+      {/* 5. BOTTOM ROW: FREE AGENTS, BIRTHDAYS & QUICK LINKS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* Free Agents */}
+        <Card title={T("home.freeAgents")} href="/free-agents" accent="text-emerald-400" viewLabel={T("ui.viewAll")}>
+          {faTop.length ? (
+            <div className="space-y-1.5 text-xs">
+              {faTop.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2 p-1 rounded-lg hover:bg-slate-800/30 transition-colors">
+                  <span className="truncate">
+                    <PlayerLink slug={p.slug} id={p.id} name={p.name} />
+                    <span className="text-slate-500 text-[10px] font-mono ml-1">{p.position}</span>
+                  </span>
+                  <span className="font-mono font-bold text-slate-300">{p.overall ?? "—"}</span>
                 </div>
-              ) : <p className="text-xs text-slate-500 py-2">{T("home.noTradeBlock")}</p>}
-            </Card>
-
-            <Card title={T("home.birthdays")} accent="text-pink-400">
-              <BirthdaysList />
-            </Card>
-          </div>
-        </div>
-
-        {/* Right / 4 cols: Standings Tabs, Scoring Leaders, Free Agents, Quick Links */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Tabbed Standings */}
-          <HomeStandingsTabs
-            east={east}
-            west={west}
-            labels={{
-              eastern: T("home.eastern") || "Východ",
-              western: T("home.western") || "Západ",
-              standings: isPreseason ? `${T("menu.standings")} (Pre-season)` : T("menu.standings"),
-              viewAll: T("ui.viewAll") || "Zobraziť",
-            }}
-          />
-
-          {/* Scoring Leaders */}
-          <Card title={isPreseason ? `${T("home.scoringLeaders")} (Pre-season)` : T("home.scoringLeaders")} href="/stats/leaders" accent="text-sky-400" viewLabel={T("ui.viewAll")}>
-            <div className="space-y-2">
-              {topScorers.map((s, i) => {
-                const meta = scorerMeta.get(s.playerId);
-                return (
-                  <div key={s.playerId} className="flex items-center gap-2.5 text-xs p-1 rounded-lg hover:bg-slate-800/30 transition-colors">
-                    <span className="w-4 text-center font-mono font-bold text-slate-500 text-[11px]">{i + 1}</span>
-                    <PlayerAvatar src={meta?.photoUrl ?? null} alt={s.name} size={28} />
-                    <span className="flex-1 truncate">
-                      <PlayerLink slug={meta?.slug ?? undefined} id={s.playerId} name={s.name} clean={false} />
-                      <span className="text-slate-500 font-mono text-[10px] ml-1.5">{s.teamCode}</span>
-                    </span>
-                    <span className="font-mono font-black text-white text-xs">{s.points} B</span>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-
-          {/* Free Agents */}
-          <Card title={T("home.freeAgents")} href="/free-agents" accent="text-emerald-400" viewLabel={T("ui.viewAll")}>
-            {faTop.length ? (
-              <div className="space-y-1.5 text-xs">
-                {faTop.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-2 p-1 rounded-lg hover:bg-slate-800/30 transition-colors">
-                    <span className="truncate">
-                      <PlayerLink slug={p.slug} id={p.id} name={p.name} />
-                      <span className="text-slate-500 text-[10px] font-mono ml-1">{p.position}</span>
-                    </span>
-                    <span className="font-mono font-bold text-slate-300">{p.overall ?? "—"}</span>
-                  </div>
-                ))}
-              </div>
-            ) : <p className="text-xs text-slate-500 py-2">Žiadni voľní hráči.</p>}
-          </Card>
-
-          {/* Quick Links */}
-          <Card title={T("home.quickLinks")}>
-            <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
-              {[[T("menu.scores"), "/scores"], [T("menu.standings"), "/standings"], [T("menu.trades"), "/trades"], [T("menu.stats"), "/stats/leaders"], [T("ui.playoffs"), "/playoffs"], [T("ui.allRosters"), "/tools/all-rosters"]].map(([l, h]) => (
-                <Link key={h} href={h} className="px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-center text-slate-300 hover:text-white transition-colors">
-                  {l}
-                </Link>
               ))}
             </div>
-          </Card>
-        </div>
+          ) : <p className="text-xs text-slate-500 py-2">Žiadni voľní hráči.</p>}
+        </Card>
+
+        {/* Birthdays */}
+        <Card title={T("home.birthdays")} accent="text-pink-400">
+          <BirthdaysList />
+        </Card>
+
+        {/* Quick Links */}
+        <Card title={T("home.quickLinks")}>
+          <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+            {[[T("menu.scores"), "/scores"], [T("menu.standings"), "/standings"], [T("menu.trades"), "/trades"], [T("menu.stats"), "/stats/leaders"], [T("ui.playoffs"), "/playoffs"], [T("ui.allRosters"), "/tools/all-rosters"]].map(([l, h]) => (
+              <Link key={h} href={h} className="px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-center text-slate-300 hover:text-white transition-colors">
+                {l}
+              </Link>
+            ))}
+          </div>
+        </Card>
       </div>
     </div>
   );
@@ -1031,20 +976,18 @@ export default async function HomePage() {
 async function BirthdaysList() {
   const today = new Date();
   const mmdd = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  // birthDate is a free-form string; match players whose stored date contains today's MM-DD
   const players = await prisma.player.findMany({ where: { birthDate: { not: null } }, select: { id: true, name: true, birthDate: true, team: { select: { code: true } } } });
-  // birthDate is ISO "YYYY-MM-DD" — match the trailing "-MM-DD" so month & day both align
   const born = players.filter((p) => p.birthDate?.endsWith(`-${mmdd}`) || p.birthDate?.includes(`-${mmdd}`));
   if (born.length === 0) return <p className="text-sm text-slate-500">No birthdays today.</p>;
   return (
     <div className="space-y-2">
       {born.slice(0, 8).map((p) => {
         const birthYear = Number((p.birthDate ?? "").slice(0, 4));
-        const age = birthYear > 1900 ? today.getFullYear() - birthYear : null; // turns this age today
+        const age = birthYear > 1900 ? today.getFullYear() - birthYear : null;
         return (
           <div key={p.id} className="flex items-center gap-2 text-sm">
             <span>🎂</span>
-            <span className="flex-1 truncate"><PlayerLink id={p.id} name={p.name} />{age != null && <span className="text-slate-500"> · {age} y/o</span>}</span>
+            <span className="flex-1 truncate"><PlayerLink id={p.id} name={p.name} />{age != null && <span className="text-slate-500"> · ${age} y/o</span>}</span>
             <span className="text-slate-500 text-xs">{p.team?.code}</span>
           </div>
         );

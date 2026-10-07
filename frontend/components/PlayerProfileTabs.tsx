@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 
 interface PlayerProfileTabsProps {
   overviewContent: React.ReactNode;
@@ -10,6 +9,7 @@ interface PlayerProfileTabsProps {
   availableSeasons: string[];
   currentSeason: string;
   playerSlugOrId: string | number;
+  currentPhase?: string;
 }
 
 export default function PlayerProfileTabs({
@@ -18,6 +18,7 @@ export default function PlayerProfileTabs({
   availableSeasons,
   currentSeason,
   playerSlugOrId,
+  currentPhase = "Základná časť",
 }: PlayerProfileTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -37,7 +38,6 @@ export default function PlayerProfileTabs({
 
   const handleTabChange = (tab: "overview" | "seasons") => {
     setActiveTab(tab);
-    // Update query param smoothly without reloading page
     const url = new URL(window.location.href);
     if (tab === "seasons") {
       url.searchParams.set("tab", "seasons");
@@ -78,30 +78,43 @@ export default function PlayerProfileTabs({
           </button>
         </div>
 
-        {/* Season Selector when in Seasons tab */}
+        {/* Season Dropdown & Current Phase badge when in Seasons tab */}
         {activeTab === "seasons" && (
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">
-              Sezóna:
-            </span>
-            <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-lg border border-slate-800">
-              {availableSeasons.map((s) => {
-                const isSelected = s === currentSeason;
-                return (
-                  <Link
-                    key={s}
-                    href={`/players/${playerSlugOrId}?tab=seasons&season=${s}`}
-                    scroll={false}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                      isSelected
-                        ? "bg-blue-500/20 text-blue-300 border border-blue-400/40 shadow-sm"
-                        : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                    }`}
-                  >
-                    {s}
-                  </Link>
-                );
-              })}
+          <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+            {/* Aktuálna fáza sezóny */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-semibold shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span className="text-slate-400 font-normal">Aktuálna fáza:</span>
+              <span className="text-white font-bold">{currentPhase}</span>
+            </div>
+
+            {/* Dropdown pre prepínanie medzi sezónami */}
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="season-dropdown" className="text-xs uppercase tracking-wider text-slate-400 font-bold">
+                Sezóna:
+              </label>
+              <div className="relative">
+                <select
+                  id="season-dropdown"
+                  value={currentSeason}
+                  onChange={(e) => {
+                    const newSeason = e.target.value;
+                    router.push(`/players/${playerSlugOrId}?tab=seasons&season=${newSeason}`, { scroll: false });
+                  }}
+                  className="appearance-none bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-100 text-xs md:text-sm font-semibold rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm transition-colors"
+                >
+                  {availableSeasons.map((s) => (
+                    <option key={s} value={s} className="bg-slate-900 text-slate-100">
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </div>
         )}
