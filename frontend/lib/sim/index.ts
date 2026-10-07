@@ -50,6 +50,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   const MIN_F = 12;
   const MIN_D = 6;
   const MIN_GOALIES = 2;
+  const AHL_ONLY_CAP_HIT = 100_000; // matches RosterMover/rosters actions: $100k = farm-only contract
   const isDef = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
   const affiliates = await prisma.team.findMany({ where: { parentTeamId: teamId }, select: { id: true } });
   const affIds = affiliates.map((a) => a.id);
@@ -64,6 +65,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
       where: {
         teamId: { in: affIds }, isGoalie: false, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 },
         id: { notIn: skaterRows.map((s) => s.id) },
+        NOT: { capHit: AHL_ONLY_CAP_HIT }, // $100k minor-league deals can never be called up
       },
       include: { goalieRating: true },
       orderBy: { overall: "desc" },
@@ -146,16 +148,25 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
 
   const goalieRows = players.filter((p) => p.isGoalie);
   if (goalieRows.length < MIN_GOALIES && affIds.length) {
+    const callupWhere = (allowAhlOnly: boolean) => ({
+      teamId: { in: affIds }, isGoalie: true, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 },
+      id: { notIn: goalieRows.map((g) => g.id) },
+      ...(allowAhlOnly ? {} : { NOT: { capHit: AHL_ONLY_CAP_HIT } }), // $100k deals are farm-only
+    });
     const callups = await prisma.player.findMany({
-      where: {
-        teamId: { in: affIds }, isGoalie: true, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 },
-        id: { notIn: goalieRows.map((g) => g.id) },
-      },
+      where: callupWhere(false),
       include: { goalieRating: true },
       orderBy: { overall: "desc" },
       take: MIN_GOALIES - goalieRows.length,
     });
     goalieRows.push(...callups);
+    // Last resort ONLY when the club has no eligible goalie at all — otherwise the
+    // game couldn't be played. With one real goalie it plays a single-goalie game.
+    if (goalieRows.length === 0) {
+      goalieRows.push(...(await prisma.player.findMany({
+        where: callupWhere(true), include: { goalieRating: true }, orderBy: { overall: "desc" }, take: 1,
+      })));
+    }
   }
   const goalies = goalieRows.map((g) => {
     const dis = (g as any).disgruntled === true;
