@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 echo "▶ Pulling latest code…"
-git pull --ff-only
+git pull --ff-only origin main
 
 echo "▶ Backing up the database before touching the schema…"
 ./scripts/ops/backup-db.sh predeploy || { echo "✗ Pre-deploy backup failed — aborting deploy."; exit 1; }
