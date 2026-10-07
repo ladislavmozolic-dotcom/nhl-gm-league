@@ -57,17 +57,43 @@ export default function NextSimCountdown({ frenzyAt, frenzyOpen, frenzyRound, fr
 
   return (
     <div>
-      {frenzyPending && <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wide mb-1">Free Agent Frenzy open in</p>}
-      {roundActive && <p className="text-[11px] font-semibold text-amber-400 uppercase tracking-wide mb-1">Frenzy Round {frenzyRound} · {frenzyStage === "IMPROVEMENT" ? "decision in" : "offers close in"}</p>}
-      {!frenzyPending && !roundActive && <p className="text-[11px] font-semibold text-blue-400 uppercase tracking-wide mb-1">Next Game Sim</p>}
-      <p className="text-3xl font-black text-slate-100 tabular-nums leading-none">{d > 0 && `${d}d `}{pad(h)}:{pad(m)}:{pad(s)}</p>
-      <div className="flex items-center justify-between gap-2 mt-2">
-        <p className="text-xs text-slate-400">{frenzyPending ? "Opens" : roundActive ? "Closes" : "Sim"} at {targetLabel}</p>
-        <select value={zone} onChange={(e) => { setZone(e.target.value); window.localStorage.setItem(ZONE_KEY, e.target.value); }}
-          className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[11px] text-slate-300">
-          {ZONES.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        {frenzyPending ? (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Frenzy Open in
+          </span>
+        ) : roundActive ? (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            R{frenzyRound} · {frenzyStage === "IMPROVEMENT" ? "Decision in" : "Deadline"}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500/15 text-sky-400 border border-sky-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+            Next Game Sim
+          </span>
+        )}
+        <select
+          value={zone}
+          onChange={(e) => { setZone(e.target.value); window.localStorage.setItem(ZONE_KEY, e.target.value); }}
+          className="bg-slate-900 border border-slate-700/70 hover:border-slate-600 rounded-md px-1.5 py-0.5 text-[10px] text-slate-300 font-medium cursor-pointer transition-colors focus:outline-none"
+        >
+          {ZONES.map((z) => <option key={z.id} value={z.id} className="bg-slate-900 text-slate-200">{z.label}</option>)}
         </select>
       </div>
+
+      <div className="flex items-baseline gap-1 my-1">
+        <p className="text-3xl font-black font-mono text-white tracking-tight tabular-nums">
+          {d > 0 && <span className="text-xl text-slate-300 font-bold mr-1.5">{d}d</span>}
+          {pad(h)}<span className="text-sky-400/70 animate-pulse">:</span>{pad(m)}<span className="text-sky-400/70 animate-pulse">:</span>{pad(s)}
+        </p>
+      </div>
+
+      <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5 mt-1">
+        <span>⏰</span>
+        <span>{frenzyPending ? "Otvára sa" : roundActive ? "Uzávierka" : "Simulácia"} o <strong className="text-slate-200 font-semibold">{targetLabel}</strong></span>
+      </p>
     </div>
   );
 }
