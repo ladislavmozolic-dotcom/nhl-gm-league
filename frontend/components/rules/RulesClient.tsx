@@ -35,12 +35,12 @@ const SECTION_ICONS: Record<string, string> = {
 };
 
 const CATEGORIES = [
-  { id: "all", label: "Všetky kapitoly", icon: "📚" },
-  { id: "gameplay", label: "Zápasy & Sezóna", icon: "🏒", sectionIds: ["season", "con", "goalies", "stats", "tactics"] },
-  { id: "roster", label: "Súpisky & Hráči", icon: "👥", sectionIds: ["rosters", "waivers", "ratings", "world"] },
-  { id: "finance", label: "Financie & Zmluvy", icon: "💰", sectionIds: ["cap", "fa", "rfa", "contracts"] },
-  { id: "market", label: "Trh & Draft", icon: "🔄", sectionIds: ["trades", "draft", "allstar"] },
-  { id: "predictor", label: "Tipovačka", icon: "🏆", sectionIds: ["predictor"] },
+  { id: "all", label: "All chapters", icon: "📚" },
+  { id: "gameplay", label: "Games & Season", icon: "🏒", sectionIds: ["season", "con", "goalies", "stats", "tactics"] },
+  { id: "roster", label: "Rosters & Players", icon: "👥", sectionIds: ["rosters", "waivers", "ratings", "world"] },
+  { id: "finance", label: "Finance & Contracts", icon: "💰", sectionIds: ["cap", "fa", "rfa", "contracts"] },
+  { id: "market", label: "Market & Draft", icon: "🔄", sectionIds: ["trades", "draft", "allstar"] },
+  { id: "predictor", label: "Picks Game", icon: "🏆", sectionIds: ["predictor"] },
 ];
 
 export default function RulesClient({
@@ -155,7 +155,7 @@ export default function RulesClient({
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-wider">
               <span>📖</span>
-              <span>Oficiálny manuál a kódex UNHL</span>
+              <span>Official UNHL manual and code</span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
               {title}
@@ -180,7 +180,7 @@ export default function RulesClient({
                 84
               </div>
               <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-1 font-semibold">
-                Zápasov
+                Games
               </div>
             </div>
             <div className="rounded-xl bg-slate-800/60 border border-slate-700/60 px-4 py-3 text-center min-w-[90px]">
@@ -188,7 +188,7 @@ export default function RulesClient({
                 23
               </div>
               <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-1 font-semibold">
-                Hráčov max
+                Max players
               </div>
             </div>
           </div>
@@ -204,14 +204,14 @@ export default function RulesClient({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Hľadať v pravidlách (napr. buyout, platový strop, waiver, zranenie, QO, výmena)..."
+              placeholder="Search the rules (e.g. buyout, salary cap, waiver, injury, QO, trade)..."
               className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-10 pr-10 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-inner"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
                 className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-white"
-                title="Vymazať filter"
+                title="Clear filter"
               >
                 ✕
               </button>
@@ -247,13 +247,13 @@ export default function RulesClient({
             onClick={() => toggleAll(true)}
             className="text-[11px] font-semibold px-2.5 py-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-colors"
           >
-            Rozbaliť všetko
+            Expand all
           </button>
           <button
             onClick={() => toggleAll(false)}
             className="text-[11px] font-semibold px-2.5 py-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-colors"
           >
-            Zbaliť všetko
+            Collapse all
           </button>
         </div>
       </div>
@@ -303,7 +303,7 @@ export default function RulesClient({
               className="w-full py-2 rounded-xl text-xs font-semibold bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors flex items-center justify-center gap-1.5"
             >
               <span>⬆️</span>
-              <span>Návrat na začiatok</span>
+              <span>Back to top</span>
             </button>
           </div>
         </aside>
@@ -314,10 +314,10 @@ export default function RulesClient({
             <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center space-y-3">
               <div className="text-4xl">🔍</div>
               <h2 className="text-lg font-bold text-slate-200">
-                Žiadne pravidlá nezodpovedajú vyhľadávaniu
+                No rules match the search
               </h2>
               <p className="text-sm text-slate-400 max-w-md mx-auto">
-                Skúste upraviť hľadaný výraz alebo kliknite na &quot;Všetky kapitoly&quot; v kategóriách vyššie.
+                Try adjusting the search term or click &quot;All chapters&quot; in the categories above.
               </p>
               <button
                 onClick={() => {
@@ -326,7 +326,7 @@ export default function RulesClient({
                 }}
                 className="mt-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors cursor-pointer"
               >
-                Resetovať filtre
+                Reset filters
               </button>
             </div>
           ) : (
@@ -358,11 +358,11 @@ export default function RulesClient({
                       <button
                         onClick={() => copyAnchor(s.id)}
                         className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60 transition-colors flex items-center gap-1"
-                        title="Skopírovať odkaz na túto kapitolu"
+                        title="Copy a link to this chapter"
                       >
                         <span>{copiedId === s.id ? "✓" : "🔗"}</span>
                         <span className="hidden sm:inline">
-                          {copiedId === s.id ? "Skopírované" : "Odkaz"}
+                          {copiedId === s.id ? "Copied" : "Link"}
                         </span>
                       </button>
 
@@ -375,7 +375,7 @@ export default function RulesClient({
                           }))
                         }
                         className="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 grid place-items-center text-sm transition-colors cursor-pointer"
-                        title={isExpanded ? "Zbaliť kapitolu" : "Rozbaliť kapitolu"}
+                        title={isExpanded ? "Collapse chapter" : "Expand chapter"}
                       >
                         {isExpanded ? "−" : "+"}
                       </button>
