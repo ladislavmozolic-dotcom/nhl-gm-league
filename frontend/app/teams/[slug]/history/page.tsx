@@ -27,8 +27,17 @@ export default async function TeamHistoryPage({ params }: { params: Promise<{ sl
     }),
     prisma.seasonAward.findMany({ where: { teamId: team.id } }),
     franchiseHistory(team.id, team.league ?? "NHL"),
+    // Trades and signings are logged without a teamId (waivers/requests carry one), so
+    // also match them by the club's name (trade lines) or code prefix ("EDM re-signed …").
     prisma.transaction.findMany({
-      where: { teamId: team.id }, orderBy: { createdAt: "desc" }, take: 20,
+      where: {
+        OR: [
+          { teamId: team.id },
+          { type: "TRADE", message: { contains: team.name, mode: "insensitive" } },
+          ...(team.code ? [{ type: "SIGNING", teamId: null, message: { startsWith: `${team.code} ` } }] : []),
+        ],
+      },
+      orderBy: { createdAt: "desc" }, take: 20,
       select: { id: true, type: true, message: true, createdAt: true },
     }),
   ]);
