@@ -1210,7 +1210,7 @@ export default function GamePicksView({
                 </div>
                 <div className="text-lg font-black text-amber-300">+$3,000,000</div>
                 <ul className="text-slate-300 space-y-1 text-[11px]">
-                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</li>
+                  <li>🎟️ <strong>Round 8 Draft Pick</strong> (or Round 9)</li>
                   <li>🥇 Gold badge <strong>Season Predictor Champion</strong></li>
                 </ul>
               </div>
@@ -1223,7 +1223,7 @@ export default function GamePicksView({
                 </div>
                 <div className="text-lg font-black text-slate-200">+$1,500,000</div>
                 <ul className="text-slate-300 space-y-1 text-[11px]">
-                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</li>
+                  <li>🎟️ <strong>Round 8 Draft Pick</strong> (or Round 9)</li>
                   <li>🥈 Silver badge <strong>Vice-Champion</strong></li>
                 </ul>
               </div>
@@ -1236,7 +1236,7 @@ export default function GamePicksView({
                 </div>
                 <div className="text-lg font-black text-amber-400">+$750,000</div>
                 <ul className="text-slate-300 space-y-1 text-[11px]">
-                  <li>🎟️ <strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</li>
+                  <li>🎟️ <strong>Round 8 Draft Pick</strong> (or Round 9)</li>
                   <li>🥉 Bronze badge <strong>3rd Place</strong></li>
                 </ul>
               </div>

@@ -1725,7 +1725,7 @@ export default function SeasonPicksView({
                 <ul className="text-slate-300 space-y-1.5 text-xs">
                   <li className="flex items-center gap-2">
                     <span>🎟️</span>
-                    <span><strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</span>
+                    <span><strong>Round 8 Draft Pick</strong> (or Round 9)</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span>🥇</span>
@@ -1746,7 +1746,7 @@ export default function SeasonPicksView({
                 <ul className="text-slate-300 space-y-1.5 text-xs">
                   <li className="flex items-center gap-2">
                     <span>🎟️</span>
-                    <span><strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</span>
+                    <span><strong>Round 8 Draft Pick</strong> (or Round 9)</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span>🥈</span>
@@ -1767,7 +1767,7 @@ export default function SeasonPicksView({
                 <ul className="text-slate-300 space-y-1.5 text-xs">
                   <li className="flex items-center gap-2">
                     <span>🎟️</span>
-                    <span><strong>Draft Pick v 8. kole</strong> (alebo 9. kole)</span>
+                    <span><strong>Round 8 Draft Pick</strong> (or Round 9)</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span>🥉</span>

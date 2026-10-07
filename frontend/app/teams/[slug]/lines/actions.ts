@@ -58,7 +58,7 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
   for (const [name, t] of Object.entries(PRESETS)) { const f = systemFit(profile, t); if (f > bestFit) { bestFit = f; bestName = name; } }
   const chosenTactics: TeamTactics = PRESETS[bestName];
   lines.system = { ...(lines.system ?? {}), ...chosenTactics };
-  rationale.push(`Tímový systém: <b>${bestName}</b> — najlepšie sadne na tento roster (SK ${Math.round(profile.sk)}, DF ${Math.round(profile.df)}, CK ${Math.round(profile.ck)}).`);
+  rationale.push(`Team system: <b>${bestName}</b> — fits this roster best (SK ${Math.round(profile.sk)}, DF ${Math.round(profile.df)}, CK ${Math.round(profile.ck)}).`);
 
   // archetype reshuffle: swap same-SLOT players ACROSS lines/pairs (LW<->LW,
   // C<->C, ... never changing WHO dresses, only WHICH line/pair they play on)
