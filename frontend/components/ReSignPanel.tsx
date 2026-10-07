@@ -811,7 +811,7 @@ export default function ReSignPanel({
             <div className="relative">
               <input
                 type="text"
-                placeholder="⌕ Filter hráča…"
+                placeholder="⌕ Filter players…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-400 w-28 sm:w-36"
