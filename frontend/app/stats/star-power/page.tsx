@@ -7,10 +7,13 @@ import { PageHeader, Card } from "@/components/ui";
 import InfoTip from "@/components/InfoTip";
 import { leagueStarLeaderboard } from "@/lib/star-power-server";
 import { tierAccent } from "@/lib/star-power";
+import { getLang } from "@/lib/lang-server";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export default async function StarPowerPage() {
+  const lang = await getLang();
   const sessionTeamId = await getTeamSession();
   const [rows, managedTeams] = await Promise.all([
     leagueStarLeaderboard(60),
@@ -23,8 +26,8 @@ export default async function StarPowerPage() {
   // Top 3 Star Power Spotlight Cards
   const top3 = rows.slice(0, 3);
   const heroCards: HeroCardItem[] = top3.map((r, idx) => ({
-    badge: idx === 0 ? "👑 FRANCHISE ICON" : idx === 1 ? "⭐ SUPERSTAR" : "🌟 MARQUEE ATTRACTION",
-    subBadge: `#${idx + 1} HVIEZDA`,
+    badge: idx === 0 ? t(lang, "stats.badge.franchiseIcon") : idx === 1 ? t(lang, "stats.badge.superstar") : t(lang, "stats.badge.marqueeAttraction"),
+    subBadge: `#${idx + 1} ${t(lang, "stats.subBadge.starRank")}`,
     playerId: r.playerId,
     slug: r.slug,
     name: r.name,
@@ -42,7 +45,7 @@ export default async function StarPowerPage() {
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle="Star Power — business & media value" />
+      <PageHeader title="Statistics" subtitle={t(lang, "stats.starPower.subtitle")} />
       <StatsTabs active="star-power" />
 
       {/* Top 3 Spotlight Podium */}

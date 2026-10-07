@@ -57,6 +57,7 @@ const TEAM_COLS: Col[] = [
 ];
 
 export default async function EdgeStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string; phase?: string }> }) {
+  const lang = await getLang();
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
   const explicit = sp.phase === "pre" || sp.phase === "regular" ? sp.phase : null;
@@ -97,8 +98,8 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
 
       if (fastest) {
         heroCards.push({
-          badge: "⚡ TOP SKATER SPEED",
-          subBadge: "RÝCHLOSŤ",
+          badge: t(lang, "stats.badge.topSkaterSpeed"),
+          subBadge: t(lang, "stats.subBadge.speed"),
           playerId: fastest.playerId,
           slug: fastest.slug,
           name: fastest.name,
@@ -110,14 +111,14 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
           teamLogo: fastest.teamLogo,
           value: fastest.topSkateSpeed.toFixed(1),
           unit: "mph",
-          sub: `${fastest.bursts} šprintov nad 22 mph`,
+          sub: `${fastest.bursts} ${t(lang, "stats.edge.bursts")}`,
           accentColor: "sky",
         });
       }
       if (hardest) {
         heroCards.push({
-          badge: "💥 HARDEST SHOT",
-          subBadge: "RÝCHLOSŤ STRELY",
+          badge: t(lang, "stats.badge.hardestShot"),
+          subBadge: t(lang, "stats.subBadge.shotSpeed"),
           playerId: hardest.playerId,
           slug: hardest.slug,
           name: hardest.name,
@@ -129,14 +130,14 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
           teamLogo: hardest.teamLogo,
           value: hardest.topShot.toFixed(1),
           unit: "mph",
-          sub: `${hardest.hits} hitov (${hardest.gp} GP)`,
+          sub: `${hardest.hits} ${t(lang, "stats.edge.hitsWithGp")} (${hardest.gp} GP)`,
           accentColor: "rose",
         });
       }
       if (dist) {
         heroCards.push({
-          badge: "🏃 MARATHON SKATER",
-          subBadge: "NAJKORČUĽOVANÉ MÍLE",
+          badge: t(lang, "stats.badge.marathonSkater"),
+          subBadge: t(lang, "stats.subBadge.distanceSkated"),
           playerId: dist.playerId,
           slug: dist.slug,
           name: dist.name,
@@ -148,7 +149,7 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
           teamLogo: dist.teamLogo,
           value: dist.miles.toFixed(1),
           unit: "mi",
-          sub: `${(dist.toi / 60).toFixed(0)} min na ľade`,
+          sub: `${(dist.toi / 60).toFixed(0)} ${t(lang, "stats.edge.minOnIce")}`,
           accentColor: "emerald",
         });
       }
@@ -172,8 +173,8 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
 
       if (hdLeader) {
         heroCards.push({
-          badge: "🧤 HIGH-DANGER LOCKDOWN",
-          subBadge: "ZÁKROKY V SLOTE",
+          badge: t(lang, "stats.badge.hdLockdown"),
+          subBadge: t(lang, "stats.subBadge.slotSaves"),
           playerId: hdLeader.playerId,
           slug: hdLeader.slug,
           name: hdLeader.name,
@@ -185,14 +186,14 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
           teamLogo: hdLeader.teamLogo,
           value: hdLeader.hdSvPct.toFixed(3).replace(/^0/, ""),
           unit: "HD SV%",
-          sub: `${hdLeader.hdShotsAg} striel zo slotu`,
+          sub: `${hdLeader.hdShotsAg} ${t(lang, "stats.edge.slotShots")}`,
           accentColor: "emerald",
         });
       }
       if (svLeader) {
         heroCards.push({
-          badge: "🛡️ OVERALL SAVE %",
-          subBadge: "CELKOVÁ ÚSPEŠNOSŤ",
+          badge: t(lang, "stats.badge.overallSvPct"),
+          subBadge: t(lang, "stats.subBadge.overallSv"),
           playerId: svLeader.playerId,
           slug: svLeader.slug,
           name: svLeader.name,
@@ -204,14 +205,14 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
           teamLogo: svLeader.teamLogo,
           value: svLeader.svPct.toFixed(3).replace(/^0/, ""),
           unit: "SV%",
-          sub: `${svLeader.gp} odchytaných zápasov`,
+          sub: `${svLeader.gp} ${t(lang, "stats.edge.gamesPlayedGoalie")}`,
           accentColor: "sky",
         });
       }
       if (mdLeader) {
         heroCards.push({
-          badge: "🎯 MID-DANGER WALL",
-          subBadge: "ZÁKROKY Z KRUHOV",
+          badge: t(lang, "stats.badge.mdWall"),
+          subBadge: t(lang, "stats.subBadge.midRangeSaves"),
           playerId: mdLeader.playerId,
           slug: mdLeader.slug,
           name: mdLeader.name,
@@ -223,7 +224,7 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
           teamLogo: mdLeader.teamLogo,
           value: mdLeader.mdSvPct.toFixed(3).replace(/^0/, ""),
           unit: "MD SV%",
-          sub: `${mdLeader.mdShotsAg} striel zo strednej vzdialenosti`,
+          sub: `${mdLeader.mdShotsAg} ${t(lang, "stats.edge.midRangeShots")}`,
           accentColor: "amber",
         });
       }
@@ -243,8 +244,8 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
 
       if (ozLeader) {
         heroCards.push({
-          badge: "⏱️ OFFENSIVE ZONE TIME",
-          subBadge: "ÚTOČNÉ PÁSMO",
+          badge: t(lang, "stats.badge.ozTime"),
+          subBadge: t(lang, "stats.subBadge.ozTime"),
           name: ozLeader.name,
           teamId: ozLeader.teamId,
           teamSlug: ozLeader.slug,
@@ -252,14 +253,14 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
           teamCode: ozLeader.code,
           value: ozLeader.ozPct.toFixed(1),
           unit: "OZ%",
-          sub: `${ozLeader.gp} odohraných zápasov`,
+          sub: `${ozLeader.gp} ${t(lang, "stats.edge.gamesPlayedTeam")}`,
           accentColor: "amber",
         });
       }
       if (shotLeader) {
         heroCards.push({
-          badge: "💥 HARDEST TEAM SHOT",
-          subBadge: "MAX RÝCHLOSŤ STRELY",
+          badge: t(lang, "stats.badge.teamHardestShot"),
+          subBadge: t(lang, "stats.subBadge.teamShotSpeed"),
           name: shotLeader.name,
           teamId: shotLeader.teamId,
           teamSlug: shotLeader.slug,
@@ -267,14 +268,14 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
           teamCode: shotLeader.code,
           value: shotLeader.topShot.toFixed(1),
           unit: "mph",
-          sub: `Priemer tímu ${shotLeader.avgShot.toFixed(1)} mph`,
+          sub: `${t(lang, "stats.edge.teamAvgShot")} ${shotLeader.avgShot.toFixed(1)} mph`,
           accentColor: "rose",
         });
       }
       if (skateLeader) {
         heroCards.push({
-          badge: "⚡ FASTEST ROSTER",
-          subBadge: "RÝCHLOSŤ TÍMU",
+          badge: t(lang, "stats.badge.fastestRoster"),
+          subBadge: t(lang, "stats.subBadge.teamSpeed"),
           name: skateLeader.name,
           teamId: skateLeader.teamId,
           teamSlug: skateLeader.slug,
@@ -282,16 +283,25 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
           teamCode: skateLeader.code,
           value: skateLeader.avgSkateSpeed.toFixed(1),
           unit: "mph",
-          sub: `${skateLeader.hitsPerGame.toFixed(1)} hitov / zápas`,
+          sub: `${skateLeader.hitsPerGame.toFixed(1)} ${t(lang, "stats.edge.hitsPerGame")}`,
           accentColor: "sky",
         });
       }
     }
   }
 
+  const viewLabels: Record<View, string> = {
+    skaters: t(lang, "stats.edge.viewSkaters"),
+    goalies: t(lang, "stats.edge.viewGoalies"),
+    teams: t(lang, "stats.edge.viewTeams"),
+  };
+
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`NHL EDGE — puck & player tracking · ${league} 2026-27 ${phase === "pre" ? "pre-season" : "regular season"}`} />
+      <PageHeader
+        title="Statistics"
+        subtitle={`${t(lang, "stats.edge.subtitle")} · ${league} 2026-27 ${phase === "pre" ? t(lang, "phase.pre").toLowerCase() : t(lang, "phase.regular").toLowerCase()}`}
+      />
       <StatsTabs active="edge" league={league} />
       <PhaseTabs active={phase} league={league} basePath="/stats/edge" showPlayoffs={false} keep={`view=${view}`} />
 
@@ -308,7 +318,7 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
             }`}
           >
             <span>{v.icon}</span>
-            <span>{v.label}</span>
+            <span>{viewLabels[v.key] ?? v.label}</span>
           </Link>
         ))}
       </div>
@@ -319,9 +329,9 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
       )}
 
       <p className="text-slate-400 text-sm">
-        {view === "skaters" && "Shot speed is tracked from every shot. Skating speed, 22+ mph bursts and distance are modelled from a skater's SK rating and ice time."}
-        {view === "goalies" && "Save % split by shot danger — high-danger (slot / net-front), mid-danger (circles) and low-danger (point / perimeter) — all from the sim's per-shot quality."}
-        {view === "teams" && "Zone time (offensive / neutral / defensive), shot speed and hits are tracked from the sim. Average skating speed is the roster's modelled SK speed."}
+        {view === "skaters" && t(lang, "stats.edge.skatersNote")}
+        {view === "goalies" && t(lang, "stats.edge.goaliesNote")}
+        {view === "teams" && t(lang, "stats.edge.teamsNote")}
       </p>
 
       <StatTable cols={cols} rows={rows} initialSort={initialSort} minWidth={820} showRank />

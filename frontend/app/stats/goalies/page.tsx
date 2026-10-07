@@ -188,7 +188,21 @@ export default async function GoalieStatsPage({ searchParams }: { searchParams: 
           ? (lang === "cs" ? " Zápasy z prípravy sa nezapočítavajú do profilov/kariéry." : " Pre-season stats don't count toward profiles/careers.")
           : ""}
       </p>
-      <StatTable cols={COLS} rows={rows} initialSort="wins" minWidth={1160} showRank />
+      {(() => {
+        const cols = COLS.map((c) => {
+          if (c.key === "steals") {
+            return {
+              ...c,
+              title: lang === "cs" ? "Steals (Ukradnuté zápasy)" : "Steals",
+              info: lang === "cs"
+                ? "Ukradnuté zápasy (Steals): Zápasy s výhrou, kde brankárov GSAx prevýšil gólový náskok tímu (bez gólov do prázdnej brány)."
+                : "Steals: Wins where the goalie's GSAx exceeded the team's margin of victory (excluding empty-net goals).",
+            };
+          }
+          return c;
+        });
+        return <StatTable cols={cols} rows={rows} initialSort="wins" minWidth={1160} showRank />;
+      })()}
       <p className="text-xs text-slate-600">
         Columns showing “—” (PIM, A, EG, PS %, PSA, ST, BG, S1–S3) are stat fields the sim engine doesn’t record yet.
       </p>

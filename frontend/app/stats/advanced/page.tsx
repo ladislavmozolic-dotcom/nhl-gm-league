@@ -190,7 +190,23 @@ export default async function AdvancedStatsPage({ searchParams }: { searchParams
           <span>🧤</span>
           <span>Goalies — goals saved above expected</span>
         </h2>
-        <StatTable cols={GOALIE_COLS} rows={goalieRows} initialSort="gsax" minWidth={760} showRank />
+        <StatTable
+          cols={GOALIE_COLS.map((c) =>
+            c.key === "steals"
+              ? {
+                  ...c,
+                  title: lang === "cs" ? "Steals (Ukradnuté zápasy)" : "Steals",
+                  info: lang === "cs"
+                    ? "Ukradnuté zápasy — výhry, kde brankárov GSAx prevýšil gólový náskok tímu (bez prázdnej brány)."
+                    : "Steals — wins where the goalie's GSAx exceeded the team's margin of victory (excluding empty net goals).",
+                }
+              : c
+          )}
+          rows={goalieRows}
+          initialSort="gsax"
+          minWidth={760}
+          showRank
+        />
         <p className="text-xs text-slate-600">Minimum {gkSaMin} shots against (scales up to 150). GSAx above zero = stopped more than the shot quality faced would predict.</p>
       </section>
     </div>

@@ -6,6 +6,8 @@ import StatHeroDeck, { type HeroCardItem } from "@/components/StatHeroDeck";
 import StatTable, { type Col } from "@/components/StatTable";
 import { PageHeader } from "@/components/ui";
 import { careerLeaderboard } from "@/lib/career-server";
+import { getLang } from "@/lib/lang-server";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +50,7 @@ const GOALIE_COLS: Col[] = [
 ];
 
 export default async function CareerStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; type?: string; phase?: string }> }) {
+  const lang = await getLang();
   const sp = await searchParams;
   const league = sp.league === "AHL" ? "AHL" : "NHL";
   const type = sp.type === "goalies" ? "goalies" : "skaters";
@@ -83,8 +86,8 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
 
     if (ptsLeader) {
       heroCards.push({
-        badge: "📜 ALL-TIME SCORER",
-        subBadge: "HISTORICKÉ BODY",
+        badge: t(lang, "stats.badge.allTimeScorer"),
+        subBadge: t(lang, "stats.subBadge.allTimePoints"),
         playerId: ptsLeader.playerId,
         slug: ptsLeader.slug,
         name: ptsLeader.name,
@@ -102,8 +105,8 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
     }
     if (goalsLeader) {
       heroCards.push({
-        badge: "🚀 ALL-TIME SNIPER",
-        subBadge: "HISTORICKÉ GÓLY",
+        badge: t(lang, "stats.badge.allTimeSniper"),
+        subBadge: t(lang, "stats.subBadge.allTimeGoals"),
         playerId: goalsLeader.playerId,
         slug: goalsLeader.slug,
         name: goalsLeader.name,
@@ -121,8 +124,8 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
     }
     if (gpLeader) {
       heroCards.push({
-        badge: "🛡️ IRON MAN",
-        subBadge: "NAJVIAC ZÁPASOV",
+        badge: t(lang, "stats.badge.ironMan"),
+        subBadge: t(lang, "stats.subBadge.mostGames"),
         playerId: gpLeader.playerId,
         slug: gpLeader.slug,
         name: gpLeader.name,
@@ -134,7 +137,7 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
         teamLogo: gpLeader.teamLogo,
         value: gpLeader.gp,
         unit: "GP",
-        sub: `${gpLeader.seasons} odohraných sezón`,
+        sub: `${gpLeader.seasons} ${t(lang, "stats.career.seasonsPlayed")}`,
         accentColor: "sky",
       });
     }
@@ -145,8 +148,8 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
 
     if (winsLeader) {
       heroCards.push({
-        badge: "🏆 ALL-TIME WINS",
-        subBadge: "HISTORICKÉ VÝHRY",
+        badge: t(lang, "stats.badge.allTimeWins"),
+        subBadge: t(lang, "stats.subBadge.allTimeWins"),
         playerId: winsLeader.playerId,
         slug: winsLeader.slug,
         name: winsLeader.name,
@@ -164,8 +167,8 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
     }
     if (soLeader) {
       heroCards.push({
-        badge: "🚫 ALL-TIME SHUTOUTS",
-        subBadge: "ČISTÉ KONTÁ",
+        badge: t(lang, "stats.badge.allTimeShutouts"),
+        subBadge: t(lang, "stats.subBadge.shutouts"),
         playerId: soLeader.playerId,
         slug: soLeader.slug,
         name: soLeader.name,
@@ -177,14 +180,14 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
         teamLogo: soLeader.teamLogo,
         value: soLeader.shutouts,
         unit: "SO",
-        sub: `${soLeader.gp} odchytaných zápasov`,
+        sub: `${soLeader.gp} ${t(lang, "stats.career.gamesPlayed")}`,
         accentColor: "emerald",
       });
     }
     if (gpLeader) {
       heroCards.push({
-        badge: "🧤 IRON GOALIE",
-        subBadge: "NAJVIAC ŠTARTOV",
+        badge: t(lang, "stats.badge.ironGoalie"),
+        subBadge: t(lang, "stats.subBadge.mostStarts"),
         playerId: gpLeader.playerId,
         slug: gpLeader.slug,
         name: gpLeader.name,
@@ -196,7 +199,7 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
         teamLogo: gpLeader.teamLogo,
         value: gpLeader.gp,
         unit: "GS",
-        sub: `${gpLeader.seasons} odchytaných sezón`,
+        sub: `${gpLeader.seasons} ${t(lang, "stats.career.seasonsPlayedGoalie")}`,
         accentColor: "sky",
       });
     }
@@ -215,15 +218,18 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Statistics" subtitle={`Career totals in the league — ${league} ${playoffs ? "playoffs" : "regular season"}`} />
+      <PageHeader
+        title="Statistics"
+        subtitle={`${t(lang, "stats.career.subtitle")} — ${league} ${playoffs ? t(lang, "phase.playoffs").toLowerCase() : t(lang, "phase.regular").toLowerCase()}`}
+      />
       <StatsTabs active="career" league={league} />
 
       <div className="flex flex-wrap gap-2">
-        <Link href={qs({ type: "skaters" })} className={pill(type === "skaters")}>Skaters</Link>
-        <Link href={qs({ type: "goalies" })} className={pill(type === "goalies")}>Goalies</Link>
+        <Link href={qs({ type: "skaters" })} className={pill(type === "skaters")}>{t(lang, "stats.career.skaters")}</Link>
+        <Link href={qs({ type: "goalies" })} className={pill(type === "goalies")}>{t(lang, "stats.career.goalies")}</Link>
         <span className="w-px bg-slate-800 mx-1" />
-        <Link href={qs({ phase: "" })} className={pill(!playoffs)}>Regular Season</Link>
-        <Link href={qs({ phase: "playoffs" })} className={pill(playoffs)}>Playoffs</Link>
+        <Link href={qs({ phase: "" })} className={pill(!playoffs)}>{t(lang, "stats.career.regularSeason")}</Link>
+        <Link href={qs({ phase: "playoffs" })} className={pill(playoffs)}>{t(lang, "stats.career.playoffs")}</Link>
       </div>
 
       {/* Hero Spotlight Cards */}
@@ -232,8 +238,7 @@ export default async function CareerStatsPage({ searchParams }: { searchParams: 
       )}
 
       <p className="text-slate-400 text-sm">
-        Every season played in this league, summed — finished seasons from the archive, the current one live.
-        Real-life NHL history is not included. Click a header to sort.
+        {t(lang, "stats.career.note")}
       </p>
 
       {type === "skaters"
