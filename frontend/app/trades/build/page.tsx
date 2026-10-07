@@ -60,21 +60,60 @@ export default async function TradeBuildPage({ searchParams }: { searchParams: P
   const oppTeam = oppId ? await prisma.team.findUnique({ where: { id: oppId }, select: { id: true, name: true, logoUrl: true } }) : null;
 
   if (!oppTeam) {
+    const isSk = lang === "cs";
     return (
-      <div className="space-y-6 py-2">
-        <PageHeader title="Trade Room" subtitle={`You are ${myTeam.name}. Pick a team to trade with.`}
-          right={<Link href="/trades/build3" className="text-sm text-slate-400 hover:text-blue-400">+ Add a 3rd team</Link>} />
-        <Card>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="max-w-7xl mx-auto space-y-6 py-2 px-3 sm:px-6">
+        <PageHeader
+          title={isSk ? "Trade Room — Výber partnera" : "Trade Room — Pick Opponent"}
+          subtitle={
+            isSk
+              ? `Ste manažérom ${myTeam.name}. Vyberte klub, s ktorým chcete zahájiť vyjednávanie o výmene.`
+              : `You are managing ${myTeam.name}. Select a team to enter the Trade Room with.`
+          }
+          right={
+            <div className="flex items-center gap-3">
+              <Link
+                href="/trades"
+                className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white hover:border-slate-700 transition-colors"
+              >
+                {isSk ? "← Späť na Výměny" : "← Back to Trades"}
+              </Link>
+              <Link
+                href="/trades/build3"
+                className="px-3 py-1.5 rounded-xl bg-cyan-950/60 border border-cyan-800/60 text-xs font-bold text-cyan-300 hover:bg-cyan-900/60 transition-colors"
+              >
+                {isSk ? "+ Pridať 3. tím" : "+ Add a 3rd team"}
+              </Link>
+            </div>
+          }
+        />
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {teams.map((t) => (
-              <Link key={t.id} href={`/trades/build?opp=${t.id}`}
-                className="flex items-center gap-3 bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 px-4 py-3 hover:border-slate-600 transition-colors">
-                {t.logoUrl && <img src={t.logoUrl} alt="" className="w-8 h-8 object-contain shrink-0" />}
-                <span className="font-medium text-sm">{t.name}</span>
+              <Link
+                key={t.id}
+                href={`/trades/build?opp=${t.id}`}
+                className="flex items-center gap-3 bg-slate-950/60 border border-slate-800/90 rounded-2xl p-3.5 hover:border-cyan-500/60 hover:bg-slate-900/80 transition-all duration-200 group shadow-md"
+              >
+                <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800/80 p-1 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  {t.logoUrl ? (
+                    <img src={t.logoUrl} alt={t.name} className="w-7 h-7 object-contain" />
+                  ) : (
+                    <span>🏒</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-sm text-white truncate group-hover:text-cyan-300 transition-colors">
+                    {t.name}
+                  </div>
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                    {isSk ? "Začať rokovania →" : "Trade Room →"}
+                  </div>
+                </div>
               </Link>
             ))}
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
