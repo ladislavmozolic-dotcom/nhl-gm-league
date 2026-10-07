@@ -162,6 +162,23 @@ function GmAssistantBriefing({ briefing }: { briefing: NonNullable<Awaited<Retur
           </div>;
         })}
       </div>
+      <GmMarketRadar briefing={briefing} />
     </div>
   </Card>;
+}
+
+function GmMarketRadar({ briefing }: { briefing: NonNullable<Awaited<ReturnType<typeof loadGmBriefing>>> }) {
+  const { radar } = briefing;
+  const money = (value: number | null) => value == null ? "—" : `$${(value / 1_000_000).toFixed(1)}M`;
+  const playerLink = (p: { id: number; name: string; slug: string | null }) => p.slug ? `/players/${p.slug}` : `/players/${p.id}`;
+  return <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 pt-1">
+    <div className="rounded-xl border border-violet-900/60 bg-violet-950/15 overflow-hidden">
+      <div className="flex justify-between items-center gap-3 px-3.5 py-2.5 border-b border-violet-900/50"><div><span className="font-semibold text-sm text-violet-200">🧱 Trade Block radar</span><p className="text-[11px] text-slate-500">Zhoda pre: {radar.positions.length ? radar.positions.join(", ") : "nastav potreby tímu alebo počkaj na roster analýzu"}</p></div><Link href="/trade-block" className="text-xs text-blue-400 hover:text-blue-300">Celý Trade Block →</Link></div>
+      {radar.tradeBlock.length ? <div className="divide-y divide-violet-950/80">{radar.tradeBlock.map((p) => <div key={p.id} className="px-3.5 py-2.5 flex items-center gap-2.5"><div className="min-w-0 flex-1"><Link href={playerLink(p)} className="text-sm font-semibold text-slate-200 hover:text-blue-400">{p.name}</Link><p className="text-[11px] text-slate-500">{p.teamCode ?? p.teamName} · {p.position}{p.farm ? " · AHL" : ""}{p.note ? ` · ${p.note}` : ""}</p></div><div className="text-right text-xs text-slate-400"><span className="font-semibold text-slate-200">OVR {p.overall ?? "—"}</span><br />{p.age ?? "—"} r. · {money(p.capHit)}</div></div>)}</div> : <p className="px-3.5 py-4 text-xs text-slate-500">Momentálne nie je na Trade Blocku hráč, ktorý by sedel na sledovanú pozíciu. Radar sa obnoví pri ďalšom otvorení stránky.</p>}
+    </div>
+    <div className="rounded-xl border border-amber-900/60 bg-amber-950/15 overflow-hidden">
+      <div className="flex justify-between items-center gap-3 px-3.5 py-2.5 border-b border-amber-900/50"><div><span className="font-semibold text-sm text-amber-200">📋 Waiver watch</span><p className="text-[11px] text-slate-500">{radar.waiversEnabled ? `Tvoja priorita nároku: ${radar.waiverPriority ?? "—"}. z 32` : "Waivery sú v nastaveniach ligy vypnuté."}</p></div><Link href="/waivers" className="text-xs text-blue-400 hover:text-blue-300">Waiver wire →</Link></div>
+      {!radar.waiversEnabled ? <p className="px-3.5 py-4 text-xs text-slate-500">Po zapnutí waiverov bude radar vyberať aktívnych hráčov, ktorí sedí na potreby tvojho tímu.</p> : radar.waivers.length ? <div className="divide-y divide-amber-950/80">{radar.waivers.map((p) => <div key={p.id} className="px-3.5 py-2.5 flex items-center gap-2.5"><div className="min-w-0 flex-1"><Link href={playerLink(p)} className="text-sm font-semibold text-slate-200 hover:text-blue-400">{p.name}</Link><p className="text-[11px] text-slate-500">z {p.teamCode ?? p.teamName} · {p.position} · {p.claimCount ? `${p.claimCount} nárokov` : "bez nároku"}</p></div><div className="text-right text-xs text-slate-400"><span className="font-semibold text-slate-200">OVR {p.overall ?? "—"}</span><br />{p.age ?? "—"} r. · {money(p.capHit)}</div></div>)}</div> : <p className="px-3.5 py-4 text-xs text-slate-500">Na waiveroch teraz nie je žiadny hráč, ktorý by sedel na sledovanú pozíciu. Sleduje sa živý stav waiver wire.</p>}
+    </div>
+  </div>;
 }

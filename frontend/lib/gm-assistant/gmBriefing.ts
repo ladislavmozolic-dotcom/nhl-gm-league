@@ -5,6 +5,10 @@ import { loadLeagueCap, teamContentionMap } from "@/lib/free-agency-server";
 import { seasonForPhase } from "@/lib/phase";
 import { analyzeRoster, type RosterAnalysis, type RosterFinding } from "./analyzeRoster";
 import { liveCapHit } from "@/lib/finance";
+import { activeWaivers, waiverPriorityOrder } from "@/lib/waivers-server";
+import { fillsNeed, tradeBlockBoard } from "@/lib/trade-block-server";
+import { loadSettings } from "@/lib/sim/settings";
+import type { Phase } from "@/lib/calendar";
 
 // The GM Assistant is deliberately a briefing, not an auto-GM. It combines
 // explainable signals that already exist in UNHL Intelligence into a short,
@@ -32,7 +36,25 @@ export type GmBriefing = {
   record: { gp: number; points: number; pointsPct: number } | null;
   form: { lastGames: number; points: number; streak: number } | null;
   items: BriefingItem[];
+  radar: {
+    positions: string[];
+    tradeBlock: RadarPlayer[];
+    waiversEnabled: boolean;
+    waiverPriority: number | null;
+    waivers: WaiverRadarPlayer[];
+  };
 };
+
+// These are live market listings, not an AI prediction that a club will accept
+// a trade or that a waiver claim is affordable. The UI deliberately says what
+// created each match: a declared team need and/or a weak role-score slot.
+export type RadarPlayer = {
+  id: number; name: string; slug: string | null; position: string; age: number | null;
+  capHit: number | null; overall: number | null; teamName: string; teamCode: string | null;
+  note: string | null; farm: boolean;
+};
+
+export type WaiverRadarPlayer = RadarPlayer & { placedAt: Date; claimCount: number };
 
 type GameResult = { won: boolean; otLoss: boolean };
 
@@ -84,6 +106,43 @@ async function capSpace(teamId: number): Promise<number | null> {
   return cap.upper - players.reduce((sum, player) => sum + liveCapHit(player), 0);
 }
 
+async function marketRadar(teamId: number, analysis: RosterAnalysis, phase: Phase): Promise<GmBriefing["radar"]> {
+  const weakPositions = analysis.findings
+    .filter((f) => f.severity === "critical" || f.severity === "warning")
+    .map(positionForFinding)
+    .filter((p): p is NonNullable<typeof p> => p != null);
+  const [team, board, waivers, settings, priority] = await Promise.all([
+    prisma.team.findUnique({ where: { id: teamId }, select: { needs: true } }),
+    tradeBlockBoard(), activeWaivers(), loadSettings(), waiverPriorityOrder(phase),
+  ]);
+  // A GM's manually declared needs take precedence in presentation; role-score
+  // gaps supplement them so an empty Trade Block setup never means an empty radar.
+  const positions = [...new Set([...(team?.needs ?? []), ...weakPositions])];
+  const wants = (position: string) => positions.some((need) => fillsNeed(position, need));
+  const toRadar = (p: { id: number; name: string; slug: string | null; position: string; age: number | null; capHit: number | null; overall: number | null; teamName: string; teamCode: string | null; note: string | null; farm: boolean }): RadarPlayer => p;
+  const tradeBlock = board
+    .filter((club) => club.teamId !== teamId)
+    .flatMap((club) => club.players)
+    .filter((p) => wants(p.position))
+    // NHL listings first, then the same transparent OVR order used by Trade Block.
+    .sort((a, b) => Number(a.farm) - Number(b.farm) || (b.overall ?? 0) - (a.overall ?? 0))
+    .slice(0, 6)
+    .map(toRadar);
+  const waiverPriority = priority.find((row) => row.teamId === teamId)?.rank ?? null;
+  const waiverRows = settings.waiversEnabled
+    ? waivers
+      .filter((w) => w.fromTeamId !== teamId && wants(w.position))
+      .sort((a, b) => b.placedAt.getTime() - a.placedAt.getTime())
+      .slice(0, 6)
+      .map((w): WaiverRadarPlayer => ({
+        id: w.playerId, name: w.playerName, slug: w.playerSlug, position: w.position, age: w.age ?? null,
+        capHit: w.capHit, overall: w.overall ?? null, teamName: w.fromName ?? w.fromCode,
+        teamCode: w.fromCode, note: null, farm: false, placedAt: w.placedAt, claimCount: w.claims.length,
+      }))
+    : [];
+  return { positions, tradeBlock, waiversEnabled: settings.waiversEnabled, waiverPriority, waivers: waiverRows };
+}
+
 function strategyItem(contention: Contention, analysis: RosterAnalysis): BriefingItem {
   const strengths = analysis.findings.filter((f) => f.severity === "ok").slice(0, 2).map((f) => f.label);
   const strengthNote = strengths.length ? ` Silné opory: ${strengths.join(", ")}.` : "";
@@ -116,12 +175,13 @@ export async function loadGmBriefing(teamId: number, existingAnalysis?: RosterAn
   ]);
   if (!analysis) return null;
   const season = seasonForPhase(clock.phase);
-  const [form, games] = await Promise.all([
+  const [form, games, radar] = await Promise.all([
     recentForm(teamId, season),
     prisma.game.findMany({
       where: { season, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] },
       select: { winnerTeamId: true, endedIn: true },
     }),
+    marketRadar(teamId, analysis, clock.phase),
   ]);
   const points = games.reduce((sum, game) => sum + (game.winnerTeamId === teamId ? 2 : game.endedIn === "REG" ? 0 : 1), 0);
   const contention = contentionMap.get(teamId) ?? "middle";
@@ -166,5 +226,6 @@ export async function loadGmBriefing(teamId: number, existingAnalysis?: RosterAn
     record: games.length ? { gp: games.length, points, pointsPct: points / (games.length * 2) } : null,
     form: form.results.length ? { lastGames: form.results.length, points: form.results.reduce((sum, r) => sum + (r.won ? 2 : r.otLoss ? 1 : 0), 0), streak: form.streak } : null,
     items: items.slice(0, 5),
+    radar,
   };
 }
