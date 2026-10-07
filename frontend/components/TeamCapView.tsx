@@ -16,6 +16,7 @@ import { getTeamSession } from "@/lib/auth";
 import { teamRetentionStatus } from "@/lib/cap";
 import { capPenaltyFor, capFloorPenaltyFor } from "@/lib/cap-penalty";
 import { ROSTER_LIMITS } from "@/lib/roster-rules";
+import ClauseBadge from "@/components/ClauseBadge";
 import BuyoutButton from "@/components/BuyoutButton";
 import { buyoutPlayer } from "@/app/finance/[slug]/actions";
 
@@ -53,11 +54,11 @@ export default async function TeamCapView({ slug }: { slug: string }) {
     prisma.game.count({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } }),
     teamRetentionStatus(team.id),
     regularSeasonDayProgress(),
-    prisma.team.findMany({ select: { id: true, code: true } }),
+    prisma.team.findMany({ select: { id: true, code: true, name: true, slug: true, logoUrl: true } }),
     prisma.capProjection.findMany({ orderBy: { year: "asc" } }),
   ]);
   // For an M-NTC player's protected-teams tooltip.
-  const teamCodeById = new Map(allTeams.map((t) => [t.id, t.code]));
+  const teamById = new Map(allTeams.map((t) => [t.id, t]));
   const isGm = session === team.id;
   // The Buyout table doubles up: a positive totalCost identifies a bought-out
   // contract; 0 identifies trade retention. Both are dead cap, never a cash fee.
@@ -208,9 +209,8 @@ export default async function TeamCapView({ slug }: { slug: string }) {
       const netCapHit = Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0));
       const cells = playerCapYears({ ...p, capHit: netCapHit }, CURRENT_SEASON_START, SPAN);
       const pendingClause = !p.tradeClause && p.extClause ? p.extClause : null;
-      const protectedTeams = p.tradeClause === "M_NTC"
-        ? (p.noTradeTeams ?? []).map((id) => teamCodeById.get(id)).filter(Boolean).join(", ")
-        : pendingClause === "M_NTC" ? (p.extNoTradeTeams ?? []).map((id) => teamCodeById.get(id)).filter(Boolean).join(", ") : "";
+      const protectedIds = p.tradeClause === "M_NTC" ? (p.noTradeTeams ?? []) : pendingClause === "M_NTC" ? (p.extNoTradeTeams ?? []) : [];
+      const protectedTeams = protectedIds.map((id) => teamById.get(id)).filter((t): t is NonNullable<typeof t> => !!t);
       const isLtir = onLtir({ capHit: p.capHit, injuryDaysLeft: p.injuryDaysLeft, condition: p.condition, isGoalie: p.isGoalie });
       return (
         <tr key={p.id} className="border-b border-slate-800/60 hover:bg-slate-800/30">
@@ -227,8 +227,12 @@ export default async function TeamCapView({ slug }: { slug: string }) {
           <td className="px-2 py-1.5 text-center text-slate-500 text-xs whitespace-nowrap">{p.position}</td>
           <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums whitespace-nowrap">{p.age ?? "—"}</td>
           <td className="px-2 py-1.5 text-center whitespace-nowrap"><TypeBadge type={p.contractType} /></td>
-          <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums whitespace-nowrap" title={protectedTeams ? `Protected against: ${protectedTeams}` : undefined}>
-            {p.tradeClause ? (CLAUSE_LABEL[p.tradeClause] ?? p.tradeClause) : pendingClause ? <span className="text-amber-300/80" title={`Signed with his extension — takes effect from ${seasonLabel(CURRENT_SEASON_START + (p.contractYears ?? 0))}${protectedTeams ? `. Protected against: ${protectedTeams}` : ""}`}>{CLAUSE_LABEL[pendingClause] ?? pendingClause}*</span> : ""}
+          <td className="px-2 py-1.5 text-center whitespace-nowrap">
+            {p.tradeClause
+              ? <ClauseBadge clause={p.tradeClause} teams={protectedTeams} playerName={p.name} />
+              : pendingClause
+                ? <ClauseBadge clause={pendingClause} pending effectiveFrom={seasonLabel(CURRENT_SEASON_START + (p.contractYears ?? 0))} teams={protectedTeams} playerName={p.name} />
+                : ""}
           </td>
           <td className="px-3 py-1.5 text-right tabular-nums font-medium text-xs whitespace-nowrap">{netCapHit ? money(netCapHit) : "—"}</td>
           {cells.map((c, i) => <td key={i} className="px-3 py-1.5 text-right tabular-nums text-xs whitespace-nowrap">{c.salary != null ? <span className="text-green-400">{money(c.salary)}</span> : c.status ? <Badge s={c.status} /> : ""}</td>)}
