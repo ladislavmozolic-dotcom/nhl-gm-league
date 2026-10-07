@@ -538,11 +538,11 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
               {/* BLOK A: OFENZÍVA & STREĽBA */}
               <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wide flex items-center gap-1.5">
+                <div className="flex items-center justify-between gap-1.5 border-b border-slate-800/80 pb-2 min-w-0">
+                  <span className="text-[11px] font-bold text-amber-400 uppercase tracking-tight flex items-center gap-1.5 whitespace-nowrap min-w-0">
                     <span>🏒</span> {isEn ? "Offense & Shooting" : "Ofenzíva & Streľba"}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">{isEn ? "Offensive Data" : "Útočné dáta"}</span>
+                  <span className="text-[9px] font-mono text-slate-500 shrink-0 whitespace-nowrap">{isEn ? "Offensive Data" : "Útočné dáta"}</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
@@ -586,11 +586,11 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
 
               {/* BLOK B: DEFENZÍVA & BRÁNKISKO */}
               <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                  <span className="text-xs font-bold text-sky-400 uppercase tracking-wide flex items-center gap-1.5">
+                <div className="flex items-center justify-between gap-1.5 border-b border-slate-800/80 pb-2 min-w-0">
+                  <span className="text-[11px] font-bold text-sky-400 uppercase tracking-tight flex items-center gap-1.5 whitespace-nowrap min-w-0">
                     <span>🛡️</span> {isEn ? "Defense & Goaltending" : "Defenzíva & Brankári"}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">{isEn ? "Defensive Data" : "Obranné dáta"}</span>
+                  <span className="text-[9px] font-mono text-slate-500 shrink-0 whitespace-nowrap">{isEn ? "Defensive Data" : "Obranné dáta"}</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
@@ -636,11 +636,11 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
 
               {/* BLOK C: BULY, FYZICKÁ HRA & BILANCIA */}
               <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
+                <div className="flex items-center justify-between gap-1.5 border-b border-slate-800/80 pb-2 min-w-0">
+                  <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-tight flex items-center gap-1.5 whitespace-nowrap min-w-0">
                     <span>⚖️</span> {isEn ? "Physical Play & Record" : "Fyzická hra & Bilancia"}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">{isEn ? "Activity" : "Aktivita"}</span>
+                  <span className="text-[9px] font-mono text-slate-500 shrink-0 whitespace-nowrap">{isEn ? "Activity" : "Aktivita"}</span>
                 </div>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between">
