@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getTeamSession } from "@/lib/auth";
 import { CATEGORIES, CAT_META } from "./categories";
-import { markForumSeen } from "./actions";
+import MarkAllReadButton from "@/components/forum/MarkAllReadButton";
 
 export const dynamic = "force-dynamic";
 
@@ -17,15 +18,32 @@ const ago = (d: Date) => {
 };
 
 export default async function ForumPage() {
-  await markForumSeen();
+  const me = await getTeamSession();
+  const myTeam = me
+    ? await prisma.team.findUnique({
+        where: { id: me },
+        select: { code: true, forumSeenAt: true },
+      })
+    : null;
 
-  // Load category details, counts and latest posts
+  const lastSeen = myTeam?.forumSeenAt ?? new Date(0);
+
+  // Load category details, counts, unread posts and latest posts
   const [cats, totalTeams, activeTeams, latestPostOverall] = await Promise.all([
     Promise.all(
       CATEGORIES.map(async (cat) => {
-        const [topics, posts, last] = await Promise.all([
+        const [topics, posts, unreadCount, last] = await Promise.all([
           prisma.forumThread.count({ where: { category: cat } }),
           prisma.forumPost.count({ where: { thread: { category: cat } } }),
+          me
+            ? prisma.forumPost.count({
+                where: {
+                  thread: { category: cat },
+                  teamId: { not: me },
+                  createdAt: { gt: lastSeen },
+                },
+              })
+            : 0,
           prisma.forumPost.findFirst({
             where: { thread: { category: cat } },
             orderBy: { id: "desc" },
@@ -36,7 +54,7 @@ export default async function ForumPage() {
             },
           }),
         ]);
-        return { cat, topics, posts, last };
+        return { cat, topics, posts, unreadCount, last };
       })
     ),
     prisma.team.count(),
@@ -67,6 +85,7 @@ export default async function ForumPage() {
 
   const totalTopics = cats.reduce((n, c) => n + c.topics, 0);
   const totalPosts = cats.reduce((n, c) => n + c.posts, 0);
+  const totalUnread = cats.reduce((n, c) => n + c.unreadCount, 0);
 
   const nowFormatted = new Date().toLocaleString("sk-SK", {
     day: "numeric",
@@ -77,16 +96,21 @@ export default async function ForumPage() {
   });
 
   return (
-    <div className="space-y-6 py-2 max-w-6xl mx-auto">
+    <div className="space-y-6 py-2 w-full">
       {/* Top phpBB Board Header */}
       <div className="rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 p-5 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span className="text-2xl">🏛️</span>
-              <h1 className="text-2xl font-black text-white tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                 UNHL Diskusné Fórum
               </h1>
+              {totalUnread > 0 && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-rose-500 text-white shadow-md shadow-rose-900/50 animate-pulse">
+                  {totalUnread} {totalUnread === 1 ? "nová správa" : "nových správ"}
+                </span>
+              )}
             </div>
             <p className="text-xs sm:text-sm text-slate-400">
               Hlavný rozcestník ligových diskusií, vyjednávaní a oficiálnych oznamov.
@@ -119,18 +143,22 @@ export default async function ForumPage() {
             <span>Aktuálny čas na serveri:</span>
             <span className="text-slate-400 font-medium">{nowFormatted}</span>
           </div>
-          {latestPostOverall && (
-            <div className="flex items-center gap-1.5 truncate">
-              <span>Posledný príspevok v lige:</span>
-              <Link
-                href={`/forum/${latestPostOverall.thread.id}`}
-                className="text-blue-400 hover:underline font-medium truncate max-w-[200px]"
-              >
-                {latestPostOverall.thread.title}
-              </Link>
-              <span className="text-slate-600">({ago(latestPostOverall.createdAt)})</span>
-            </div>
-          )}
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {latestPostOverall && (
+              <div className="flex items-center gap-1.5 truncate">
+                <span>Posledný príspevok v lige:</span>
+                <Link
+                  href={`/forum/${latestPostOverall.thread.id}`}
+                  className="text-blue-400 hover:underline font-medium truncate max-w-[200px]"
+                >
+                  {latestPostOverall.thread.title}
+                </Link>
+                <span className="text-slate-600">({ago(latestPostOverall.createdAt)})</span>
+              </div>
+            )}
+            {me && <MarkAllReadButton />}
+          </div>
         </div>
       </div>
 
@@ -143,44 +171,77 @@ export default async function ForumPage() {
               🏒 Ligové sekcie a podfóra
             </span>
           </div>
-          <span className="text-xs text-slate-400 font-medium hidden sm:inline">
-            Board Index
-          </span>
+          <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+            <span>Board Index</span>
+          </div>
         </div>
 
         {/* Table Column Headers */}
         <div className="hidden sm:flex items-center justify-between px-5 py-2.5 bg-slate-950/70 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
           <div className="flex-1">Podfórum / Popis</div>
           <div className="w-32 text-center">Štatistika</div>
-          <div className="w-64 pl-5">Posledný príspevok</div>
+          <div className="w-72 pl-5">Posledný príspevok</div>
         </div>
 
         {/* Category Rows */}
         <div className="divide-y divide-slate-800/70">
-          {cats.map(({ cat, topics, posts, last }) => {
+          {cats.map(({ cat, topics, posts, unreadCount, last }) => {
             const m = CAT_META[cat];
+            const hasNew = unreadCount > 0;
+            const isLastPostNew =
+              last != null &&
+              me != null &&
+              last.createdAt > lastSeen &&
+              last.team.code !== myTeam?.code;
+
             return (
               <div
                 key={cat}
-                className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 gap-3 transition-all hover:bg-slate-800/40"
+                className={`group flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 gap-3 transition-all ${
+                  hasNew
+                    ? "bg-rose-950/15 border-l-4 border-l-rose-500 hover:bg-rose-950/25"
+                    : "hover:bg-slate-800/40"
+                }`}
               >
                 {/* Left: Icon & Subforum Info */}
                 <div className="flex items-start sm:items-center gap-4 min-w-0 flex-1">
-                  <Link
-                    href={`/forum/c/${cat}`}
-                    className="shrink-0 w-12 h-12 rounded-xl bg-slate-800 border border-slate-700/80 grid place-items-center text-2xl shadow-sm transition-transform group-hover:scale-105"
-                  >
-                    {m.icon}
-                  </Link>
+                  <div className="relative shrink-0">
+                    <Link
+                      href={`/forum/c/${cat}`}
+                      className={`block w-12 h-12 rounded-xl border grid place-items-center text-2xl shadow-sm transition-transform group-hover:scale-105 ${
+                        hasNew
+                          ? "bg-rose-900/30 border-rose-500/60 ring-2 ring-rose-500/50 shadow-[0_0_15px_-2px_rgba(244,63,94,0.4)] text-rose-300"
+                          : "bg-slate-800 border-slate-700/80 text-slate-300"
+                      }`}
+                    >
+                      {m.icon}
+                    </Link>
+                    {hasNew && (
+                      <span
+                        title={`${unreadCount} nových príspevkov`}
+                        className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-slate-950 ring-1 ring-rose-400 shadow animate-pulse"
+                      />
+                    )}
+                  </div>
 
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link
                         href={`/forum/c/${cat}`}
-                        className={`text-base font-bold tracking-tight ${m.color} group-hover:text-blue-300 transition-colors`}
+                        className={`text-base font-bold tracking-tight ${
+                          hasNew ? "text-white font-black" : m.color
+                        } group-hover:text-blue-300 transition-colors flex items-center gap-2`}
                       >
-                        {m.label}
+                        <span>{m.label}</span>
                       </Link>
+
+                      {hasNew && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500 text-white shadow-sm flex items-center gap-1 animate-pulse">
+                          <span>NOVÉ</span>
+                          <span>({unreadCount})</span>
+                        </span>
+                      )}
+
                       {m.adminOnly && (
                         <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 rounded px-1.5 py-0.5">
                           len komisár
@@ -214,7 +275,7 @@ export default async function ForumPage() {
                 </div>
 
                 {/* Right: Last Post Information */}
-                <div className="shrink-0 sm:w-64 pl-16 sm:pl-0 sm:border-l border-slate-800/80 sm:pl-5">
+                <div className="shrink-0 sm:w-72 pl-16 sm:pl-0 sm:border-l border-slate-800/80 sm:pl-5">
                   {last ? (
                     <div className="flex items-center gap-3">
                       {last.team.logoUrl ? (
@@ -229,12 +290,21 @@ export default async function ForumPage() {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/forum/${last.thread.id}`}
-                          className="text-xs font-bold text-slate-200 truncate group-hover:text-blue-400 transition-colors block"
-                        >
-                          {last.thread.title}
-                        </Link>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Link
+                            href={`/forum/${last.thread.id}`}
+                            className={`text-xs font-bold truncate group-hover:text-blue-400 transition-colors block max-w-[170px] ${
+                              isLastPostNew ? "text-rose-300 font-extrabold" : "text-slate-200"
+                            }`}
+                          >
+                            {last.thread.title}
+                          </Link>
+                          {isLastPostNew && (
+                            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                              NOVÝ
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
                           od{" "}
                           <span className="text-slate-400 font-medium">
@@ -341,8 +411,12 @@ export default async function ForumPage() {
 
           <div className="space-y-2 text-xs text-slate-400 pt-1">
             <div className="flex items-center gap-2.5">
+              <span className="w-6 text-center text-sm">🔴</span>
+              <span className="text-rose-300 font-semibold">Nové neprečítané príspevky</span>
+            </div>
+            <div className="flex items-center gap-2.5">
               <span className="w-6 text-center text-sm">💬</span>
-              <span>Bežná diskusná téma</span>
+              <span>Všetky príspevky prečítané</span>
             </div>
             <div className="flex items-center gap-2.5">
               <span className="w-6 text-center text-sm">📌</span>
@@ -350,7 +424,7 @@ export default async function ForumPage() {
             </div>
             <div className="flex items-center gap-2.5">
               <span className="w-6 text-center text-sm">🔥</span>
-              <span>Horúca téma (viac ako 10 odpovedí)</span>
+              <span>Horúca téma (&gt; 10 odpovedí)</span>
             </div>
             <div className="flex items-center gap-2.5">
               <span className="w-6 text-center text-sm">👑</span>

@@ -27,6 +27,7 @@ export type ForumPostView = {
   authorTeamName?: string | null;
   authorPostsCount?: number;
   authorIsOnline?: boolean;
+  isNewPost?: boolean;
   canModify: boolean;
   reacts: PostReact[];
 };
@@ -101,7 +102,11 @@ export default function ForumPostCard({
   return (
     <div
       id={`post-${post.id}`}
-      className="rounded-xl border border-slate-800/90 bg-slate-900/80 shadow-lg shadow-black/25 overflow-hidden transition-colors"
+      className={`rounded-xl border border-slate-800/90 ${
+        post.isNewPost
+          ? "border-l-4 border-l-rose-500 bg-rose-950/15"
+          : "bg-slate-900/80"
+      } shadow-lg shadow-black/25 overflow-hidden transition-colors`}
     >
       <div className="flex flex-col md:flex-row">
         {/* Left Column: phpBB User Profile Box (Postbit) */}
@@ -183,11 +188,17 @@ export default function ForumPostCard({
           <div>
             {/* Post Header Bar */}
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/80 text-xs text-slate-400">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-slate-500">🕐</span>
                 <span title={post.fullDate || post.when} className="text-slate-300 font-medium">
                   {post.fullDate || post.when}
                 </span>
+                {post.isNewPost && (
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500 text-white shadow-sm flex items-center gap-1 animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                    <span>NOVÝ PRÍSPEVOK</span>
+                  </span>
+                )}
                 {post.edited && (
                   <span className="text-[10px] text-slate-500 italic bg-slate-800/50 px-1.5 py-0.5 rounded border border-slate-800">
                     upravené

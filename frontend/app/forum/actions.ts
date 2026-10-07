@@ -71,6 +71,7 @@ export async function markForumSeen() {
   const me = await getTeamSession();
   if (!me) return;
   await prisma.team.update({ where: { id: me }, data: { forumSeenAt: new Date() } }).catch(() => {});
+  revalidatePath("/forum");
 }
 
 /** Toggle an emoji reaction on a post (add if absent, remove if present). */

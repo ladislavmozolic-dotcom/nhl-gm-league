@@ -43,7 +43,13 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const tid = Number(id);
   const [me, admin] = await Promise.all([getTeamSession(), isAdmin()]);
-  await markForumSeen();
+  const myTeam = me
+    ? await prisma.team.findUnique({
+        where: { id: me },
+        select: { forumSeenAt: true },
+      })
+    : null;
+  const lastSeen = myTeam?.forumSeenAt ?? new Date(0);
 
   const thread = await prisma.forumThread.findUnique({
     where: { id: tid },
@@ -159,13 +165,17 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       authorTeamName: p.team.name,
       authorPostsCount: p.team._count.forumPosts,
       authorIsOnline: isOnline,
+      isNewPost: me != null && p.teamId !== me && p.createdAt > lastSeen,
       canModify: me != null && (p.teamId === me || admin),
       reacts: [...byEmoji.entries()].map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })),
     };
   });
 
+  // After determining which posts are new for this GM, mark the forum as seen
+  await markForumSeen();
+
   return (
-    <div className="space-y-4 py-2 max-w-6xl mx-auto">
+    <div className="space-y-4 py-2 w-full">
       {/* Top Breadcrumb Navigation */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <ForumBreadcrumbs
