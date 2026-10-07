@@ -83,7 +83,7 @@ export default async function LeagueBankPage() {
         <p className="text-[11px] text-slate-500 mt-2">Payout / bonus: league bank → club&apos;s bank. Fine: club → league bank. The +/− selector only applies to Income / Adjustment.</p>
       </Card>
 
-      <Card title="🎯 Tipovačka payouts" accent="text-violet-400">
+      <Card title="🎯 Picks game payouts" accent="text-violet-400">
         <p className="text-xs text-slate-500 mb-2">Weekly winners are paid automatically (week = Mon–Sun by game day; last paid: {bank.lastPickWeekPaid ?? "none"}). Repeating is safe — one payout per club per week.</p>
         <form action={payPicksWeek} className="flex gap-2 items-center text-sm mb-3"><input name="week" placeholder="Monday YYYY-MM-DD" className={`${inp} w-44`} /><button className={btn}>Pay that week&apos;s winner now</button></form>
         <form action={payPicksSeason} className="flex flex-wrap gap-2 items-center text-sm">

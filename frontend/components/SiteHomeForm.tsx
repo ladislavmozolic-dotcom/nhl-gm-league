@@ -20,7 +20,7 @@ export default function SiteHomeForm({ initial }: { initial: HomeBlock[] }) {
   const field = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm";
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-400">Vlastné bloky (nadpis + text v Markdowne) sa zobrazia <b>nad</b> dashboardom na domovskej stránke. Dashboard (skóre, tabuľka, leaders) zostáva.</p>
+      <p className="text-sm text-slate-400">Custom blocks (title + Markdown text) are shown <b>above</b> the dashboard on the home page. The dashboard (scores, standings, leaders) stays.</p>
       {blocks.map((b, i) => (
         <div key={b.id} className={`rounded-lg border border-slate-800 p-3 space-y-2 ${!b.visible ? "opacity-50" : ""}`}>
           <div className="flex items-center gap-2">
@@ -28,17 +28,17 @@ export default function SiteHomeForm({ initial }: { initial: HomeBlock[] }) {
               <button onClick={() => move(i, -1)} disabled={i === 0} className="text-slate-500 hover:text-white disabled:opacity-20 text-xs leading-none">▲</button>
               <button onClick={() => move(i, 1)} disabled={i === blocks.length - 1} className="text-slate-500 hover:text-white disabled:opacity-20 text-xs leading-none">▼</button>
             </div>
-            <input value={b.title} onChange={(e) => upd(i, { title: e.target.value })} placeholder="Nadpis bloku (voliteľné)" className={`${field} flex-1`} />
-            <label className="flex items-center gap-1.5 text-xs text-slate-400"><input type="checkbox" checked={b.visible} onChange={(e) => upd(i, { visible: e.target.checked })} className="accent-blue-500" />viditeľné</label>
+            <input value={b.title} onChange={(e) => upd(i, { title: e.target.value })} placeholder="Block title (optional)" className={`${field} flex-1`} />
+            <label className="flex items-center gap-1.5 text-xs text-slate-400"><input type="checkbox" checked={b.visible} onChange={(e) => upd(i, { visible: e.target.checked })} className="accent-blue-500" />visible</label>
             <button onClick={() => del(i)} className="text-red-400 hover:text-red-300 text-sm px-1">✕</button>
           </div>
-          <textarea value={b.body} onChange={(e) => upd(i, { body: e.target.value })} rows={4} placeholder="Text (Markdown — # nadpis, **tučné**, - zoznam, [text](url))" className={`${field} font-mono text-[13px]`} />
+          <textarea value={b.body} onChange={(e) => upd(i, { body: e.target.value })} rows={4} placeholder="Text (Markdown — # heading, **bold**, - list, [text](url))" className={`${field} font-mono text-[13px]`} />
         </div>
       ))}
       <div className="flex items-center gap-3">
-        <button onClick={add} className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">+ Pridať blok</button>
-        <button onClick={save} disabled={pending} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold">{pending ? "Ukladám…" : "Uložiť bloky"}</button>
-        {saved && <span className="text-emerald-400 text-sm">✓ Uložené — obnov domovskú stránku</span>}
+        <button onClick={add} className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">+ Add block</button>
+        <button onClick={save} disabled={pending} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold">{pending ? "Saving…" : "Save blocks"}</button>
+        {saved && <span className="text-emerald-400 text-sm">✓ Saved — refresh the home page</span>}
       </div>
     </div>
   );

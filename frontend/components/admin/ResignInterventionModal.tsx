@@ -110,10 +110,10 @@ export default function ResignInterventionModal({
           clearLowball,
         });
         if (!res.ok) {
-          setError(res.error ?? "Nepodarilo sa uložiť zmeny.");
+          setError(res.error ?? "Could not save the changes.");
         } else {
           router.refresh();
-          setSuccess("Vyjednávanie bolo úspešne upravené.");
+          setSuccess("The negotiation was updated successfully.");
           setTimeout(() => onClose(), 800);
         }
       } catch (e) {
@@ -132,10 +132,10 @@ export default function ResignInterventionModal({
     setSuccess(null);
     const sal = Number(signSalary);
     if (!sal || sal < 775_000) {
-      setError("Plat musí byť aspoň minimálny ligový plat ($775,000).");
+      setError("The salary must be at least the league minimum ($775,000).");
       return;
     }
-    if (!confirm(`Naozaj chcete vynútiť podpis predĺženia pre hráča ${cleanName(player.name)} za ${fmtM(sal)} na ${signYears} rokov?`)) {
+    if (!confirm(`Do you really want to force the extension signing for ${cleanName(player.name)} for ${fmtM(sal)} for ${signYears} years?`)) {
       return;
     }
 
@@ -149,10 +149,10 @@ export default function ResignInterventionModal({
           mNtcBreadth: clause === "M_NTC" ? mNtcBreadth : null,
         });
         if (!res.ok) {
-          setError(res.error ?? "Nepodarilo sa podpísať zmluvu.");
+          setError(res.error ?? "Could not sign the contract.");
         } else {
           router.refresh();
-          setSuccess("Zmluva bola úspešne predĺžená a zapísaná.");
+          setSuccess("The contract was extended and recorded successfully.");
           setTimeout(() => onClose(), 800);
         }
       } catch (e) {
@@ -167,7 +167,7 @@ export default function ResignInterventionModal({
   };
 
   const handleReset = () => {
-    if (!confirm(`Vymazať prebiehajúce rokovanie hráča ${cleanName(player.name)} a vrátiť GM na začiatok (kolo 0)?`)) {
+    if (!confirm(`Clear the ongoing negotiation for ${cleanName(player.name)} and send the GM back to the start (round 0)?`)) {
       return;
     }
     setError(null);
@@ -178,7 +178,7 @@ export default function ResignInterventionModal({
           setError(res.error ?? "Chyba pri resete.");
         } else {
           router.refresh();
-          setSuccess("Vyjednávanie bolo resetované.");
+          setSuccess("The negotiation was reset.");
           setTimeout(() => onClose(), 800);
         }
       } catch (e) {
@@ -193,8 +193,8 @@ export default function ResignInterventionModal({
   };
 
   const handleForceWalk = (toUFA: boolean) => {
-    const dest = toUFA ? "Trh voľných hráčov (UFA)" : "RFA Offer Sheets";
-    if (!confirm(`Ukončiť rokovania a poslať hráča do stavu: ${dest}?`)) return;
+    const dest = toUFA ? "Free agent market (UFA)" : "RFA Offer Sheets";
+    if (!confirm(`End the negotiations and send the player to: ${dest}?`)) return;
     setError(null);
     startTransition(async () => {
       try {
@@ -203,7 +203,7 @@ export default function ResignInterventionModal({
           setError(res.error ?? "Chyba.");
         } else {
           router.refresh();
-          setSuccess(`Hráč bol presunutý: ${dest}`);
+          setSuccess(`The player was moved to: ${dest}`);
           setTimeout(() => onClose(), 800);
         }
       } catch (e) {
@@ -224,10 +224,10 @@ export default function ResignInterventionModal({
       try {
         const res = await clearPlayerLowballAction(player.id, player.teamId!);
         if (!res.ok) {
-          setError(res.error ?? "Chyba pri mazaní lowballu.");
+          setError(res.error ?? "Error clearing the lowball.");
         } else {
           router.refresh();
-          setSuccess("Urazenie z nízkej ponuky bolo zmazané.");
+          setSuccess("The low-offer insult was cleared.");
           setTimeout(() => onClose(), 800);
         }
       } catch (e) {
@@ -281,11 +281,11 @@ export default function ResignInterventionModal({
               </span>
               <span>•</span>
               <span>
-                Aktuálna zmluva:{" "}
+                Current contract:{" "}
                 <b className="text-slate-200">
                   {player.capHit ? fmtM(player.capHit) : "—"}
                 </b>{" "}
-                ({player.contractYears ?? 0}r zostáva)
+                ({player.contractYears ?? 0}yr left)
               </span>
             </p>
           </div>
@@ -300,9 +300,9 @@ export default function ResignInterventionModal({
         {/* AI Valuation & Morale Quick Bar */}
         <div className="px-6 py-2.5 bg-slate-950/40 border-b border-slate-800/70 text-xs flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 text-slate-300">
-            <span className="text-slate-500 font-medium">Interný AI odhad:</span>
+            <span className="text-slate-500 font-medium">Internal AI estimate:</span>
             <span>
-              Požiadavka:{" "}
+              Demand:{" "}
               <b className="text-emerald-400 font-mono">
                 {fmtM(player.aiAskSalary)}
               </b>
@@ -315,7 +315,7 @@ export default function ResignInterventionModal({
             </span>
             {player.aiMinYears && (
               <span>
-                Termín:{" "}
+                Term:{" "}
                 <b className="text-slate-200">
                   {player.aiMinYears}–{player.aiMaxYears ?? player.aiMinYears}r
                 </b>
@@ -327,7 +327,7 @@ export default function ResignInterventionModal({
           </div>
           {lowballPct > 0 && (
             <span className="px-2 py-0.5 rounded bg-rose-950/80 border border-rose-800/60 text-rose-300 font-semibold flex items-center gap-1">
-              😠 Urazený lowballom: +{lowballPct}%
+              😠 Insulted by a lowball: +{lowballPct}%
             </span>
           )}
         </div>
@@ -342,7 +342,7 @@ export default function ResignInterventionModal({
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            ✏️ Parametre vyjednávania
+            ✏️ Negotiation parameters
           </button>
           <button
             onClick={() => setTab("sign")}
@@ -352,7 +352,7 @@ export default function ResignInterventionModal({
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            ✍️ Vynútiť podpis (Override)
+            ✍️ Force signing (Override)
           </button>
           <button
             onClick={() => setTab("quick")}
@@ -362,7 +362,7 @@ export default function ResignInterventionModal({
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            ⚡ Rýchle zásahy
+            ⚡ Quick actions
           </button>
         </div>
 
@@ -384,33 +384,33 @@ export default function ResignInterventionModal({
               <div className="grid grid-cols-2 gap-4">
                 <label className="space-y-1.5">
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                    Stav vyjednávania
+                    Negotiation status
                   </span>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
                   >
-                    <option value="open">open (Otvorené rokovania)</option>
-                    <option value="countered">countered (Hráč dal protinávrh)</option>
-                    <option value="walkedToUFA">walkedToUFA (Odišiel na trh UFA)</option>
-                    <option value="osEligible">osEligible (Čaká na Offer Sheets)</option>
-                    <option value="null">null (Vynulovať stav)</option>
+                    <option value="open">open (Open negotiation)</option>
+                    <option value="countered">countered (Player made a counter-offer)</option>
+                    <option value="walkedToUFA">walkedToUFA (Went to the UFA market)</option>
+                    <option value="osEligible">osEligible (Awaiting Offer Sheets)</option>
+                    <option value="null">null (Reset the status)</option>
                   </select>
                 </label>
 
                 <label className="space-y-1.5">
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                    Kolo vyjednávania
+                    Negotiation round
                   </span>
                   <select
                     value={round}
                     onChange={(e) => setRound(Number(e.target.value))}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
                   >
-                    <option value={0}>0 (Žiadna ponuka / štart)</option>
+                    <option value={0}>0 (No offer / start)</option>
                     <option value={1}>1 (Po 1. ponuke klubu)</option>
-                    <option value={2}>2 (Finálne 2. kolo)</option>
+                    <option value={2}>2 (Final round 2)</option>
                   </select>
                 </label>
               </div>
@@ -419,7 +419,7 @@ export default function ResignInterventionModal({
                 <label className="space-y-1.5">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                      Posledná ponuka klubu ($)
+                      Latest club offer ($)
                     </span>
                     {offerSalary && (
                       <span className="text-xs font-mono text-sky-400 font-bold">
@@ -441,7 +441,7 @@ export default function ResignInterventionModal({
                   <label className="space-y-1.5">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                        Protinávrh ($)
+                        Counter-offer ($)
                       </span>
                     </div>
                     <input
@@ -473,7 +473,7 @@ export default function ResignInterventionModal({
                 <label className="space-y-1.5">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                      Ručný FA Demand ($)
+                      Manual FA Demand ($)
                     </span>
                     {faDemandOverride && (
                       <span className="text-xs font-mono text-purple-400 font-bold">
@@ -484,13 +484,13 @@ export default function ResignInterventionModal({
                   <input
                     type="number"
                     step="50000"
-                    placeholder="Voliteľný manuálny strop ($)"
+                    placeholder="Optional manual cap ($)"
                     value={faDemandOverride}
                     onChange={(e) => setFaDemandOverride(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-sky-500"
                   />
                   <p className="text-[11px] text-slate-500">
-                    Prepíše automatický výpočet trhovej ceny hráča.
+                    Overrides the automatic market-price calculation for the player.
                   </p>
                 </label>
 
@@ -504,10 +504,10 @@ export default function ResignInterventionModal({
                     />
                     <div>
                       <span className="text-xs font-semibold text-slate-200 block">
-                        Odpustiť lowball urazenie
+                        Forgive the lowball insult
                       </span>
                       <span className="text-[11px] text-slate-400 block">
-                        Odstráni pamäť o nízkej ponuke (+{lowballPct}% prirážka).
+                        Removes the memory of the low offer (+{lowballPct}% premium).
                       </span>
                     </div>
                   </label>
@@ -519,10 +519,10 @@ export default function ResignInterventionModal({
           {tab === "sign" && (
             <div className="space-y-4">
               <p className="text-xs text-slate-400">
-                Ako komisár môžete okamžite schváliť a podpísať zmluvu pre klub{" "}
-                <b className="text-slate-200">{player.teamCode}</b>. Ak je hráč v
-                poslednom roku zmluvy a beží sezóna, predĺženie začne platiť od
-                novej sezóny (deferred extension).
+                As commissioner you can immediately approve and sign a contract for club{" "}
+                <b className="text-slate-200">{player.teamCode}</b>. If the player is in the
+                final year of his contract and the season is running, the extension takes effect from
+                the new season (deferred extension).
               </p>
 
               <div className="grid grid-cols-2 gap-4">
@@ -548,7 +548,7 @@ export default function ResignInterventionModal({
 
                 <label className="space-y-1.5">
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                    Dĺžka zmluvy (roky)
+                    Contract length (years)
                   </span>
                   <select
                     value={signYears}
@@ -574,7 +574,7 @@ export default function ResignInterventionModal({
                     onChange={(e) => setClause(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
                   >
-                    <option value="">Žiadna klauzula</option>
+                    <option value="">No clause</option>
                     <option value="NTC">NTC (No-Trade Clause)</option>
                     <option value="NMC">NMC (No-Movement Clause)</option>
                     <option value="M_NTC">M-NTC (Modified No-Trade)</option>
@@ -584,17 +584,17 @@ export default function ResignInterventionModal({
                 {clause === "M_NTC" ? (
                   <label className="space-y-1.5">
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                      Rozsah M-NTC (počet tímov)
+                      M-NTC scope (number of teams)
                     </span>
                     <select
                       value={mNtcBreadth}
                       onChange={(e) => setMNtcBreadth(Number(e.target.value))}
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
                     >
-                      <option value={6}>6 tímov</option>
-                      <option value={12}>12 tímov</option>
-                      <option value={18}>18 tímov</option>
-                      <option value={24}>24 tímov</option>
+                      <option value={6}>6 teams</option>
+                      <option value={12}>12 teams</option>
+                      <option value={18}>18 teams</option>
+                      <option value={24}>24 teams</option>
                     </select>
                   </label>
                 ) : (
@@ -607,7 +607,7 @@ export default function ResignInterventionModal({
                         className="rounded border-slate-600 bg-slate-700 text-emerald-500 focus:ring-0"
                       />
                       <span className="text-xs font-semibold text-slate-300">
-                        Dvojcestná zmluva (Two-Way deal, $100k AHL)
+                        Two-way contract (Two-Way deal, $100k AHL)
                       </span>
                     </label>
                   </div>
@@ -619,7 +619,7 @@ export default function ResignInterventionModal({
           {tab === "quick" && (
             <div className="space-y-3">
               <p className="text-xs text-slate-400 mb-2">
-                Rýchle jednoklikové administratívne operácie pre toto vyjednávanie:
+                Quick one-click admin operations for this negotiation:
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -631,9 +631,9 @@ export default function ResignInterventionModal({
                 >
                   <span className="text-lg">🔄</span>
                   <div>
-                    <div className="text-xs font-bold text-white">Resetovať vyjednávanie</div>
+                    <div className="text-xs font-bold text-white">Reset the negotiation</div>
                     <div className="text-[11px] text-slate-400 mt-0.5">
-                      Vráti kolo na 0, vymaže protinávrhy a umožní GM začať znova.
+                      Returns the round to 0, clears counter-offers and lets the GM start over.
                     </div>
                   </div>
                 </button>
@@ -647,9 +647,9 @@ export default function ResignInterventionModal({
                   >
                     <span className="text-lg">🧹</span>
                     <div>
-                      <div className="text-xs font-bold text-amber-300">Zmazať iba lowball urazenie</div>
+                      <div className="text-xs font-bold text-amber-300">Clear only the lowball insult</div>
                       <div className="text-[11px] text-slate-400 mt-0.5">
-                        Zmaže urazenie hráča bez zmeny rozpracovanej ponuky.
+                        Clears the player's insult without changing the offer in progress.
                       </div>
                     </div>
                   </button>
@@ -663,9 +663,9 @@ export default function ResignInterventionModal({
                 >
                   <span className="text-lg">🚪</span>
                   <div>
-                    <div className="text-xs font-bold text-rose-300">Poslať na voľný trh (walkedToUFA)</div>
+                    <div className="text-xs font-bold text-rose-300">Send to the open market (walkedToUFA)</div>
                     <div className="text-[11px] text-rose-400/80 mt-0.5">
-                      Ukončí rokovania a pošle hráča testovať otvorený trh UFA.
+                      Ends the negotiations and sends the player to test the open UFA market.
                     </div>
                   </div>
                 </button>
@@ -678,9 +678,9 @@ export default function ResignInterventionModal({
                 >
                   <span className="text-lg">📜</span>
                   <div>
-                    <div className="text-xs font-bold text-purple-300">Otvoriť pre Offer Sheets (osEligible)</div>
+                    <div className="text-xs font-bold text-purple-300">Open to Offer Sheets (osEligible)</div>
                     <div className="text-[11px] text-purple-400/80 mt-0.5">
-                      RFA hráč odmietol ponuku a bude dostupný pre súperov.
+                      The RFA player rejected the offer and will be available to rivals.
                     </div>
                   </div>
                 </button>
@@ -697,7 +697,7 @@ export default function ResignInterventionModal({
             disabled={pending}
             className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition"
           >
-            Zrušiť
+            Cancel
           </button>
 
           {tab === "edit" && (
@@ -707,7 +707,7 @@ export default function ResignInterventionModal({
               onClick={handleSaveEdit}
               className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 shadow-lg shadow-sky-600/30 disabled:opacity-50 transition"
             >
-              {pending ? "Ukladám…" : "Uložiť zmeny"}
+              {pending ? "Saving…" : "Save changes"}
             </button>
           )}
 
@@ -718,7 +718,7 @@ export default function ResignInterventionModal({
               onClick={handleForceSign}
               className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 disabled:opacity-50 transition"
             >
-              {pending ? "Podpisujem…" : "Vynútiť podpis predĺženia"}
+              {pending ? "Signing…" : "Force the extension signing"}
             </button>
           )}
         </div>

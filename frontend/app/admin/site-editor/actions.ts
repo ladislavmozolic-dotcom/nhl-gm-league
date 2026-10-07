@@ -77,7 +77,7 @@ export async function saveTemplate(name: string, style: TemplateStyle) {
     logoHeight: clamp(style.logoHeight, 64),
     nameHeight: clamp(style.nameHeight, 64),
   };
-  await prisma.siteTemplate.create({ data: { name: name.trim() || "Šablóna", style: clean } });
+  await prisma.siteTemplate.create({ data: { name: name.trim() || "Template", style: clean } });
 }
 
 /** Delete a saved template. Admin only. */
@@ -97,7 +97,7 @@ export async function createPage(title: string): Promise<number> {
   const base = slugify(title || "page");
   let slug = base, n = 1;
   while (await prisma.customPage.findUnique({ where: { slug } })) slug = `${base}-${++n}`;
-  const p = await prisma.customPage.create({ data: { slug, title: title || "Nová stránka", body: "" } });
+  const p = await prisma.customPage.create({ data: { slug, title: title || "New page", body: "" } });
   revalidatePath("/", "layout");
   return p.id;
 }
@@ -106,7 +106,7 @@ export async function createPage(title: string): Promise<number> {
 export async function updatePage(id: number, data: { title: string; body: string; published: boolean; inMenu: boolean; menuLabel: string; order: number }) {
   if (!(await isAdmin())) throw new Error("Not authorized");
   await prisma.customPage.update({ where: { id }, data: {
-    title: data.title || "Stránka", body: data.body ?? "", published: !!data.published,
+    title: data.title || "Page", body: data.body ?? "", published: !!data.published,
     inMenu: !!data.inMenu, menuLabel: data.menuLabel.trim() || null, order: Number.isFinite(data.order) ? data.order : 0,
   } });
   revalidatePath("/", "layout");

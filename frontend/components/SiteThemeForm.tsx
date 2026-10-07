@@ -31,36 +31,36 @@ export default function SiteThemeForm({ theme }: { theme: Theme }) {
       {/* LIVE PREVIEW — inline styles from state, independent of the global theme */}
       <div className="rounded-xl overflow-hidden border border-slate-700">
         <div className="p-5" style={{ background: t.bgColor, fontFamily: font || undefined }}>
-          <div className="text-[10px] uppercase tracking-widest mb-3" style={{ color: t.text3Color }}>Živý náhľad</div>
+          <div className="text-[10px] uppercase tracking-widest mb-3" style={{ color: t.text3Color }}>Live preview</div>
           <div className="p-4 mb-3" style={{ background: t.surfaceColor, border: `1px solid ${t.borderColor}`, borderRadius: radius + 4 }}>
             <div className="text-lg font-bold mb-1" style={{ color: t.textColor }}>Nadpis karty</div>
-            <div className="text-sm mb-2" style={{ color: t.text2Color }}>Sekundárny text — popis alebo label.</div>
-            <div className="text-xs mb-3" style={{ color: t.text3Color }}>Tlmený text — poznámka, dátum.</div>
+            <div className="text-sm mb-2" style={{ color: t.text2Color }}>Secondary text — a description or label.</div>
+            <div className="text-xs mb-3" style={{ color: t.text3Color }}>Muted text — a note, a date.</div>
             <div className="flex gap-2 items-center">
-              <input placeholder="Vstupné pole" className="text-sm px-3 py-1.5 flex-1" style={{ background: t.surface2Color, border: `1px solid ${t.borderColor}`, borderRadius: radius, color: "#fff" }} />
-              <button className="text-sm font-semibold text-white px-3 py-1.5" style={{ background: t.accentColor, borderRadius: radius }}>Tlačidlo</button>
+              <input placeholder="Input field" className="text-sm px-3 py-1.5 flex-1" style={{ background: t.surface2Color, border: `1px solid ${t.borderColor}`, borderRadius: radius, color: "#fff" }} />
+              <button className="text-sm font-semibold text-white px-3 py-1.5" style={{ background: t.accentColor, borderRadius: radius }}>Button</button>
             </div>
           </div>
           <div className="flex gap-2">
             <span className="text-xs px-2 py-1" style={{ background: t.surface2Color, color: t.text2Color, borderRadius: radius }}>Chip</span>
-            <span className="text-xs px-2 py-1 font-semibold" style={{ color: t.accentColor }}>Akcentový odkaz →</span>
+            <span className="text-xs px-2 py-1 font-semibold" style={{ color: t.accentColor }}>Accent link →</span>
           </div>
         </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
-        {swatch("Pozadie stránky", "bgColor")}
+        {swatch("Page background", "bgColor")}
         {swatch("Karty / bunky", "surfaceColor")}
-        {swatch("Inputy / sekundárne plochy", "surface2Color")}
-        {swatch("Orámovanie", "borderColor")}
-        {swatch("Hlavný text", "textColor")}
-        {swatch("Sekundárny text", "text2Color")}
-        {swatch("Tlmený text", "text3Color")}
-        {swatch("Akcentová farba", "accentColor")}
+        {swatch("Inputs / secondary surfaces", "surface2Color")}
+        {swatch("Borders", "borderColor")}
+        {swatch("Main text", "textColor")}
+        {swatch("Secondary text", "text2Color")}
+        {swatch("Muted text", "text3Color")}
+        {swatch("Accent color", "accentColor")}
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <label className="block"><span className="text-xs text-slate-400">Písmo</span>
+        <label className="block"><span className="text-xs text-slate-400">Font</span>
           <select value={t.fontKey} onChange={(e) => set("fontKey", e.target.value)} className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm">
             {FONTS.map((f) => <option key={f.key} value={f.key}>{f.name}</option>)}
           </select></label>
@@ -69,11 +69,11 @@ export default function SiteThemeForm({ theme }: { theme: Theme }) {
       </div>
 
       <div className="flex items-center gap-3">
-        <button onClick={save} disabled={pending} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold">{pending ? "Ukladám…" : "Uložiť tému"}</button>
-        <button onClick={reset} className="text-sm text-slate-400 hover:text-white">Obnoviť predvolené</button>
-        {saved && <span className="text-emerald-400 text-sm">✓ Uložené — obnov stránku pre plný efekt</span>}
+        <button onClick={save} disabled={pending} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold">{pending ? "Saving…" : "Save theme"}</button>
+        <button onClick={reset} className="text-sm text-slate-400 hover:text-white">Reset to defaults</button>
+        {saved && <span className="text-emerald-400 text-sm">✓ Saved — refresh the page for the full effect</span>}
       </div>
-      <p className="text-[11px] text-slate-500">Téma sa aplikuje na celú stránku (karty, orámovania, text, rohy, písmo). Náhľad hore je presný. Niektoré farebné akcenty (zelená/červená pre stavy) zostávajú zámerne.</p>
+      <p className="text-[11px] text-slate-500">The theme applies to the whole site (cards, borders, text, corners, font). The preview above is accurate. Some color accents (green/red for statuses) intentionally stay.</p>
     </div>
   );
 }

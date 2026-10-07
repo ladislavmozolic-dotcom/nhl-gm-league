@@ -34,7 +34,7 @@ const fmtDate = (d: Date) =>
 
 const QO_TENDERED_STATUSES = ["QO_TENDERED", "NEGOTIATING", "ARB_FILED", "AWARDED", "OS_ELIGIBLE"];
 const qoStatusLabel: Record<string, string> = {
-  QO_TENDERED: "QO podaná", NEGOTIATING: "Vyjednáva sa", ARB_FILED: "Arbitráž podaná", AWARDED: "Arbitráž — rozhodnuté", OS_ELIGIBLE: "Otvorené pre offer sheety",
+  QO_TENDERED: "QO tendered", NEGOTIATING: "Negotiating", ARB_FILED: "Arbitration filed", AWARDED: "Arbitration — decided", OS_ELIGIBLE: "Open to offer sheets",
 };
 
 export default async function AdminAgentPage() {
@@ -213,10 +213,10 @@ export default async function AdminAgentPage() {
   const insultedCount = resignRows.filter((r) => r.lowballBump > 1).length;
 
   const phaseLabel: Record<string, string> = {
-    regular: "Základná časť",
+    regular: "Regular season",
     playoffs: "Play-off",
     frenzy: "Free Agent Frenzy",
-    offseason: "Medzisezóna",
+    offseason: "Off-season",
     draft: "Draft",
   };
 
@@ -224,8 +224,8 @@ export default async function AdminAgentPage() {
     <div className="space-y-6 py-2">
       {/* Page Header */}
       <PageHeader
-        title="🤖 AI Agent & Vyjednávania"
-        subtitle="Riadenie a dohľad nad automatickým vyjednávacím enginom ligy (Free Agent Frenzy & Team Re-signings)."
+        title="🤖 AI Agent & Negotiations"
+        subtitle="Control and oversight of the league's automatic negotiation engine (Free Agent Frenzy & Team Re-signings)."
         right={
           <div className="flex items-center gap-3">
             <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-800 text-sky-400 border border-slate-700">
@@ -245,53 +245,53 @@ export default async function AdminAgentPage() {
           </div>
           <div className="text-2xl font-black text-white">{marketOffers.length}</div>
           <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
-            <span>{rawOffers.filter((o) => o.status === "PENDING").length} čakajúcich</span>
+            <span>{rawOffers.filter((o) => o.status === "PENDING").length} pending</span>
             <span>•</span>
-            <span>{rawOffers.filter((o) => o.status === "COUNTERED").length} protinávrhov</span>
+            <span>{rawOffers.filter((o) => o.status === "COUNTERED").length} counter-offers</span>
           </div>
         </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg shadow-black/20">
           <div className="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">
-            <span>Aktívne predĺženia</span>
+            <span>Active extensions</span>
             <span className="text-emerald-400">🤝</span>
           </div>
           <div className="text-2xl font-black text-emerald-400">{activeNegotiations}</div>
           <div className="text-xs text-slate-500 mt-1">
-            {resignRows.filter((r) => r.resignStatus === "countered").length} s aktívnym protinávrhom
+            {resignRows.filter((r) => r.resignStatus === "countered").length} with an active counter-offer
           </div>
         </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg shadow-black/20">
           <div className="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">
-            <span>Prerušené / UFA</span>
+            <span>Broken off / UFA</span>
             <span className="text-rose-400">🛑</span>
           </div>
           <div className="text-2xl font-black text-rose-400">{stalledNegotiations}</div>
           <div className="text-xs text-slate-500 mt-1">
-            {resignRows.filter((r) => r.resignStatus === "walkedToUFA").length} odišlo na trh UFA
+            {resignRows.filter((r) => r.resignStatus === "walkedToUFA").length} went to the UFA market
           </div>
         </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg shadow-black/20">
           <div className="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">
-            <span>Nálada & Morálka</span>
+            <span>Mood & Morale</span>
             <span className="text-amber-400">😠</span>
           </div>
           <div className="text-2xl font-black text-amber-400">{insultedCount}</div>
           <div className="text-xs text-slate-500 mt-1">
-            {resignRows.filter((r) => r.tradeRequested).length} žiada trade
+            {resignRows.filter((r) => r.tradeRequested).length} requesting a trade
           </div>
         </div>
       </div>
 
       {/* Card 1: Team Re-signings (Promoted to Primary Position) */}
       <Card
-        title="Predlžovanie zmlúv v kluboch (Team Re-signings)"
+        title="Contract extensions at clubs (Team Re-signings)"
         accent="text-emerald-400"
         right={
           <span className="text-xs text-slate-400 font-normal">
-            Celkovo {resignRows.length} sledovaných hráčov
+            {resignRows.length} players tracked in total
           </span>
         }
       >
@@ -300,28 +300,28 @@ export default async function AdminAgentPage() {
 
       {/* Card 2: Free Agent Frenzy Market Offers */}
       <Card
-        title="Otvorený trh: Free Agent Frenzy"
+        title="Open market: Free Agent Frenzy"
         accent="text-blue-400"
         right={
           <span className="text-xs text-slate-400 font-normal">
-            {marketOffers.length} otvorených ponúk na trhu
+            {marketOffers.length} open offers on the market
           </span>
         }
       >
         {marketOffers.length === 0 ? (
           <div className="text-center py-10 px-4 border border-dashed border-slate-800 rounded-2xl mx-4 my-2">
-            <p className="text-slate-500 text-sm font-medium">Momentálne na trhu nie sú žiadne aktívne ponuky.</p>
+            <p className="text-slate-500 text-sm font-medium">There are currently no active offers on the market.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[760px]">
               <thead>
                 <tr className="text-xs text-slate-400 uppercase tracking-wider border-b border-slate-800 bg-slate-800/40">
-                  <th className="text-left px-4 py-3 font-semibold">Hráč</th>
+                  <th className="text-left px-4 py-3 font-semibold">Player</th>
                   <th className="text-left px-3 py-3 font-semibold">Klub</th>
                   <th className="text-left px-3 py-3 font-semibold">Stav ponuky</th>
-                  <th className="text-right px-3 py-3 font-semibold">Výška & Dĺžka</th>
-                  <th className="text-right px-3 py-3 font-semibold">Podaná / Zmena</th>
+                  <th className="text-right px-3 py-3 font-semibold">Amount & Length</th>
+                  <th className="text-right px-3 py-3 font-semibold">Submitted / Changed</th>
                   <th className="text-right px-4 py-3 font-semibold">Akcia</th>
                 </tr>
               </thead>
@@ -335,19 +335,19 @@ export default async function AdminAgentPage() {
                   if (o.status === "PENDING") {
                     statusBadge = (
                       <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                        Čaká na rozhodnutie
+                        Awaiting decision
                       </span>
                     );
                   } else if (o.status === "COUNTERED") {
                     statusBadge = (
                       <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        Protinávrh
+                        Counter-offer
                       </span>
                     );
                   } else if (o.status === "SHORTLISTED") {
                     statusBadge = (
                       <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                        Užší výber (Shortlist)
+                        Shortlist
                       </span>
                     );
                   }
@@ -362,7 +362,7 @@ export default async function AdminAgentPage() {
                           <Link
                             href={`/admin/bids/${o.playerId}`}
                             className="font-bold text-white hover:text-blue-400 transition"
-                            title="Zobraziť históriu ponúk"
+                            title="View offer history"
                           >
                             {cleanName(o.player.name)}
                           </Link>
@@ -382,7 +382,7 @@ export default async function AdminAgentPage() {
                             href={`/players/${o.player.slug ?? o.player.id}`}
                             className="hover:text-blue-400 transition"
                           >
-                            profil hráča →
+                            player profile →
                           </Link>
                         </div>
                       </td>
@@ -438,24 +438,24 @@ export default async function AdminAgentPage() {
 
       {/* Card 3: Qualifying offers tendered (RFA) */}
       <Card
-        title="Podané kvalifikačné ponuky (QO) — RFA"
+        title="Submitted qualifying offers (QO) — RFA"
         accent="text-sky-400"
-        right={<span className="text-xs text-slate-400 font-normal">{qoCases.length} podaných · {qoDueOpen} čaká na podanie</span>}
+        right={<span className="text-xs text-slate-400 font-normal">{qoCases.length} submitted · {qoDueOpen} awaiting submission</span>}
       >
         {qoCases.length === 0 ? (
           <div className="text-center py-8 px-4 border border-dashed border-slate-800 rounded-2xl mx-4 my-2">
-            <p className="text-slate-500 text-sm font-medium">Zatiaľ žiadny klub nepodal kvalifikačnú ponuku.</p>
+            <p className="text-slate-500 text-sm font-medium">No club has submitted a qualifying offer yet.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[760px]">
               <thead>
                 <tr className="text-xs text-slate-400 uppercase tracking-wider border-b border-slate-800 bg-slate-800/40">
-                  <th className="text-left px-4 py-3 font-semibold">Hráč</th>
+                  <th className="text-left px-4 py-3 font-semibold">Player</th>
                   <th className="text-left px-3 py-3 font-semibold">Klub</th>
                   <th className="text-left px-3 py-3 font-semibold">Stav</th>
                   <th className="text-right px-3 py-3 font-semibold">QO</th>
-                  <th className="text-right px-3 py-3 font-semibold">Podaná</th>
+                  <th className="text-right px-3 py-3 font-semibold">Submitted</th>
                   <th className="text-right px-4 py-3 font-semibold">Akcia</th>
                 </tr>
               </thead>

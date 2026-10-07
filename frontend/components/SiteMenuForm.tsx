@@ -29,7 +29,7 @@ export default function SiteMenuForm({ initial }: { initial: Row[] }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-400">Presúvaj položky (▲▼) a zapni/vypni ich viditeľnosť v hornom menu. „Teams" je špeciálny rozbaľovač tímov.</p>
+      <p className="text-sm text-slate-400">Move items (▲▼) and toggle their visibility in the top menu. "Teams" is a special team dropdown.</p>
       <div className="rounded-lg border border-slate-800 divide-y divide-slate-800/70">
         {rows.map((r, i) => (
           <div key={r.key} className={`flex items-center gap-3 px-3 py-2 ${r.hidden ? "opacity-45" : ""}`}>
@@ -40,15 +40,15 @@ export default function SiteMenuForm({ initial }: { initial: Row[] }) {
             <span className="flex-1 text-sm font-medium text-slate-200">{r.label}{r.custom && <span className="ml-2 text-[10px] text-blue-400 uppercase">page</span>}</span>
             <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
               <input type="checkbox" checked={!r.hidden} onChange={() => toggle(i)} className="accent-blue-500" />
-              {r.hidden ? "skryté" : "viditeľné"}
+              {r.hidden ? "hidden" : "visible"}
             </label>
           </div>
         ))}
       </div>
       <div className="flex items-center gap-3">
         <button onClick={onSave} disabled={pending} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold">
-          {pending ? "Ukladám…" : "Uložiť menu"}</button>
-        {saved && <span className="text-emerald-400 text-sm">✓ Uložené — obnov stránku</span>}
+          {pending ? "Saving…" : "Save menu"}</button>
+        {saved && <span className="text-emerald-400 text-sm">✓ Saved — refresh the page</span>}
       </div>
     </div>
   );

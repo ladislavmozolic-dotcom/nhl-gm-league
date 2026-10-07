@@ -28,7 +28,7 @@ export default function SiteBrandingForm({ branding, savedTemplates }: { brandin
   const upload = async (file: File | undefined, key: "logoUrl" | "nameImageUrl", which: "logo" | "name") => {
     setErr(null);
     if (!file) return;
-    if (!file.type.startsWith("image/")) { setErr("Musí to byť obrázok."); return; }
+    if (!file.type.startsWith("image/")) { setErr("It must be an image."); return; }
     setUploading(which);
     try {
       const fd = new FormData(); fd.append("file", file);
@@ -55,10 +55,10 @@ export default function SiteBrandingForm({ branding, savedTemplates }: { brandin
           <img src={url} alt="" className={`${which === "logo" ? "h-14 w-14" : "h-10 w-auto max-w-[180px]"} object-contain rounded bg-slate-800 border border-slate-700 p-1`} />
         ) : <div className="h-14 w-14 rounded bg-slate-800 border border-slate-700 grid place-items-center text-slate-600 text-lg">{which === "logo" ? "🏒" : "T"}</div>}
         <label className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold cursor-pointer">
-          {uploading === which ? "Nahrávam…" : "Nahrať súbor"}
+          {uploading === which ? "Uploading…" : "Upload file"}
           <input type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files?.[0], keyName, which)} />
         </label>
-        {url && <button type="button" onClick={() => set(keyName, "")} className="text-sm text-red-400 hover:text-red-300">Odstrániť</button>}
+        {url && <button type="button" onClick={() => set(keyName, "")} className="text-sm text-red-400 hover:text-red-300">Remove</button>}
       </div>
     </div>
   );
@@ -79,7 +79,7 @@ export default function SiteBrandingForm({ branding, savedTemplates }: { brandin
 
       {/* Templates — pick a look, or save the current one */}
       <div className="rounded-lg border border-slate-800 p-4 space-y-3">
-        <div className="text-[11px] uppercase tracking-wider text-slate-500">Šablóny vzhľadu</div>
+        <div className="text-[11px] uppercase tracking-wider text-slate-500">Look templates</div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {BUILTIN_TEMPLATES.map((t) => (
             <button key={t.key} type="button" onClick={() => applyStyle(t.style)} title={t.desc}
@@ -103,8 +103,8 @@ export default function SiteBrandingForm({ branding, savedTemplates }: { brandin
           </div>
         )}
         <div className="flex gap-2 pt-1">
-          <input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="Uložiť aktuálny vzhľad ako šablónu…" className="flex-1 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm" />
-          <button type="button" onClick={saveTpl} disabled={pending || !tplName.trim()} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-sm font-semibold whitespace-nowrap">Uložiť šablónu</button>
+          <input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="Save the current look as a template…" className="flex-1 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-sm" />
+          <button type="button" onClick={saveTpl} disabled={pending || !tplName.trim()} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-sm font-semibold whitespace-nowrap">Save template</button>
         </div>
       </div>
 
@@ -131,16 +131,16 @@ export default function SiteBrandingForm({ branding, savedTemplates }: { brandin
 
       <div className="grid md:grid-cols-2 gap-5">
         <ImgSlot url={b.logoUrl} which="logo" keyName="logoUrl" label="Logo ligy (znak)" />
-        <ImgSlot url={b.nameImageUrl} which="name" keyName="nameImageUrl" label="Názov ako obrázok (wordmark) — nahradí text" />
+        <ImgSlot url={b.nameImageUrl} which="name" keyName="nameImageUrl" label="Name as an image (wordmark) — replaces the text" />
       </div>
 
       {/* Banner layout & sizes */}
       <div className="rounded-lg border border-slate-800 p-4 space-y-4">
-        <div className="text-[11px] uppercase tracking-wider text-slate-500">Veľkosť & umiestnenie v banneri</div>
+        <div className="text-[11px] uppercase tracking-wider text-slate-500">Size & placement in the banner</div>
         <div className="grid md:grid-cols-2 gap-4">
-          <label className="block"><span className="text-xs text-slate-400">Veľkosť loga — {b.logoHeight}px</span>
+          <label className="block"><span className="text-xs text-slate-400">Logo size — {b.logoHeight}px</span>
             <input type="range" min={24} max={200} value={b.logoHeight} onChange={(e) => setB((p) => ({ ...p, logoHeight: +e.target.value }))} className="w-full accent-blue-500" /></label>
-          <label className="block"><span className="text-xs text-slate-400">Veľkosť názvu — {b.nameHeight}px</span>
+          <label className="block"><span className="text-xs text-slate-400">Name size — {b.nameHeight}px</span>
             <input type="range" min={24} max={200} value={b.nameHeight} onChange={(e) => setB((p) => ({ ...p, nameHeight: +e.target.value }))} className="w-full accent-blue-500" /></label>
         </div>
         <div className="grid md:grid-cols-3 gap-4">
@@ -149,15 +149,15 @@ export default function SiteBrandingForm({ branding, savedTemplates }: { brandin
               {(["left", "center", "right"] as const).map((a) => (
                 <button key={a} type="button" onClick={() => setB((p) => ({ ...p, bannerAlign: a }))}
                   className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold ${b.bannerAlign === a ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>
-                  {a === "left" ? "Vľavo" : a === "center" ? "Stred" : "Vpravo"}</button>
+                  {a === "left" ? "Left" : a === "center" ? "Center" : "Right"}</button>
               ))}
             </div></div>
-          <div><span className="text-xs text-slate-400 block mb-1">Rozloženie</span>
+          <div><span className="text-xs text-slate-400 block mb-1">Layout</span>
             <div className="flex gap-1">
               {(["row", "stack"] as const).map((l) => (
                 <button key={l} type="button" onClick={() => setB((p) => ({ ...p, bannerLayout: l }))}
                   className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold ${b.bannerLayout === l ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>
-                  {l === "row" ? "Vedľa seba" : "Pod sebou"}</button>
+                  {l === "row" ? "Side by side" : "Stacked"}</button>
               ))}
             </div></div>
           <div><span className="text-xs text-slate-400 block mb-1">Poradie</span>
@@ -165,26 +165,26 @@ export default function SiteBrandingForm({ branding, savedTemplates }: { brandin
               {[true, false].map((v) => (
                 <button key={String(v)} type="button" onClick={() => setB((p) => ({ ...p, logoFirst: v }))}
                   className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold ${b.logoFirst === v ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>
-                  {v ? "Logo prvé" : "Názov prvý"}</button>
+                  {v ? "Logo first" : "Name first"}</button>
               ))}
             </div></div>
         </div>
         {/* Banner height — independent of logo/name size */}
         <div className="pt-1 border-t border-slate-800">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-400">Výška banneru {b.bannerHeight > 0 ? `— ${b.bannerHeight}px` : "— automatická (podľa obsahu)"}</span>
-            <label className="flex items-center gap-1.5 text-xs text-slate-400"><input type="checkbox" checked={b.bannerHeight === 0} onChange={(e) => setB((p) => ({ ...p, bannerHeight: e.target.checked ? 0 : 96 }))} className="accent-blue-500" />Automatická</label>
+            <span className="text-xs text-slate-400">Banner height {b.bannerHeight > 0 ? `— ${b.bannerHeight}px` : "— automatic (by content)"}</span>
+            <label className="flex items-center gap-1.5 text-xs text-slate-400"><input type="checkbox" checked={b.bannerHeight === 0} onChange={(e) => setB((p) => ({ ...p, bannerHeight: e.target.checked ? 0 : 96 }))} className="accent-blue-500" />Automatic</label>
           </div>
           {b.bannerHeight > 0 && (
             <input type="range" min={40} max={300} value={b.bannerHeight} onChange={(e) => setB((p) => ({ ...p, bannerHeight: +e.target.value }))} className="w-full accent-blue-500" />
           )}
-          <p className="text-[11px] text-slate-500 mt-1">Pri pevnej výške sa banner nezväčšuje keď zväčšíš logo — veľké logo sa oreže na výšku pruhu.</p>
+          <p className="text-[11px] text-slate-500 mt-1">With a fixed height the banner does not grow when you enlarge the logo — a large logo is cropped to the strip height.</p>
         </div>
       </div>
 
       {/* Social links in the banner corner */}
       <div className="rounded-lg border border-slate-800 p-4 space-y-3">
-        <div className="text-[11px] uppercase tracking-wider text-slate-500">Sociálne siete v banneri</div>
+        <div className="text-[11px] uppercase tracking-wider text-slate-500">Social links in the banner</div>
         {(b.socialLinks ?? []).map((s, i) => (
           <div key={i} className="flex gap-2 items-center">
             <select value={s.type} onChange={(e) => setB((p) => ({ ...p, socialLinks: p.socialLinks.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x) }))}
@@ -197,18 +197,18 @@ export default function SiteBrandingForm({ branding, savedTemplates }: { brandin
           </div>
         ))}
         <button type="button" onClick={() => setB((p) => ({ ...p, socialLinks: [...(p.socialLinks ?? []), { type: "facebook", url: "" }] }))}
-          className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">+ Pridať odkaz</button>
+          className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold">+ Add link</button>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <label className="block"><span className="text-xs text-slate-400">Názov ligy {hasWordmark && <span className="text-slate-600">(použije sa keď nie je wordmark)</span>}</span>
+        <label className="block"><span className="text-xs text-slate-400">League name {hasWordmark && <span className="text-slate-600">(used when there is no wordmark)</span>}</span>
           <input name="leagueName" value={b.leagueName} onChange={(e) => set("leagueName", e.target.value)} className={field} /></label>
         <label className="block"><span className="text-xs text-slate-400">Tagline / podnadpis</span>
           <input name="tagline" value={b.tagline} onChange={(e) => set("tagline", e.target.value)} className={field} /></label>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <label className="block"><span className="text-xs text-slate-400">Akcentná farba</span>
+        <label className="block"><span className="text-xs text-slate-400">Accent color</span>
           <div className="flex gap-2 items-center">
             <input type="color" name="accentColor" value={b.accentColor} onChange={(e) => set("accentColor", e.target.value)} className="h-10 w-14 rounded bg-slate-800 border border-slate-700" />
             <input value={b.accentColor} onChange={(e) => set("accentColor", e.target.value)} className={field} />
@@ -220,19 +220,19 @@ export default function SiteBrandingForm({ branding, savedTemplates }: { brandin
           </div></label>
       </div>
 
-      <label className="block"><span className="text-xs text-slate-400">Text pätičky (voliteľné — prázdne = automatický copyright)</span>
+      <label className="block"><span className="text-xs text-slate-400">Footer text (optional — empty = automatic copyright)</span>
         <textarea name="footerText" value={b.footerText ?? ""} onChange={(e) => set("footerText", e.target.value)} rows={2} className={field} /></label>
 
       <input type="hidden" name="navLight" value={String(b.navLight)} />
       <label className="flex items-center gap-2 text-sm text-slate-300">
         <input type="checkbox" checked={b.navLight} onChange={(e) => setB((p) => ({ ...p, navLight: e.target.checked }))} className="accent-blue-500" />
-        Svetlé menu (biely navigačný pás namiesto tmavého)
+        Light menu (a white navigation bar instead of a dark one)
       </label>
 
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold">
-          {pending ? "Ukladám…" : "Uložiť branding"}</button>
-        {saved && <span className="text-emerald-400 text-sm">✓ Uložené — obnov stránku pre plný efekt</span>}
+          {pending ? "Saving…" : "Save branding"}</button>
+        {saved && <span className="text-emerald-400 text-sm">✓ Saved — refresh the page for the full effect</span>}
       </div>
     </form>
   );

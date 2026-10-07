@@ -36,12 +36,12 @@ export default async function JoinRequestsPage() {
 
   return (
     <div className="space-y-6 py-2">
-      <PageHeader title="Žiadosti o vstup" subtitle="GM registrácie čakajúce na schválenie. Schválením sa žiadateľ stane GM daného tímu." />
+      <PageHeader title="Join Requests" subtitle="GM registrations awaiting approval. Approving makes the applicant the GM of that team." />
 
       <Card>
-        <div className="text-sm font-semibold text-slate-200 mb-3">Čakajúce ({pending.length})</div>
+        <div className="text-sm font-semibold text-slate-200 mb-3">Pending ({pending.length})</div>
         {pending.length === 0 ? (
-          <p className="text-slate-500 text-sm py-4 text-center">Žiadne čakajúce žiadosti.</p>
+          <p className="text-slate-500 text-sm py-4 text-center">No pending requests.</p>
         ) : (
           <div className="space-y-3">
             {pending.map((r) => (
@@ -58,11 +58,11 @@ export default async function JoinRequestsPage() {
                 <div className="flex items-center gap-2">
                   <form action={approveJoinRequest}>
                     <input type="hidden" name="id" value={r.id} />
-                    <button className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-semibold">Schváliť</button>
+                    <button className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-semibold">Approve</button>
                   </form>
                   <form action={rejectJoinRequest}>
                     <input type="hidden" name="id" value={r.id} />
-                    <button className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-red-600 text-slate-200 text-xs font-semibold">Zamietnuť</button>
+                    <button className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-red-600 text-slate-200 text-xs font-semibold">Reject</button>
                   </form>
                 </div>
               </div>
@@ -72,10 +72,10 @@ export default async function JoinRequestsPage() {
       </Card>
 
       <Card>
-        <div className="text-sm font-semibold text-slate-200 mb-1">Registrovaní GM ({registered.length})</div>
-        <p className="text-xs text-slate-500 mb-3">Vymazaním sa tím vráti na 🤖 AI GM — okamžite viditeľné v Team / GM Directory — a bude znova voľný pre novú žiadosť.</p>
+        <div className="text-sm font-semibold text-slate-200 mb-1">Registered GMs ({registered.length})</div>
+        <p className="text-xs text-slate-500 mb-3">Removing returns the team to 🤖 AI GM — immediately visible in the Team / GM Directory — and it becomes free for a new request again.</p>
         {registered.length === 0 ? (
-          <p className="text-slate-500 text-sm py-4 text-center">Žiadny tím zatiaľ nemá registrovaného GM.</p>
+          <p className="text-slate-500 text-sm py-4 text-center">No team has a registered GM yet.</p>
         ) : (
           <div className="space-y-2">
             {registered.map((t) => (
@@ -98,7 +98,7 @@ export default async function JoinRequestsPage() {
 
       {decided.length > 0 && (
         <Card>
-          <div className="text-sm font-semibold text-slate-200 mb-3">Vybavené</div>
+          <div className="text-sm font-semibold text-slate-200 mb-3">Resolved</div>
           <div className="space-y-1.5">
             {decided.map((r) => (
               <div key={r.id} className="flex items-center gap-2 text-xs text-slate-400">

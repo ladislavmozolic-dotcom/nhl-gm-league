@@ -15,11 +15,11 @@ import type { TemplateStyle } from "@/lib/site-templates";
 export const dynamic = "force-dynamic";
 
 const TABS = [
-  { key: "branding", label: "Branding & vzhľad", ready: true },
-  { key: "theme", label: "Téma & farby", ready: true },
+  { key: "branding", label: "Branding & look", ready: true },
+  { key: "theme", label: "Theme & colors", ready: true },
   { key: "menu", label: "Menu & sekcie", ready: true },
-  { key: "home", label: "Domovská stránka", ready: true },
-  { key: "pages", label: "Vlastné stránky", ready: true },
+  { key: "home", label: "Home page", ready: true },
+  { key: "pages", label: "Custom pages", ready: true },
 ];
 
 export default async function SiteEditorPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
@@ -34,25 +34,25 @@ export default async function SiteEditorPage({ searchParams }: { searchParams: P
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 space-y-5">
-      <PageHeader title="Web Editor" subtitle="Prispôsob si stránku podľa seba — branding, menu, domovská stránka, vlastné stránky" />
+      <PageHeader title="Web Editor" subtitle="Customize the site your way — branding, menu, home page, custom pages" />
       <div className="flex gap-1.5 flex-wrap">
         {TABS.map((t) => (
           <a key={t.key} href={t.ready ? `/admin/site-editor?tab=${t.key}` : undefined}
             className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${active === t.key ? "bg-blue-600 text-white" : t.ready ? "bg-slate-800 text-slate-300 hover:bg-slate-700" : "bg-slate-800/40 text-slate-600 cursor-default"}`}>
-            {t.label}{!t.ready && " · čoskoro"}
+            {t.label}{!t.ready && " · coming soon"}
           </a>
         ))}
       </div>
 
       {active === "branding" && (
         <Card>
-          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Branding & vzhľad</div>
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Branding & look</div>
           <SiteBrandingForm branding={branding} savedTemplates={templates.map((t) => ({ id: t.id, name: t.name, style: t.style as TemplateStyle }))} />
         </Card>
       )}
       {active === "theme" && (
         <Card>
-          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Téma & farby</div>
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Theme & colors</div>
           <SiteThemeForm theme={site.theme} />
         </Card>
       )}
@@ -64,13 +64,13 @@ export default async function SiteEditorPage({ searchParams }: { searchParams: P
       )}
       {active === "home" && (
         <Card>
-          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Domovská stránka — vlastné bloky</div>
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Home page — custom blocks</div>
           <SiteHomeForm initial={(site.homeBlocks as HomeBlock[] | null) ?? []} />
         </Card>
       )}
       {active === "pages" && (
         <Card>
-          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Vlastné stránky</div>
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Custom pages</div>
           <SitePagesForm pages={pages.map((p) => ({ id: p.id, slug: p.slug, title: p.title, body: p.body, published: p.published, inMenu: p.inMenu, menuLabel: p.menuLabel, order: p.order }))} />
         </Card>
       )}

@@ -66,7 +66,7 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
               tab === "all" ? "bg-slate-800 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Všetky ({rows.length})
+            All ({rows.length})
           </button>
           <button
             onClick={() => setTab("active")}
@@ -74,7 +74,7 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
               tab === "active" ? "bg-sky-950/80 text-sky-300 border border-sky-800/60 shadow-sm" : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Aktívne ({rows.filter((r) => ["open", "countered"].includes(r.resignStatus ?? "")).length})
+            Active ({rows.filter((r) => ["open", "countered"].includes(r.resignStatus ?? "")).length})
           </button>
           <button
             onClick={() => setTab("countered")}
@@ -82,7 +82,7 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
               tab === "countered" ? "bg-amber-950/80 text-amber-300 border border-amber-800/60 shadow-sm" : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Protinávrhy ({rows.filter((r) => r.resignStatus === "countered").length})
+            Counter-offers ({rows.filter((r) => r.resignStatus === "countered").length})
           </button>
           <button
             onClick={() => setTab("stalled")}
@@ -90,14 +90,14 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
               tab === "stalled" ? "bg-rose-950/80 text-rose-300 border border-rose-800/60 shadow-sm" : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            Prerušené ({rows.filter((r) => ["walkedToUFA", "osEligible"].includes(r.resignStatus ?? "")).length})
+            Broken off ({rows.filter((r) => ["walkedToUFA", "osEligible"].includes(r.resignStatus ?? "")).length})
           </button>
         </div>
 
         <div className="w-full sm:w-72 relative">
           <input
             type="text"
-            placeholder="Hľadať hráča, klub alebo pozíciu…"
+            placeholder="Search player, club or position…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"
@@ -116,13 +116,13 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="text-center py-12 px-4 border border-dashed border-slate-800 rounded-2xl mx-4 my-2">
-          <p className="text-slate-400 text-sm font-medium">Žiadne vyjednávania nezodpovedajú zvolenému filtru.</p>
+          <p className="text-slate-400 text-sm font-medium">No negotiations match the selected filter.</p>
           {search && (
             <button
               onClick={() => setSearch("")}
               className="mt-2 text-xs text-sky-400 hover:underline"
             >
-              Zrušiť vyhľadávanie
+              Clear search
             </button>
           )}
         </div>
@@ -131,14 +131,14 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
           <table className="w-full text-sm min-w-[960px]">
             <thead>
               <tr className="text-xs text-slate-400 uppercase tracking-wider border-b border-slate-800 bg-slate-800/40">
-                <th className="text-left px-4 py-3 font-semibold">Hráč & CBA</th>
+                <th className="text-left px-4 py-3 font-semibold">Player & CBA</th>
                 <th className="text-left px-3 py-3 font-semibold">Klub</th>
                 <th className="text-left px-3 py-3 font-semibold">Stav & Kolo</th>
                 <th className="text-right px-3 py-3 font-semibold">Ponuka klubu</th>
-                <th className="text-right px-3 py-3 font-semibold">Protinávrh hráča</th>
-                <th className="text-right px-3 py-3 font-semibold">Podaná</th>
-                <th className="text-left px-4 py-3 font-semibold">AI Benchmark & Nálada</th>
-                <th className="text-right px-4 py-3 font-semibold">Administrácia</th>
+                <th className="text-right px-3 py-3 font-semibold">Player counter-offer</th>
+                <th className="text-right px-3 py-3 font-semibold">Submitted</th>
+                <th className="text-left px-4 py-3 font-semibold">AI Benchmark & Mood</th>
+                <th className="text-right px-4 py-3 font-semibold">Admin</th>
               </tr>
             </thead>
             <tbody>
@@ -178,7 +178,7 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                         <Link
                           href={`/admin/bids/${p.id}`}
                           className="font-bold text-white hover:text-sky-400 transition"
-                          title="Zobraziť históriu ponúk"
+                          title="View offer history"
                         >
                           {cleanName(p.name)}
                         </Link>
@@ -249,12 +249,12 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                         <div>
                           {p.resignStatus === "countered" && (
                             <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              Protinávrh
+                              Counter-offer
                             </span>
                           )}
                           {p.resignStatus === "open" && (
                             <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                              Rozpracované
+                              In progress
                             </span>
                           )}
                           {p.resignStatus === "walkedToUFA" && (
@@ -282,7 +282,7 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                             <span className="text-purple-400 font-semibold">(po OS, priamo s klubom)</span>
                           )}
                           {roundCap != null && p.resignRound === roundCap && (
-                            <span className="text-amber-400 font-semibold">(Finálne)</span>
+                            <span className="text-amber-400 font-semibold">(Final)</span>
                           )}
                         </div>
                       </div>
@@ -295,7 +295,7 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                           <span className="font-bold text-slate-200">
                             {fmtM(p.resignOfferSalary)}
                           </span>
-                          <span className="text-[10px] text-slate-500 block">posledná ponuka</span>
+                          <span className="text-[10px] text-slate-500 block">last offer</span>
                         </div>
                       ) : (
                         <span className="text-slate-600">—</span>
@@ -348,19 +348,19 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                           {lowballPct > 0 && (
                             <span
                               className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-rose-950/70 border border-rose-800/50 text-rose-300"
-                              title="Hráč bol urazený nízkou ponukou a žiada prirážku."
+                              title="The player was insulted by a low offer and is asking for a premium."
                             >
                               😠 +{lowballPct}% ask
                             </span>
                           )}
                           {p.tradeRequested && (
                             <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-red-950/80 border border-red-800/60 text-red-300">
-                              🚨 Žiada trade
+                              🚨 Requests a trade
                             </span>
                           )}
                           {p.disgruntled && (
                             <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-amber-950/80 border border-amber-800/60 text-amber-300">
-                              ⚠️ Nespokojný
+                              ⚠️ Unhappy
                             </span>
                           )}
                           {(p.iceWarnedAt || p.promiseWarnGame != null) && !p.disgruntled && (
@@ -370,12 +370,12 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                           )}
                           {p.faDemandOverride && (
                             <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-purple-950/80 border border-purple-800/60 text-purple-300">
-                              Ručný strop: {fmtM(p.faDemandOverride)}
+                              Manual cap: {fmtM(p.faDemandOverride)}
                             </span>
                           )}
                           {!lowballPct && !p.tradeRequested && !p.disgruntled && !p.iceWarnedAt && !p.faDemandOverride && (
                             <span className="text-[11px] text-slate-500">
-                              {p.desiredRole ?? "Štandardné vyjednávanie"}
+                              {p.desiredRole ?? "Standard negotiation"}
                             </span>
                           )}
                         </div>
@@ -391,12 +391,12 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                           className="px-3 py-1.5 rounded-lg bg-sky-600/90 hover:bg-sky-500 text-white text-xs font-semibold whitespace-nowrap shadow-sm hover:shadow transition flex items-center gap-1.5"
                         >
                           <span>🛠️</span>
-                          <span>Zasiahnuť</span>
+                          <span>Intervene</span>
                         </button>
                         <ResetResignButton
                           playerId={p.id}
                           name={cleanName(p.name)}
-                          label={p.resignStatus === "walkedToUFA" || p.resignStatus === "osEligible" ? "Zmazať" : "Reset"}
+                          label={p.resignStatus === "walkedToUFA" || p.resignStatus === "osEligible" ? "Delete" : "Reset"}
                         />
                       </div>
                     </td>
