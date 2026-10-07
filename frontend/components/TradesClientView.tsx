@@ -5,6 +5,7 @@ import Link from "next/link";
 import PlayerAvatar from "@/components/playerAvatar";
 import TradeActions from "@/components/TradeActions";
 import TradeGroupActions from "@/components/TradeGroupActions";
+import CommishTradeActions from "@/components/CommishTradeActions";
 
 export type EnrichedTradeAsset = {
   assetType: "PLAYER" | "PROSPECT" | "PICK" | "CASH" | "OTHER";
@@ -210,26 +211,53 @@ export default function TradesClientView({
     return [];
   }, [groups, activeTab, teamFilter, search, sessionTeamId]);
 
+  // Group trades for clean sections
+  const inReviewTrades = useMemo(() => {
+    return filteredTrades.filter((t) => ["AWAITING_COMMISH", "MODIFY", "MODIFIED"].includes(t.status));
+  }, [filteredTrades]);
+
+  const inReviewGroups = useMemo(() => {
+    return filteredGroups.filter((g) => g.status === "AWAITING_COMMISH");
+  }, [filteredGroups]);
+
+  const pendingTrades = useMemo(() => {
+    return filteredTrades.filter((t) => t.status === "PENDING");
+  }, [filteredTrades]);
+
+  const regularTrades = useMemo(() => {
+    return filteredTrades.filter((t) => !["AWAITING_COMMISH", "MODIFY", "MODIFIED", "PENDING"].includes(t.status));
+  }, [filteredTrades]);
+
+  const regularGroups = useMemo(() => {
+    return filteredGroups.filter((g) => g.status !== "AWAITING_COMMISH");
+  }, [filteredGroups]);
+
   return (
     <div className="space-y-6">
-      {/* 1. COMMISSION REVIEW CALLOUT (if user has commission/admin permissions and items pending) */}
-      {isCommission && commishQueueCount > 0 && (
+      {/* 1. COMMISSION REVIEW CALLOUT (Always visible to commissioners!) */}
+      {isCommission && (
         <div className="bg-gradient-to-r from-amber-950/40 via-[#0e172a] to-amber-950/30 border border-amber-500/40 rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-lg shrink-0">
-              ⚖️
+              🕵️
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-black text-amber-300 uppercase tracking-wide">
-                  Komisia pre dohľad nad výmenami
+                  Komisia pre dohľad nad výmenami (Trade Commission)
                 </h3>
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/25 text-amber-200 border border-amber-500/40 text-[10px] font-bold">
-                  {commishQueueCount} na schválenie
-                </span>
+                {commishQueueCount > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/25 text-amber-200 border border-amber-500/40 text-[10px] font-bold animate-pulse">
+                    {commishQueueCount} čaká na posúdenie
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-semibold">
+                    0 čakajúcich výmen
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Výmeny zahŕňajúce nováčikov (Rookie GM) vyžadujú posúdenie komisiou pred ich finalizáciou v lige.
+                Posudzovanie a schvaľovanie výmen nováčikov (Rookie GM oversight) a dohľad nad ligovým balansom.
               </p>
             </div>
           </div>
@@ -237,7 +265,7 @@ export default function TradesClientView({
             href="/trades/commish"
             className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors shrink-0 shadow-lg shadow-amber-500/20"
           >
-            Posúdiť výmeny →
+            {commishQueueCount > 0 ? `Posúdiť výmeny (${commishQueueCount}) →` : "Otvoriť komisiu →"}
           </Link>
         </div>
       )}
@@ -369,33 +397,111 @@ export default function TradesClientView({
       </div>
 
       {/* 3. LIST OF TRADES */}
-      <div className="space-y-4">
-        {/* Render 3-Team Trades if on GROUPS or ALL tab */}
-        {(activeTab === "GROUPS" || (activeTab === "ALL" && filteredGroups.length > 0)) && (
-          <div className="space-y-4">
-            {activeTab === "ALL" && filteredGroups.length > 0 && (
-              <h2 className="text-sm font-black uppercase tracking-wider text-sky-400 flex items-center gap-2 pt-2">
-                <span>🔄</span> 3-Tímové výmeny ({filteredGroups.length})
+      <div className="space-y-6">
+        {/* SECTION A: WITH THE COMMISSION (always pinned when items are in review) */}
+        {(inReviewTrades.length > 0 || inReviewGroups.length > 0) && (activeTab === "ALL" || activeTab === "COMMISH") && (
+          <div className="space-y-4 p-4 sm:p-5 rounded-2xl bg-purple-950/20 border border-purple-500/30 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-purple-500/25">
+              <h2 className="text-sm font-black uppercase tracking-wider text-purple-300 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse" />
+                <span>Na posúdenie komisiou (With the Commission)</span>
+                <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/40 text-[10px] font-mono">
+                  {inReviewTrades.length + inReviewGroups.length}
+                </span>
               </h2>
-            )}
-            {filteredGroups.map((g) => (
-              <TradeGroupCardComponent key={`group-${g.id}`} group={g} />
-            ))}
+              {isCommission && (
+                <Link
+                  href="/trades/commish"
+                  className="text-xs text-purple-300 hover:text-purple-100 font-bold underline-offset-2 hover:underline"
+                >
+                  Otvoriť komisiu →
+                </Link>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {inReviewTrades.map((t) => (
+                <TradeCardComponent
+                  key={`commish-${t.id}`}
+                  trade={t}
+                  admin={isAdmin}
+                  isCommission={isCommission}
+                  sessionTeamId={sessionTeamId}
+                />
+              ))}
+
+              {inReviewGroups.map((g) => (
+                <TradeGroupCardComponent
+                  key={`commish-g-${g.id}`}
+                  group={g}
+                  isCommission={isCommission}
+                />
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Render 2-Team Trades */}
-        {activeTab !== "GROUPS" && (
+        {/* SECTION B: PENDING PROPOSALS (for recipient or proposer) */}
+        {pendingTrades.length > 0 && activeTab === "ALL" && (
           <div className="space-y-4">
-            {activeTab === "ALL" && filteredGroups.length > 0 && filteredTrades.length > 0 && (
-              <h2 className="text-sm font-black uppercase tracking-wider text-cyan-400 flex items-center gap-2 pt-2">
-                <span>🔁</span> 2-Tímové výmeny ({filteredTrades.length})
+            <h2 className="text-sm font-black uppercase tracking-wider text-amber-400 flex items-center gap-2 pt-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              Čakajúce návrhy výmen ({pendingTrades.length})
+            </h2>
+            <div className="space-y-4">
+              {pendingTrades.map((t) => (
+                <TradeCardComponent
+                  key={`pending-${t.id}`}
+                  trade={t}
+                  admin={isAdmin}
+                  isCommission={isCommission}
+                  sessionTeamId={sessionTeamId}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SECTION C: 3-TEAM TRADES */}
+        {(activeTab === "GROUPS" || (activeTab === "ALL" && regularGroups.length > 0)) && (
+          <div className="space-y-4">
+            {activeTab === "ALL" && regularGroups.length > 0 && (
+              <h2 className="text-sm font-black uppercase tracking-wider text-sky-400 flex items-center gap-2 pt-2">
+                <span>🔄</span> 3-Tímové výmeny ({regularGroups.length})
+              </h2>
+            )}
+            <div className="space-y-4">
+              {regularGroups.map((g) => (
+                <TradeGroupCardComponent
+                  key={`group-${g.id}`}
+                  group={g}
+                  isCommission={isCommission}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SECTION D: REGULAR / COMPLETED TRADES */}
+        {activeTab !== "GROUPS" && (activeTab !== "COMMISH" || inReviewTrades.length === 0) && (
+          <div className="space-y-4">
+            {activeTab === "ALL" && regularTrades.length > 0 && (
+              <h2 className="text-sm font-black uppercase tracking-wider text-slate-300 flex items-center gap-2 pt-2">
+                <span>🔁</span> História výmen ({regularTrades.length})
               </h2>
             )}
 
-            {filteredTrades.map((t) => (
-              <TradeCardComponent key={`trade-${t.id}`} trade={t} admin={isAdmin} />
-            ))}
+            <div className="space-y-4">
+              {regularTrades.map((t) => (
+                <TradeCardComponent
+                  key={`trade-${t.id}`}
+                  trade={t}
+                  admin={isAdmin}
+                  isCommission={isCommission}
+                  sessionTeamId={sessionTeamId}
+                />
+              ))}
+            </div>
           </div>
         )}
 
@@ -431,13 +537,26 @@ export default function TradesClientView({
 // =========================================================================
 // 2-TEAM TRADE CARD COMPONENT
 // =========================================================================
-function TradeCardComponent({ trade, admin }: { trade: EnrichedTrade; admin?: boolean }) {
+function TradeCardComponent({
+  trade,
+  admin,
+  isCommission,
+  sessionTeamId,
+}: {
+  trade: EnrichedTrade;
+  admin?: boolean;
+  isCommission?: boolean;
+  sessionTeamId?: number | null;
+}) {
   const isDone = trade.status === "ACCEPTED" || trade.status === "COMPLETED";
   const statusCfg = STATUS_CONFIG[trade.status] ?? {
     label: trade.status,
     badgeClass: "bg-slate-700/40 text-slate-300 border-slate-700/50",
     icon: "•",
   };
+
+  const isInReview = ["AWAITING_COMMISH", "MODIFY", "MODIFIED"].includes(trade.status);
+  const isConflicted = sessionTeamId != null && (sessionTeamId === trade.fromTeamId || sessionTeamId === trade.toTeamId);
 
   return (
     <div className="bg-[#0b1120] border border-slate-800/90 hover:border-slate-700/80 rounded-2xl shadow-xl overflow-hidden transition-all duration-300">
@@ -623,14 +742,30 @@ function TradeCardComponent({ trade, admin }: { trade: EnrichedTrade; admin?: bo
         </div>
 
         {/* Actions component */}
-        {(trade.action || admin) && (
-          <TradeActions
-            tradeId={trade.id}
-            role={trade.action}
-            admin={admin}
-            pending={trade.status === "PENDING"}
-          />
-        )}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {(trade.action || admin) && (
+            <TradeActions
+              tradeId={trade.id}
+              role={trade.action}
+              admin={admin}
+              pending={trade.status === "PENDING"}
+            />
+          )}
+
+          {/* COMMISSION DIRECT APPROVAL BUTTONS */}
+          {isCommission && isInReview && (
+            <div className="flex items-center gap-2 bg-purple-950/30 border border-purple-500/30 px-3 py-1.5 rounded-xl">
+              <span className="text-xs font-bold text-purple-300 flex items-center gap-1">
+                <span>⚖️</span> Komisia:
+              </span>
+              {isConflicted ? (
+                <span className="text-xs text-slate-400 italic">Váš tím je vo výmene (rozhoduje iný člen)</span>
+              ) : (
+                <CommishTradeActions tradeId={trade.id} status={trade.status} />
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -770,7 +905,14 @@ function TradeAssetRow({ asset }: { asset: EnrichedTradeAsset }) {
 // =========================================================================
 // 3-TEAM TRADE GROUP CARD COMPONENT
 // =========================================================================
-function TradeGroupCardComponent({ group }: { group: EnrichedGroup }) {
+function TradeGroupCardComponent({
+  group,
+  isCommission,
+}: {
+  group: EnrichedGroup;
+  isCommission?: boolean;
+}) {
+  const isCommishReview = group.status === "AWAITING_COMMISH";
   return (
     <div className="bg-[#0b1120] border border-sky-800/40 hover:border-sky-700/60 rounded-2xl shadow-xl overflow-hidden transition-all">
       {/* Header */}
@@ -859,8 +1001,8 @@ function TradeGroupCardComponent({ group }: { group: EnrichedGroup }) {
         <span className="text-slate-500 font-mono">Dátum návrhu: {group.createdAtStr}</span>
         <TradeGroupActions
           groupId={group.id}
-          canRespond={group.canRespond}
-          isCommishReview={group.isCommishReview}
+          canRespond={group.canRespond || (!!isCommission && isCommishReview)}
+          isCommishReview={group.isCommishReview || (!!isCommission && isCommishReview)}
         />
       </div>
     </div>

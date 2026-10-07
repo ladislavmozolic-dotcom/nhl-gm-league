@@ -325,7 +325,7 @@ export default async function TradesPage() {
   const enrichedGroups: EnrichedGroup[] = groups
     .filter((g) => {
       if (g.status === "COMPLETED" || g.status === "ACCEPTED") return true;
-      return admin || myGroupIds.includes(g.id);
+      return admin || commission || myGroupIds.includes(g.id);
     })
     .map((g) => {
       const legs = groupLegs
@@ -371,7 +371,7 @@ export default async function TradesPage() {
         });
 
       const myResponse = session ? responses.find((r) => r.teamId === session) : undefined;
-      const canRespond = admin || myResponse?.status === "PENDING";
+      const canRespond = admin || commission || myResponse?.status === "PENDING";
 
       return {
         id: g.id,
@@ -380,7 +380,7 @@ export default async function TradesPage() {
         legs,
         responses,
         canRespond,
-        isCommishReview: admin && g.status === "AWAITING_COMMISH",
+        isCommishReview: (admin || commission) && g.status === "AWAITING_COMMISH",
       };
     });
 
