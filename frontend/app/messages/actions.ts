@@ -67,7 +67,7 @@ export async function listConversations() {
   if (!from) return { ok: false as const, me: null, teams: [] as ConvTeam[] };
   const teams = await prisma.team.findMany({
     where: { league: "NHL", isAffiliate: false, id: { not: from } },
-    select: { id: true, name: true, code: true, logoUrl: true, gmNickname: true, passwordHash: true },
+    select: { id: true, name: true, code: true, slug: true, logoUrl: true, gmNickname: true, passwordHash: true, conference: true, division: true },
     orderBy: { name: "asc" },
   });
   const [unread, sent, recv] = await Promise.all([
@@ -80,22 +80,65 @@ export async function listConversations() {
   const lastMap = new Map<number, number>();
   for (const s of sent) lastMap.set(s.toTeamId, Math.max(lastMap.get(s.toTeamId) ?? 0, s._max.id ?? 0));
   for (const r of recv) lastMap.set(r.fromTeamId, Math.max(lastMap.get(r.fromTeamId) ?? 0, r._max.id ?? 0));
-  const out: ConvTeam[] = teams.map((t) => ({
-    id: t.id, name: t.name, code: t.code, logoUrl: t.logoUrl,
-    gm: t.gmNickname, hasGm: !!t.passwordHash, unread: unreadMap.get(t.id) ?? 0, lastId: lastMap.get(t.id) ?? 0,
-  }));
+  // Fetch details of the latest message for every active conversation
+  const lastIds = [...new Set([...lastMap.values()])].filter((id) => id > 0);
+  const lastMsgDetails = lastIds.length
+    ? await prisma.dmMessage.findMany({
+        where: { id: { in: lastIds } },
+        select: { id: true, body: true, fromTeamId: true, createdAt: true },
+      })
+    : [];
+  const lastMsgMap = new Map(
+    lastMsgDetails.map((m) => [m.id, { body: m.body, fromTeamId: m.fromTeamId, createdAt: m.createdAt.toISOString() }])
+  );
+
+  const out: ConvTeam[] = teams.map((t) => {
+    const lId = lastMap.get(t.id) ?? 0;
+    const lMsg = lId ? lastMsgMap.get(lId) : undefined;
+    return {
+      id: t.id,
+      name: t.name,
+      code: t.code,
+      slug: t.slug ?? null,
+      conference: t.conference ?? null,
+      division: t.division ?? null,
+      logoUrl: t.logoUrl,
+      gm: t.gmNickname,
+      hasGm: !!t.passwordHash,
+      unread: unreadMap.get(t.id) ?? 0,
+      lastId: lId,
+      lastSnippet: lMsg ? lMsg.body.slice(0, 80) : null,
+      lastAt: lMsg ? lMsg.createdAt : null,
+      lastFromMe: lMsg ? lMsg.fromTeamId === from : false,
+    };
+  });
   // Also surface non-NHL conversation partners the club has actually exchanged DMs with —
   // notably the "Free Agents" club (the FA/agent that DMs offer counters & signings). Without
   // this they'd count as unread (a notification pops) but have no thread to open.
   const baseIds = new Set(teams.map((t) => t.id));
   const extraIds = [...new Set([...lastMap.keys(), ...unreadMap.keys()])].filter((id) => id !== from && !baseIds.has(id));
   if (extraIds.length) {
-    const extra = await prisma.team.findMany({ where: { id: { in: extraIds } }, select: { id: true, name: true, code: true, logoUrl: true, gmNickname: true, league: true } });
+    const extra = await prisma.team.findMany({
+      where: { id: { in: extraIds } },
+      select: { id: true, name: true, code: true, slug: true, logoUrl: true, gmNickname: true, league: true },
+    });
     for (const t of extra) {
       const isFa = t.league === "FA";
+      const lId = lastMap.get(t.id) ?? 0;
+      const lMsg = lId ? lastMsgMap.get(lId) : undefined;
       out.push({
-        id: t.id, name: isFa ? "Free Agent Frenzy" : t.name, code: isFa ? "FA" : t.code, logoUrl: t.logoUrl,
-        gm: isFa ? "Agent" : t.gmNickname, hasGm: true, unread: unreadMap.get(t.id) ?? 0, lastId: lastMap.get(t.id) ?? 0,
+        id: t.id,
+        name: isFa ? "Free Agent Frenzy" : t.name,
+        code: isFa ? "FA" : t.code,
+        slug: t.slug ?? null,
+        logoUrl: t.logoUrl,
+        gm: isFa ? "Agent" : t.gmNickname,
+        hasGm: true,
+        unread: unreadMap.get(t.id) ?? 0,
+        lastId: lId,
+        lastSnippet: lMsg ? lMsg.body.slice(0, 80) : null,
+        lastAt: lMsg ? lMsg.createdAt : null,
+        lastFromMe: lMsg ? lMsg.fromTeamId === from : false,
       });
     }
   }
@@ -105,9 +148,21 @@ export async function listConversations() {
   // in the unread badge with no thread to ever open or mark read. Surface them as a
   // synthetic "League Notifications" entry, same trick as the FA pseudo-team above.
   if ((lastMap.get(from) ?? 0) > 0 || (unreadMap.get(from) ?? 0) > 0) {
+    const lId = lastMap.get(from) ?? 0;
+    const lMsg = lId ? lastMsgMap.get(lId) : undefined;
     out.push({
-      id: from, name: "League Notifications", code: "SYS", logoUrl: null,
-      gm: "System", hasGm: true, unread: unreadMap.get(from) ?? 0, lastId: lastMap.get(from) ?? 0,
+      id: from,
+      name: "League Notifications",
+      code: "SYS",
+      slug: null,
+      logoUrl: null,
+      gm: "System",
+      hasGm: true,
+      unread: unreadMap.get(from) ?? 0,
+      lastId: lId,
+      lastSnippet: lMsg ? lMsg.body.slice(0, 80) : null,
+      lastAt: lMsg ? lMsg.createdAt : null,
+      lastFromMe: false,
     });
   }
   // active conversations (most recent message) float to the top; then teams you've
@@ -115,7 +170,22 @@ export async function listConversations() {
   out.sort((a, b) => b.lastId - a.lastId || Number(b.hasGm) - Number(a.hasGm) || a.name.localeCompare(b.name));
   return { ok: true as const, me: from, teams: out };
 }
-export type ConvTeam = { id: number; name: string; code: string | null; logoUrl: string | null; gm: string | null; hasGm: boolean; unread: number; lastId: number };
+export type ConvTeam = {
+  id: number;
+  name: string;
+  code: string | null;
+  slug?: string | null;
+  conference?: string | null;
+  division?: string | null;
+  logoUrl: string | null;
+  gm: string | null;
+  hasGm: boolean;
+  unread: number;
+  lastId: number;
+  lastSnippet?: string | null;
+  lastAt?: string | null;
+  lastFromMe?: boolean;
+};
 
 /** Total unread DMs for the signed-in GM (menu badge). */
 export async function unreadDmCount(): Promise<number> {
@@ -123,3 +193,4 @@ export async function unreadDmCount(): Promise<number> {
   if (!from) return 0;
   return prisma.dmMessage.count({ where: { toTeamId: from, readAt: null } });
 }
+
