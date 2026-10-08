@@ -19,29 +19,22 @@ type Player = {
   capHit: number;
   ahlSalary?: number | null;
   onWaivers?: boolean;
-  // Rule 30/10 recall pass — riding a free (no-waivers) trip back to the farm since
-  // his last AHL→NHL call-up (≤30 days AND ≤10 NHL games played since then).
   recallExempt?: boolean;
   recallDaysLeft?: number;
   recallGamesLeft?: number;
 };
 
-// Exactly the $100k farm deal → a minor-league (AHL-only) contract. Such a player
-// can NEVER be on the NHL roster — dressed OR scratched. Anything else (including a
-// two-way deal well below the real NHL minimum) is governed by contractType instead.
 const isAhlOnly = (p: Player) => p.capHit === 100_000;
 
-// OV badge in green, brighter the higher the rating.
 const ovColor = (ov: number) =>
   ov >= 80
-    ? "bg-emerald-500/30 text-emerald-200 border-emerald-400/60"
+    ? "bg-emerald-500/30 text-emerald-200 border-emerald-400/60 shadow-sm shadow-emerald-500/20"
     : ov >= 70
     ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
     : ov >= 60
-    ? "bg-emerald-600/12 text-emerald-400/90 border-emerald-600/30"
-    : "bg-emerald-700/10 text-emerald-500/70 border-emerald-700/25";
+    ? "bg-emerald-600/15 text-emerald-400/90 border-emerald-600/30"
+    : "bg-slate-800 text-slate-400 border-slate-700";
 
-// a $100k minor-league deal is the only contract that can be released to UFA
 const isReleasable = (p: Player) => p.capHit === 100_000;
 
 type Props = {
@@ -131,9 +124,10 @@ export default function RosterMover({
     proScratched = of("pro-scratched"),
     farm = of("farm"),
     farmScratched = of("farm-scratched");
-  const nhlRoster = rows.filter((r) => isNhlSide(r.side)); // dressed + scratched → cap + 23-limit
+  const nhlRoster = rows.filter((r) => isNhlSide(r.side));
   const goalies = (l: Player[]) => l.filter((p) => p.isGoalie).length;
   const proSkaters = pro.length - goalies(pro);
+  const farmSkaters = farm.length - goalies(farm);
   const isDef = (pos: string) => /(^|\/)D(\/|$)/.test(pos) || pos === "D";
   const fdg = (l: Player[]) => {
     const g = l.filter((p) => p.isGoalie).length;
@@ -225,118 +219,119 @@ export default function RosterMover({
       }
     });
 
-  const MoveBtn = ({ p, to, label }: { p: Player; to: RosterSide; label: string }) => (
-    <button
-      onClick={() => move(p.id, to)}
-      disabled={!canMove(p, to)}
-      title={
-        !canMove(p, to)
-          ? isNhlSide(to)
-            ? isCs
-              ? "Iba AHL / $100k zmluva — nemôže byť na NHL súpiske"
-              : "AHL-only / $100k contract — can't be on the NHL roster"
-            : isCs
-            ? "Jednocestnú zmluvu nie je možné poslať priamo na farmu"
-            : "One-way contracts can't be sent down"
-          : ""
-      }
-      className="text-[11px] px-2 py-0.5 rounded bg-slate-750 hover:bg-slate-700 disabled:opacity-30 whitespace-nowrap transition-colors"
-    >
-      {label}
-    </button>
-  );
+  const MoveBtn = ({
+    p,
+    to,
+    label,
+    variant = "slate",
+  }: {
+    p: Player;
+    to: RosterSide;
+    label: string;
+    variant?: "slate" | "blue" | "emerald" | "sky";
+  }) => {
+    const disabled = !canMove(p, to);
+    const cls =
+      variant === "blue"
+        ? "bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-sm shadow-blue-600/30"
+        : variant === "emerald"
+        ? "bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-bold"
+        : variant === "sky"
+        ? "bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/40 font-bold"
+        : "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60";
+
+    return (
+      <button
+        onClick={() => move(p.id, to)}
+        disabled={disabled}
+        title={
+          disabled
+            ? isNhlSide(to)
+              ? isCs
+                ? "Iba AHL / $100k zmluva — nemôže byť na NHL súpiske"
+                : "AHL-only / $100k contract — can't be on the NHL roster"
+              : isCs
+              ? "Jednocestnú zmluvu nie je možné poslať priamo na farmu"
+              : "One-way contracts can't be sent down"
+            : ""
+        }
+        className={`text-[11px] px-2.5 py-1 rounded-lg disabled:opacity-30 whitespace-nowrap transition-all ${cls}`}
+      >
+        {label}
+      </button>
+    );
+  };
 
   const Row = ({ p }: { p: Player }) => {
     const oneWay = p.contractType === "ONE_WAY";
     const ahlOnly = isAhlOnly(p);
     const tooExpensive = p.capHit > WAIVER_CAP_HIT_LIMIT;
+
     return (
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-800/60 text-sm hover:bg-slate-800/30 transition-colors">
-        <span className={`shrink-0 w-9 text-center tabular-nums font-bold text-sm px-1 py-0.5 rounded border ${ovColor(p.overall)}`}>
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-slate-800/40 text-sm hover:bg-slate-800/40 transition-colors">
+        <span
+          className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center tabular-nums font-black text-xs border ${ovColor(
+            p.overall
+          )}`}
+        >
           {p.overall}
         </span>
-        <span className="flex-1 min-w-0 truncate">
-          <PlayerLink id={p.id} name={p.name} className="font-medium" />
-          <span className="text-slate-500 text-xs ml-1.5">{p.position}</span>
-        </span>
-        {p.isGoalie && p.condition != null && (
-          <span
-            title={
-              isCs
-                ? "Kondícia brankára — pod ~95% nemôže začať zápas; simulátor nechá unaveného chytať len v núdzi"
-                : "Goalie condition — below ~95 he can't start; the sim rests a tired starter"
-            }
-            className={`shrink-0 text-[11px] font-semibold tabular-nums px-1.5 py-0.5 rounded border border-slate-700 ${
-              p.condition >= 98
-                ? "text-emerald-400"
-                : p.condition >= 95
-                ? "text-green-400"
-                : p.condition >= 90
-                ? "text-amber-400"
-                : "text-red-400"
-            }`}
-          >
-            {isCs ? "KOND" : "CON"} {Math.round(p.condition)}%
-          </span>
-        )}
-        {ahlOnly ? (
-          <span
-            title={
-              isCs
-                ? "Zmluva pre farmu (iba AHL) — pod minimom NHL, nemožno povolať do prvého tímu"
-                : "Minor-league (AHL-only) contract — below the NHL minimum salary, can't be called up"
-            }
-            className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-600/50 text-emerald-400"
-          >
-            {isCs ? "Iba AHL" : "AHL only"}
-          </span>
-        ) : (
-          <span
-            title={
-              isCs
-                ? oneWay
-                  ? "Jednocestná zmluva — nemožno poslať na farmu priamo bez waivers"
-                  : p.ahlSalary != null
-                  ? `Dvojcestná zmluva — $${p.capHit.toLocaleString("en-US")} NHL / $${p.ahlSalary.toLocaleString("en-US")} AHL`
-                  : `Zmluva — $${p.capHit.toLocaleString("en-US")}`
-                : oneWay
-                ? "One-way contract — can't be sent to the farm"
-                : p.ahlSalary != null
-                ? `Two-way contract — $${p.capHit.toLocaleString("en-US")} NHL / $${p.ahlSalary.toLocaleString("en-US")} AHL`
-                : `Legacy contract — $${p.capHit.toLocaleString("en-US")} on NHL and AHL roster`
-            }
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-              oneWay ? "border-amber-600/60 text-amber-400" : "border-slate-700 text-slate-400"
-            }`}
-          >
-            {oneWay ? "1-way" : "2-way"}
-          </span>
-        )}
-        {oneWay && !ahlOnly && p.recallExempt && (p.side === "pro" || p.side === "pro-scratched") && (
-          <span
-            title={
-              isCs
-                ? `Výnimka z waivers — povolaný z AHL v posledných 30 dňoch / 10 zápasoch: zostáva ${p.recallDaysLeft}d / ${p.recallGamesLeft}z do opätovnej nutnosti waivers`
-                : `Recall pass — sent down from the AHL within the last 30 days/10 games gets him back down freely: ${p.recallDaysLeft}d / ${p.recallGamesLeft}g left before he needs waivers again`
-            }
-            className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-600/50 text-emerald-400 whitespace-nowrap"
-          >
-            {isCs ? "🔓 Výnimka" : "🔓 Recall pass"}
-          </span>
-        )}
-        <div className="flex items-center gap-1 shrink-0">
-          {oneWay && p.onWaivers && (p.side === "pro" || p.side === "pro-scratched") && (
-            <span
-              title={
-                isCs
-                  ? "Čaká na uzavretie 24-hodinového okna waivers — pozrite stránku Waivers"
-                  : "Waiting for the one-day waiver window to close — check the Waivers page"
-              }
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-600/50 text-amber-400 whitespace-nowrap"
-            >
-              {isCs ? "⏳ Na waivers" : "⏳ On Waivers"}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <PlayerLink id={p.id} name={p.name} className="font-semibold text-slate-200 hover:text-blue-400 transition-colors truncate" />
+            <span className="text-[10px] font-mono font-bold text-slate-400 px-1 py-0.2 rounded bg-slate-800/80 border border-slate-700/60">
+              {p.position}
             </span>
-          )}
+          </div>
+
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            {p.isGoalie && p.condition != null && (
+              <span
+                className={`text-[10px] font-bold tabular-nums px-1.5 py-0.2 rounded border ${
+                  p.condition >= 95
+                    ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                    : p.condition >= 85
+                    ? "text-green-400 border-green-500/30 bg-green-500/10"
+                    : "text-amber-400 border-amber-500/30 bg-amber-500/10"
+                }`}
+              >
+                {isCs ? "KOND" : "CON"} {Math.round(p.condition)}%
+              </span>
+            )}
+
+            {ahlOnly ? (
+              <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded border border-emerald-500/40 text-emerald-300 bg-emerald-500/10">
+                {isCs ? "Iba AHL" : "AHL only"}
+              </span>
+            ) : (
+              <span
+                className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${
+                  oneWay
+                    ? "border-amber-500/40 text-amber-300 bg-amber-500/10"
+                    : "border-slate-700 text-slate-400 bg-slate-800/50"
+                }`}
+              >
+                {oneWay ? "1-way" : "2-way"}
+              </span>
+            )}
+
+            {oneWay && !ahlOnly && p.recallExempt && (p.side === "pro" || p.side === "pro-scratched") && (
+              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded border border-emerald-500/40 text-emerald-300 bg-emerald-500/10 whitespace-nowrap">
+                {isCs ? "🔓 Výnimka" : "🔓 Recall pass"}
+              </span>
+            )}
+
+            {oneWay && p.onWaivers && (p.side === "pro" || p.side === "pro-scratched") && (
+              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded border border-amber-500/40 text-amber-300 bg-amber-500/10 whitespace-nowrap">
+                {isCs ? "⏳ Na waivers" : "⏳ On Waivers"}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {p.side === "pro" && (
             <>
               <MoveBtn p={p} to="pro-scratched" label={isCs ? "Posadiť" : "Scratch"} />
@@ -345,75 +340,51 @@ export default function RosterMover({
                   <button
                     onClick={() => waiver(p)}
                     disabled={pending || tooExpensive}
-                    title={
-                      tooExpensive
-                        ? isCs
-                          ? `Príliš drahý hráč na waivers (nad $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M cap hit) — nemožno poslať na farmu`
-                          : `Too valuable to clear waivers (over $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M cap hit) — he can't be sent to the farm`
-                        : isCs
-                        ? "Jednocestné zmluvy musia prejsť waivers pred odchodom na farmu"
-                        : "One-way contracts must clear waivers before they can be sent to the farm"
-                    }
-                    className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap transition-colors"
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-900/40 hover:bg-amber-800 text-amber-200 border border-amber-600/40 disabled:opacity-30 whitespace-nowrap transition-colors font-semibold"
                   >
-                    {isCs ? "Farma/Waivers" : "Farm/Waivers"}
+                    {isCs ? "Waivers" : "Farm/Waivers"}
                   </button>
                 )
               ) : (
-                <MoveBtn p={p} to="farm" label={isCs ? "↓ Farma" : "↓ Farm"} />
+                <MoveBtn p={p} to="farm" label={isCs ? "↓ Farma" : "↓ Farm"} variant="sky" />
               )}
             </>
           )}
+
           {p.side === "pro-scratched" && (
             <>
-              <MoveBtn p={p} to="pro" label={isCs ? "Nasadiť" : "Dress"} />
+              <MoveBtn p={p} to="pro" label={isCs ? "Nasadiť" : "Dress"} variant="emerald" />
               {oneWay && !ahlOnly && !p.recallExempt ? (
                 !p.onWaivers && (
                   <button
                     onClick={() => waiver(p)}
                     disabled={pending || tooExpensive}
-                    title={
-                      tooExpensive
-                        ? isCs
-                          ? `Príliš drahý hráč na waivers (nad $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M cap hit) — nemožno poslať na farmu`
-                          : `Too valuable to clear waivers (over $${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M cap hit) — he can't be sent to the farm`
-                        : isCs
-                        ? "Jednocestné zmluvy musia prejsť waivers pred odchodom na farmu"
-                        : "One-way contracts must clear waivers before they can be sent to the farm"
-                    }
-                    className="text-[11px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-30 whitespace-nowrap transition-colors"
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-900/40 hover:bg-amber-800 text-amber-200 border border-amber-600/40 disabled:opacity-30 whitespace-nowrap transition-colors font-semibold"
                   >
-                    {isCs ? "Farma/Waivers" : "Farm/Waivers"}
+                    {isCs ? "Waivers" : "Farm/Waivers"}
                   </button>
                 )
               ) : (
-                <MoveBtn p={p} to="farm" label={isCs ? "↓ Farma" : "↓ Farm"} />
+                <MoveBtn p={p} to="farm" label={isCs ? "↓ Farma" : "↓ Farm"} variant="sky" />
               )}
             </>
           )}
+
           {p.side === "farm" && (
             <>
-              <MoveBtn p={p} to="pro" label={isCs ? "↑ NHL" : "↑ Pro"} />
+              <MoveBtn p={p} to="pro" label={isCs ? "↑ NHL" : "↑ Pro"} variant="blue" />
               <MoveBtn p={p} to="farm-scratched" label={isCs ? "Posadiť" : "Scratch"} />
             </>
           )}
+
           {p.side === "farm-scratched" && (
             <>
-              <MoveBtn p={p} to="pro" label={isCs ? "↑ NHL" : "↑ Pro"} />
-              <MoveBtn p={p} to="farm" label={isCs ? "Nasadiť" : "Dress"} />
+              <MoveBtn p={p} to="pro" label={isCs ? "↑ NHL" : "↑ Pro"} variant="blue" />
+              <MoveBtn p={p} to="farm" label={isCs ? "Nasadiť" : "Dress"} variant="emerald" />
               <button
                 onClick={() => release(p)}
                 disabled={!isReleasable(p) || pending}
-                title={
-                  isReleasable(p)
-                    ? isCs
-                      ? "Prepustiť tohto $100k hráča na trh voľných hráčov (UFA)"
-                      : "Release this $100k minor-league player to the UFA market"
-                    : isCs
-                    ? "Prepustiť možno iba $100k farmársku zmluvu"
-                    : "Only a $100k minor-league contract can be released"
-                }
-                className="text-[11px] px-2 py-0.5 rounded bg-red-900/70 hover:bg-red-800 text-red-200 disabled:opacity-25 whitespace-nowrap transition-colors"
+                className="text-[11px] px-2.5 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-200 border border-rose-800/50 disabled:opacity-25 whitespace-nowrap transition-colors font-semibold"
               >
                 {isCs ? "Prepustiť" : "Release"}
               </button>
@@ -424,28 +395,61 @@ export default function RosterMover({
     );
   };
 
-  const Col = ({ title, sub, list, warn }: { title: string; sub: string; list: Player[]; warn?: boolean }) => (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden shadow-md backdrop-blur">
-      <div className={`px-3.5 py-2.5 border-b border-slate-800 ${warn ? "bg-red-950/40" : "bg-slate-800/40"}`}>
-        <div className="font-bold text-sm text-slate-100">{title}</div>
-        <div className="text-[11px] text-slate-400 mt-0.5">{sub}</div>
-      </div>
-      <div className="max-h-[42vh] overflow-y-auto divide-y divide-slate-800/30">
-        {list.length === 0 && (
-          <div className="px-4 py-6 text-center text-slate-500 text-xs italic">
-            {isCs ? "Žiadni hráči" : "empty"}
+  const Col = ({
+    title,
+    sub,
+    list,
+    theme = "slate",
+    warn,
+    countBadge,
+  }: {
+    title: string;
+    sub: string;
+    list: Player[];
+    theme?: "blue" | "slate" | "amber";
+    warn?: boolean;
+    countBadge?: string;
+  }) => {
+    const headerCls =
+      warn
+        ? "bg-rose-950/60 border-rose-800/80 text-rose-200"
+        : theme === "blue"
+        ? "bg-gradient-to-r from-blue-900/40 to-slate-900/60 border-blue-500/30 text-blue-200"
+        : theme === "amber"
+        ? "bg-gradient-to-r from-amber-900/40 to-slate-900/60 border-amber-500/30 text-amber-200"
+        : "bg-slate-850/60 border-slate-800 text-slate-200";
+
+    return (
+      <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md flex flex-col">
+        <div className={`px-4 py-3 border-b flex items-center justify-between ${headerCls}`}>
+          <div>
+            <div className="font-extrabold text-sm sm:text-base tracking-tight">{title}</div>
+            <div className="text-[11px] opacity-80 mt-0.5">{sub}</div>
           </div>
-        )}
-        {list.map((p) => (
-          <Row key={p.id} p={p} />
-        ))}
+          {countBadge && (
+            <span className="text-xs font-mono font-black px-2 py-0.5 rounded-full bg-black/40 border border-white/10">
+              {countBadge}
+            </span>
+          )}
+        </div>
+
+        <div className="max-h-[46vh] overflow-y-auto divide-y divide-slate-800/30 p-1 flex-1">
+          {list.length === 0 && (
+            <div className="px-4 py-8 text-center text-slate-500 text-xs italic">
+              {isCs ? "Žiadni hráči" : "empty"}
+            </div>
+          )}
+          {list.map((p) => (
+            <Row key={p.id} p={p} />
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (!hasAffiliate)
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto px-4 py-12 text-center">
         <h1 className="text-2xl font-bold mb-2">
           {teamName} — {isCs ? "Pohyby v súpiske" : "Rosters"}
         </h1>
@@ -456,160 +460,235 @@ export default function RosterMover({
     );
 
   return (
-    <div className="w-full px-6 pb-28">
-      <div className="mb-5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h1 className="text-2xl font-extrabold tracking-tight">
-            {teamName} — {isCs ? "Pohyby v súpiske" : "Rosters"}
-          </h1>
-          <div className="flex items-center gap-1.5 text-xs bg-slate-900/80 border border-slate-800 px-2 py-1 rounded-lg">
-            <span className="text-slate-400 mr-0.5">{isCs ? "Zoradiť:" : "Sort:"}</span>
+    <div className="w-full px-4 sm:px-6 pb-32 space-y-6">
+      {/* Top Header & Overview Bar */}
+      <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl backdrop-blur-md">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white uppercase">
+              {teamName} — {isCs ? "Pohyby v súpiske" : "Rosters"}
+            </h1>
+            <div className="flex gap-4 text-xs mt-1.5 items-center">
+              <BackLink fallback={`/teams/${fromFarmSlug ?? teamSlug}`} label={isCs ? "tím" : "team"} />
+              <Link href={`/teams/${fromFarmSlug ?? teamSlug}/lines`} className="text-slate-400 hover:text-blue-400 transition-colors">
+                {isCs ? "Zostavy →" : "Lines →"}
+              </Link>
+              <Link
+                href={`/teams/${fromFarmSlug ?? teamSlug}/roster/edit`}
+                className="text-slate-400 hover:text-blue-400 transition-colors"
+              >
+                {isCs ? "Čísla a kapitáni →" : "Numbers & captains →"}
+              </Link>
+            </div>
+          </div>
+
+          {/* Sort Switcher */}
+          <div className="flex items-center gap-1.5 text-xs bg-slate-850/80 border border-slate-700/60 px-2.5 py-1.5 rounded-xl shadow-sm">
+            <span className="text-slate-400 font-medium mr-1">{isCs ? "Zoradiť:" : "Sort:"}</span>
             <button
               onClick={() => setSortMode("name")}
-              className={`px-2.5 py-0.5 rounded-md font-semibold transition-colors ${
-                sortMode === "name" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
+              className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                sortMode === "name" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
               }`}
             >
               A–Z
             </button>
             <button
               onClick={() => setSortMode("ov")}
-              className={`px-2.5 py-0.5 rounded-md font-semibold transition-colors ${
-                sortMode === "ov" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
+              className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                sortMode === "ov" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
               }`}
             >
               OV
             </button>
           </div>
         </div>
-        <div className="flex gap-3 text-sm mt-1.5 items-center">
-          <BackLink fallback={`/teams/${fromFarmSlug ?? teamSlug}`} label={isCs ? "tím" : "team"} />
-          <Link href={`/teams/${fromFarmSlug ?? teamSlug}/lines`} className="text-slate-400 hover:text-blue-400 transition-colors">
-            {isCs ? "Zostavy →" : "Lines →"}
-          </Link>
-          <Link
-            href={`/teams/${fromFarmSlug ?? teamSlug}/roster/edit`}
-            className="text-slate-400 hover:text-blue-400 transition-colors"
-          >
-            {isCs ? "Čísla a kapitáni →" : "Numbers & captains →"}
-          </Link>
+
+        {/* Quota KPI Meters */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-slate-800/60">
+          <div className="bg-slate-850/50 border border-slate-800 rounded-xl p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">
+              {isCs ? "NHL ZÁPASOVÁ 20" : "NHL DRESSED 20"}
+            </span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className={`text-lg font-black ${pro.length === 20 ? "text-emerald-400" : "text-amber-400"}`}>
+                {pro.length}/20
+              </span>
+              <span className="text-[11px] text-slate-400">{fdg(pro)}</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-850/50 border border-slate-800 rounded-xl p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">
+              {isCs ? "NHL LIMIT SÚPISKY" : "NHL ROSTER CAP"}
+            </span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className={`text-lg font-black ${nhlRoster.length <= ROSTER_LIMITS.proMax ? "text-emerald-400" : "text-rose-400"}`}>
+                {nhlRoster.length}/{ROSTER_LIMITS.proMax}
+              </span>
+              <span className="text-[11px] text-slate-400">{isCs ? "na strope" : "on cap"}</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-850/50 border border-slate-800 rounded-xl p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">
+              {isCs ? "FARMA NASADENÍ" : "FARM DRESSED"}
+            </span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className={`text-lg font-black ${farm.length <= ROSTER_LIMITS.ahlMax ? "text-amber-400" : "text-rose-400"}`}>
+                {farm.length}/{ROSTER_LIMITS.ahlMax}
+              </span>
+              <span className="text-[11px] text-slate-400">{fdg(farm)}</span>
+            </div>
+          </div>
+
+          <div className="bg-slate-850/50 border border-slate-800 rounded-xl p-2.5">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">
+              {isCs ? "ORGANIZÁCIA SPOLU" : "TOTAL PLAYERS"}
+            </span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className={`text-lg font-black ${rows.length <= ROSTER_LIMITS.orgMax ? "text-sky-400" : "text-rose-400"}`}>
+                {rows.length}/{ROSTER_LIMITS.orgMax}
+              </span>
+              <span className="text-[11px] text-slate-400">{isCs ? "zmlúv" : "contracts"}</span>
+            </div>
+          </div>
         </div>
-        <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+
+        <p className="text-xs text-slate-400 mt-3 leading-relaxed">
           {isCs ? (
             <>
-              Zvoľte, ktorých <b>20 hráčov nastúpi</b> (NHL) oproti zdravým náhradníkom a manažujte farmu. Jednocestné zmluvy (1-way) nie je možné poslať na farmu priamo — umiestnite ich na <b>Farma/Waivers</b> (hráč s platom nad <b>${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M</b> má príliš vysokú hodnotu a cez waivers neprejde), okrem prípadov s <b>🔓 Výnimkou</b> z predchádzajúceho povolania. Hráči s kontraktom iba pre farmu ($100k) nemôžu byť povolaní do NHL. <b>NHL Náhradníci</b> sa započítavajú do platového stropu. Farmárskeho hráča za <b>$100k</b> možno <b>Prepustiť</b> priamo na trh UFA.
+              Zvoľte, ktorých <b>20 hráčov nastúpi</b> (NHL) oproti zdravým náhradníkom a manažujte farmu. Jednocestné zmluvy (1-way) nie je možné poslať na farmu priamo bez umiestnenia na <b>Waivers</b> (okrem hráčov s <b>🔓 Výnimkou</b>). Hráči s kontraktom iba pre farmu ($100k) nemôžu byť povolaní do NHL a možno ich z farmárskych náhradníkov <b>Prepustiť</b>.
             </>
           ) : (
             <>
-              Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down directly — put them on <b>Farm/Waivers</b> instead (a player over <b>${(WAIVER_CAP_HIT_LIMIT / 1e6).toFixed(1)}M</b> cap hit is too valuable to clear waivers, so that button is disabled for him), unless he still has a <b>🔓 Recall pass</b> from his last call-up — sent up from the AHL within the last 30 days/10 games, he goes back down freely; AHL-only / $100k minor-league deals can&apos;t be called up. <b>NHL Scratched</b> still count against the cap; <b>Farm Scratched</b> dress nowhere. A <b>$100k</b> minor-league player can be <b>Released</b> from Farm Scratched straight to the UFA market.
+              Choose which <b>20 dress</b> (NHL) vs the healthy scratches, and manage the farm. One-way contracts can&apos;t be sent down directly — put them on <b>Farm/Waivers</b> instead (unless they have a <b>🔓 Recall pass</b>). AHL-only / $100k minor-league deals can&apos;t be called up and can be <b>Released</b> to UFA from Farm Scratched.
             </>
           )}
         </p>
       </div>
 
       {blockers.length > 0 && (
-        <div className="mb-2 text-sm text-red-300 bg-red-950/40 border border-red-800/50 rounded-lg px-4 py-2 font-medium">
-          {blockers.join(" ")}
+        <div className="text-sm text-rose-300 bg-rose-950/50 border border-rose-800/80 rounded-2xl px-5 py-3 font-semibold shadow-lg">
+          ⚠️ {blockers.join(" ")}
         </div>
       )}
       {warnings.length > 0 && (
-        <div className="mb-4 text-sm text-amber-300/90 bg-amber-950/30 border border-amber-800/40 rounded-lg px-4 py-2 font-medium">
-          {warnings.join(" ")}
+        <div className="text-sm text-amber-300 bg-amber-950/40 border border-amber-800/60 rounded-2xl px-5 py-3 font-medium shadow-md">
+          ℹ️ {warnings.join(" ")}
         </div>
       )}
 
-      {/* NHL row */}
-      <div className="text-xs uppercase font-bold tracking-wider text-slate-400 mb-2 flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-blue-500" />
-        NHL — {teamName}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <Col
-          title={isCs ? "NHL Zostava" : "NHL Dressed"}
-          warn={
-            nhlRoster.length > ROSTER_LIMITS.proMax ||
-            proSkaters < ROSTER_LIMITS.proMinSkaters ||
-            goalies(pro) < ROSTER_LIMITS.proMinGoalies
-          }
-          sub={
-            isCs
-              ? `${fdg(pro)} · ${pro.length} nasadených (potrebné 12Ú·6O·2B) · NHL súpiska ${nhlRoster.length}/${ROSTER_LIMITS.proMax}`
-              : `${fdg(pro)} · ${pro.length} dressed (need 12F·6D·2G) · NHL roster ${nhlRoster.length}/${ROSTER_LIMITS.proMax}`
-          }
-          list={pro}
-        />
-        <Col
-          title={isCs ? "NHL Náhradníci (Scratched)" : "NHL Scratched"}
-          sub={
-            isCs
-              ? `${proScratched.length} zdravých náhradníkov · započítava sa do platového stropu`
-              : `${proScratched.length} healthy scratch${proScratched.length === 1 ? "" : "es"} · still on the cap`
-          }
-          list={proScratched}
-        />
+      {/* NHL Deck */}
+      <div className="space-y-2">
+        <div className="text-xs uppercase font-extrabold tracking-wider text-blue-400 flex items-center gap-2 px-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/60" />
+          NHL — {teamName}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Col
+            title={isCs ? "NHL Zostava (Dressed)" : "NHL Dressed"}
+            theme="blue"
+            warn={
+              nhlRoster.length > ROSTER_LIMITS.proMax ||
+              proSkaters < ROSTER_LIMITS.proMinSkaters ||
+              goalies(pro) < ROSTER_LIMITS.proMinGoalies
+            }
+            sub={
+              isCs
+                ? `${fdg(pro)} · ${pro.length}/20 nasadených`
+                : `${fdg(pro)} · ${pro.length}/20 dressed`
+            }
+            countBadge={`${pro.length}/20`}
+            list={pro}
+          />
+          <Col
+            title={isCs ? "NHL Náhradníci (Scratched)" : "NHL Scratched"}
+            theme="slate"
+            sub={
+              isCs
+                ? `${proScratched.length} náhradníkov · započítava sa do stropu`
+                : `${proScratched.length} healthy scratches · still on the cap`
+            }
+            countBadge={`${proScratched.length}`}
+            list={proScratched}
+          />
+        </div>
       </div>
 
-      {/* Farm row */}
-      <div className="text-xs uppercase font-bold tracking-wider text-slate-400 mb-2 flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-amber-500" />
-        {isCs ? "Farma" : "Farm"} — {affiliateName}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Col
-          title={isCs ? "Farma Zostava" : "Farm Dressed"}
-          warn={farm.length > ROSTER_LIMITS.ahlMax}
-          sub={
-            isCs
-              ? `${fdg(farm)} · ${farm.length}/${ROSTER_LIMITS.ahlMax}${
-                  farm.length > ROSTER_LIMITS.ahlMax ? " — posaďte nadpočetných" : " (potrebné 12Ú·6O·2B)"
-                }`
-              : `${fdg(farm)} · ${farm.length}/${ROSTER_LIMITS.ahlMax}${
-                  farm.length > ROSTER_LIMITS.ahlMax ? " — scratch the overflow" : " (need 12F·6D·2G)"
-                }`
-          }
-          list={farm}
-        />
-        <Col
-          title={isCs ? "Farma Náhradníci (Scratched)" : "Farm Scratched"}
-          sub={
-            isCs
-              ? `${farmScratched.length} náhradníkov · celá organizácia ${rows.length}/${ROSTER_LIMITS.orgMax}`
-              : `${farmScratched.length} scratch${farmScratched.length === 1 ? "" : "es"} · org ${rows.length}/${ROSTER_LIMITS.orgMax}`
-          }
-          list={farmScratched}
-        />
+      {/* Farm Deck */}
+      <div className="space-y-2 pt-2">
+        <div className="text-xs uppercase font-extrabold tracking-wider text-amber-400 flex items-center gap-2 px-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/60" />
+          {isCs ? "Farma" : "Farm"} — {affiliateName}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Col
+            title={isCs ? "Farma Zostava (Dressed)" : "Farm Dressed"}
+            theme="amber"
+            warn={farm.length > ROSTER_LIMITS.ahlMax}
+            sub={
+              isCs
+                ? `${fdg(farm)} · ${farm.length}/${ROSTER_LIMITS.ahlMax}`
+                : `${fdg(farm)} · ${farm.length}/${ROSTER_LIMITS.ahlMax}`
+            }
+            countBadge={`${farm.length}/${ROSTER_LIMITS.ahlMax}`}
+            list={farm}
+          />
+          <Col
+            title={isCs ? "Farma Náhradníci (Scratched)" : "Farm Scratched"}
+            theme="slate"
+            sub={
+              isCs
+                ? `${farmScratched.length} náhradníkov · pool organizácie`
+                : `${farmScratched.length} scratches · org pool`
+            }
+            countBadge={`${farmScratched.length}`}
+            list={farmScratched}
+          />
+        </div>
       </div>
 
       {/* Floating Save Toolbar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-950/95 border-t border-slate-800 backdrop-blur-md px-4 py-3 z-30 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-2 flex items-center gap-3 flex-wrap">
+      <div className="fixed bottom-0 left-0 right-0 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl px-4 py-3 z-30 shadow-2xl">
+        <div className="max-w-7xl mx-auto px-2 flex items-center gap-3.5 flex-wrap">
           <button
             onClick={save}
             disabled={pending || blockers.length > 0}
-            className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-bold text-sm disabled:opacity-50 transition-colors shadow-md shadow-blue-600/30"
+            className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 font-extrabold text-sm disabled:opacity-50 transition-all shadow-lg shadow-blue-600/30 flex items-center gap-2"
           >
-            {pending ? (isCs ? "Ukladá sa…" : "Saving…") : isCs ? "Uložiť súpisky" : "Save rosters"}
+            {pending ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>{isCs ? "Ukladá sa…" : "Saving…"}</span>
+              </>
+            ) : (
+              <span>{isCs ? "Uložiť súpisky" : "Save rosters"}</span>
+            )}
           </button>
+
           <button
             onClick={autoRoster}
             disabled={pending}
-            className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 font-semibold text-sm disabled:opacity-50 border border-slate-700/60 transition-colors"
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm disabled:opacity-50 border border-slate-700/60 transition-colors flex items-center gap-1.5"
             title={
               isCs
                 ? "Nasadí 20 najlepších (18+2), zvyšok na farmu, nadpočet posadí"
                 : "Dress the best available 20 (18+2), the rest to the farm, overflow scratched"
             }
           >
-            {isCs ? "Auto súpiska" : "Auto Roster"}
+            <span>⚡</span>
+            <span>{isCs ? "Auto súpiska" : "Auto Roster"}</span>
           </button>
+
           {blockers.length > 0 && (
             <span className="text-rose-400 text-xs font-semibold">
               {isCs ? "Pred uložením vyriešte chyby v limite/strope" : "Fix the cap/limit issue to save"}
             </span>
           )}
           {saved && <span className="text-emerald-400 text-sm font-bold">{isCs ? "✓ Uložené" : "✓ Saved"}</span>}
-          {note && <span className="text-amber-300 text-sm">{note}</span>}
-          {err && <span className="text-red-400 text-sm">{err}</span>}
+          {note && <span className="text-amber-300 text-sm font-medium">{note}</span>}
+          {err && <span className="text-rose-400 text-sm font-medium">{err}</span>}
         </div>
       </div>
     </div>
