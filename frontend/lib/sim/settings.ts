@@ -6,10 +6,6 @@
 import { prisma } from "../prisma";
 
 export type EngineSettings = {
-  // Which simulation model to run:
-  //   "volume"     — the calibrated shot-volume model (default, proven)
-  //   "possession" — the STHS-style sequential possession decision-tree (newer)
-  engineModel: "volume" | "possession";
   // Possession model: in-game fatigue — a long shift drains a player's effective
   // attributes (EN slows the drain). 0 disables it. Only used by the possession engine.
   inGameFatiguePct: number;
@@ -25,7 +21,6 @@ export type EngineSettings = {
   catchUpStrength: number; // per-goal score-effect that pulls trailing teams back (curbs blowouts)
   // Game Options — percentage multipliers (100 = calibrated default)
   goalsPct: number;
-  shotsPct: number;
   penaltiesPct: number;
   severePenaltyPct: number;      // frequency of severe infractions (Major + Game Misconduct / Match → ejection + automatic suspension)
   hitsPct: number;
@@ -253,8 +248,8 @@ export type EngineSettings = {
 };
 
 export const DEFAULT_SETTINGS: EngineSettings = {
-  engineModel: "possession", inGameFatiguePct: 100, possessionSkillPct: 0.85, defenseTalentPct: 35, catchUpStrength: 0.07,
-  goalsPct: 98, shotsPct: 100, penaltiesPct: 100, severePenaltyPct: 100, hitsPct: 100,
+  inGameFatiguePct: 100, possessionSkillPct: 0.85, defenseTalentPct: 35, catchUpStrength: 0.07,
+  goalsPct: 98, penaltiesPct: 100, severePenaltyPct: 100, hitsPct: 100,
   fightsPct: 35, powerPlayPct: 100, homeAdvPct: 100, homeLastChangePct: 100,
   pullGoalieEnabled: true, pullGoalieMinGoals: 6, pullGoalieMinShots: 15, pullGoalieSvPct: 0.80,
   rivalryEnabled: true, rivalryFightMult: 1.8, rivalryPenaltyMult: 1.5,
@@ -330,8 +325,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
 
 /** Merge stored partial settings over the defaults (forward-compatible). */
 export function mergeSettings(partial: Partial<EngineSettings> | null | undefined): EngineSettings {
-  // the shot-volume model is retired — whatever an old stored row says, games use the possession model
-  return { ...DEFAULT_SETTINGS, ...(partial ?? {}), engineModel: "possession" };
+  return { ...DEFAULT_SETTINGS, ...(partial ?? {}) };
 }
 
 type ChemPoint = { chem: number; bonusPct: number };

@@ -10,7 +10,7 @@ import { DEFAULT_SETTINGS, chemCurveBonusPct, type EngineSettings } from "./sett
 import { SEVERE_INFRACTIONS, SEVERE_PER_TEAM } from "./infractions";
 import { EventSink, type SimEvent } from "./events";
 import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, oneTimerHandednessMult, type ShotSector, type ShotStrength, type ShotType } from "./shot-quality";
-import { ENGINE_V2, isExperimentalEngine, isNextGenEngine } from "./version";
+import { ENGINE_V2, isExperimentalEngine } from "./version";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
@@ -65,17 +65,13 @@ const LEAGUE = {
   avgOffense: 55,
   avgDefense: 69.5,
   avgGoalie: 84,
-  baseShots: 27.5,          // tuned down (~32 → ~30 shots/team; real NHL ~29-30)
   baseConversion: 0.090,    // tuned up (SV% ~91.5% → ~90.7%, goals ~2.7 → ~2.9/team; real SV% ~90.5-91)
-  homeShotBonus: 1.05,
   homeConvBonus: 1.05,
   penaltiesPerTeam: 2.85,  // penalties a team of avg discipline takes per game (tuned: ~3.0 PP opps/team/game, NHL-realistic — was 3.2 giving ~3.6)
   ppConvBoost: 2.85,       // PP conversion multiplier (lowered from 3.1 to keep PP% ~21% after the baseConversion bump)
   shConvPenalty: 0.45,     // conversion multiplier while shorthanded
   hitsPerTeam: 21,
   blocksPerTeam: 14,
-  faceoffsPerGame: 46,
-  zoneEntriesPerTeam: 50,  // controlled + dump-in entries, real NHL-tracked ballpark
   fwdIcePool: 10800,       // total forward TOI seconds/game (3 on ice * 60min)
   defIcePool: 7200,        // total defense TOI seconds/game (2 on ice * 60min)
 };
@@ -153,7 +149,6 @@ type SimState = {
   ejections: { playerId: number; teamId: number; abs: number; applied: boolean }[]; // game misconduct / match penalty → thrown out at abs game-second `abs` (applied into `injured` live)
   shootout: ShootoutAttempt[];      // shootout attempts (empty unless the game went to a shootout)
   sink: EventSink;                  // next-gen typed event stream (v2)
-  isNextGen: boolean;                // v2+ — gates real (non-narration) gameplay differences like line matchups
   isExperimentalV3: boolean;         // V3 workbench only; never enabled by LeagueConfig or scheduled games
   v3FatigueDeployment: boolean;      // V3 diagnostic feature flag
   v3CoachAdaptation: boolean;        // V3 diagnostic feature flag
@@ -287,15 +282,7 @@ function initTeamBox(team: SimTeam): TeamBox {
   };
 }
 
-// ---- team strength -> expected volume ---------------------------------------
-
-function expectedShots(off: SimTeam, def: SimTeam, isHome: boolean): number {
-  const offFactor = off.offenseRating / LEAGUE.avgOffense;
-  const defFactor = LEAGUE.avgDefense / def.defenseRating;
-  let shots = LEAGUE.baseShots * (0.55 + 0.45 * offFactor) * (0.6 + 0.4 * defFactor);
-  if (isHome) shots *= 1 + (LEAGUE.homeShotBonus - 1) * (CFG.homeAdvPct / 100);
-  return shots * (CFG.shotsPct / 100);
-}
+// ---- team strength -> conversion ---------------------------------------------
 
 function conversion(
   shooterFinishing: number, goalieQuality: number, isHome: boolean,
@@ -438,20 +425,6 @@ function pickOnIce(rng: RNG, team: SimTeam): SimSkater[] {
   const takeF = weightedSample(rng, team.forwards, 3);
   const takeD = weightedSample(rng, team.defense, 2);
   return [...takeF, ...takeD];
-}
-
-/** Snapshot a fresh weighted on-ice unit for a team into st.currentOnIce. Used by the
- *  endgame / OT simple models, which don't run the shift loop, so recordGoal doesn't
- *  reuse the stale end-of-3rd unit for their goals + +/-. */
-function setFreshUnit(st: SimState, team: SimTeam) {
-  // simulateEndgame's extra empty-net attempts don't run through the tick loop's
-  // onIceF/onIceD/subMis, so they need their own exclusion of anyone hurt this game.
-  const fwd = team.forwards.filter((s) => !st.injured.has(s.id));
-  const def = team.defense.filter((s) => !st.injured.has(s.id));
-  st.currentOnIce[team.id] = {
-    f: weightedSample(st.rng, fwd.length ? fwd : team.forwards, 3),
-    d: weightedSample(st.rng, def.length ? def : team.defense, 2),
-  };
 }
 
 /** Overtime is 3-on-3: a fresh unit of THREE skaters (~2F + 1D), not the regulation five.
@@ -959,54 +932,6 @@ function resolveCoincidentalPenalties(st: SimState, active: Penalty[], period: n
   }
 }
 
-/**
- * Fights: driven by both teams' fighting (FG). Both combatants take a 5-minute
- * major (offsetting — no power play). Occasionally a second bout breaks out at
- * the same stoppage (a line brawl), adding roughing minors and a misconduct.
- */
-// Scoped to ONE period (called once per period, right after that period's tick
-// loop) rather than a single once-per-game roll — so a fight's injury (see
-// generateFightInjuries) can actually bench the player for the periods still to
-// come, instead of being decided after the whole game is already simulated.
-// A chippy game can now produce more than one bout across different periods,
-// which is realistic (previously capped at exactly one fight, ever).
-function generateFights(st: SimState, period: number) {
-  // st.injured reflects everyone hurt in EARLIER periods (this period's tick loop
-  // just ran) — a player already hurt can't be the one who drops the gloves.
-  const active = (t: SimTeam) => [...t.forwards, ...t.defense].filter((s) => !st.injured.has(s.id));
-  const topFG = (t: SimTeam) => Math.max(0, ...active(t).map((s) => s.attrs.fg ?? 30));
-  const enforcerPick = (t: SimTeam) => {
-    const pool = active(t);
-    return pool[st.rng.weighted(pool.map((s) => Math.pow(Math.max(1, (s.attrs.fg ?? 30) - 40), 2)))];
-  };
-  if (!CFG.fightsEnabled || !active(st.home).length || !active(st.away).length) return;
-  const fgHome = topFG(st.home), fgAway = topFG(st.away);
-  // base fight chance scales with the lower of the two teams' willingness; a
-  // rivalry game runs hot (far more likely to drop the gloves). Divided by 3 —
-  // rolled independently each period now instead of once for the whole game —
-  // so the per-GAME rate stays roughly the same as before this rework.
-  let p = (0.06 + 0.5 * Math.max(0, Math.min(fgHome, fgAway) - 55) / 45) * (CFG.fightsPct / 100) / 3;
-  if (st.rivalry) p *= CFG.rivalryFightMult;
-  if (!st.rng.chance(Math.min(0.85, p))) return;
-
-  const at = 60 + st.rng.int(PERIOD_SECONDS - 120);
-  const h = enforcerPick(st.home), a = enforcerPick(st.away);
-  addPenalty(st, st.home, h, period, at, "Fighting", 5, "Major", false);
-  addPenalty(st, st.away, a, period, at, "Fighting", 5, "Major", false);
-
-  // line brawl: a second simultaneous bout + roughing minors + a misconduct (far likelier in a rivalry)
-  if (st.rng.chance(st.rivalry ? 0.4 : 0.12)) {
-    const h2 = enforcerPick(st.home), a2 = enforcerPick(st.away);
-    addPenalty(st, st.home, h2, period, at, "Fighting", 5, "Major", false);
-    addPenalty(st, st.away, a2, period, at, "Fighting", 5, "Major", false);
-    addPenalty(st, st.home, h2, period, at, "Roughing", 2, "Minor", false);
-    addPenalty(st, st.away, a2, period, at, "Roughing", 2, "Minor", false);
-    const instigator = st.rng.chance(0.5) ? st.home : st.away;
-    addPenalty(st, instigator, instigator.id === st.home.id ? h : a, period, at,
-      "Misconduct", 10, "Misconduct", false);
-  }
-}
-
 // Shared by maybeStartFight and generateHeatEvents' donnybrook — rolls a
 // fighter's injury chance immediately (real period+seconds), so st.injured
 // updates live instead of waiting for a separate post-hoc pass.
@@ -1159,11 +1084,6 @@ function strengthDiffAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[
     skatersAgainst: 5 - Math.min(2, theirs),
   };
 }
-/** Manpower situation for `team` at time t (within-period seconds). */
-function strengthAt(team: SimTeam, opp: SimTeam, t: number, active: Penalty[]): "EV" | "PP" | "SH" {
-  return strengthDiffAt(team, opp, t, active).state;
-}
-
 /** Expire the earliest-ending active penalty on `penalizedTeam` (PP goal ends it). */
 function expireOnePenalty(penalizedTeamId: number, t: number, active: Penalty[]) {
   let best: Penalty | null = null;
@@ -1176,58 +1096,8 @@ function expireOnePenalty(penalizedTeamId: number, t: number, active: Penalty[])
   if (best) best.expired = true;
 }
 
-// ---- period simulation ------------------------------------------------------
-
-function simulatePeriod(st: SimState, period: number, homeShots: number, awayShots: number) {
-  const { home, away, rng } = st;
-  const active: Penalty[] = [];
-  generatePenalties(st, home, period, active);
-  generatePenalties(st, away, period, active);
-  resolveCoincidentalPenalties(st, active, period, 0);
-
-  type Shot = { team: SimTeam; opp: SimTeam; isHome: boolean; t: number };
-  const shots: Shot[] = [];
-  for (let i = 0; i < homeShots; i++) shots.push({ team: home, opp: away, isHome: true, t: rng.int(PERIOD_SECONDS) });
-  for (let i = 0; i < awayShots; i++) shots.push({ team: away, opp: home, isHome: false, t: rng.int(PERIOD_SECONDS) });
-  shots.sort((a, b) => a.t - b.t);
-
-  for (const shot of shots) {
-    const shooter = pickShooter(rng, shot.team);
-    const strength = strengthAt(shot.team, shot.opp, shot.t, active);
-    const absT = (period - 1) * PERIOD_SECONDS + shot.t;
-    const box = st.box[shot.team.id];
-    box.shots++;
-    box.shotsByPeriod[Math.min(period, 4) - 1]++;
-    st.lines[shot.team.id][shooter.id].shots++;
-    const situation = situationFor(st, shot.team, shot.opp, period, strength);
-    if (situation) st.lines[shot.team.id][shooter.id].situations[situation].shots++;
-    st.box[shot.opp.id].goalie.shotsAgainst++;
-    const margin = st.box[shot.team.id].goals - st.box[shot.opp.id].goals;
-    // offense chemistry + morale and defense chemistry are symmetric direct factors
-    // on the final probability (offMult<=1, defShield>=1) so they cancel league-wide.
-    const offMult = chemFactor(shooter.chem, shooter.roleFit) * moraleFactor(shooter.morale) * physFactor(shooter.weight) * shot.team.coachOff;
-    const defShield = (2 - (st.defChem[shot.opp.id] ?? 1)) * shot.opp.coachDef; // poor/redundant D → opponent converts more
-    const ppMod = strength === "PP" ? (shot.team.ppChem / shot.opp.pkChem) * shot.team.tactics.ppConv * shot.opp.tactics.pkSuppress : 1; // gelled PP1 + formation vs PK
-    // off-position penalty is waived on special teams (STHS) — restore full offense
-    const shOff = strength !== "EV" ? shooter.offense / shooter.posPenalty : shooter.offense;
-    const p = conversion(shOff, effGoalieQuality(shot.opp.goalie), shot.isHome, strength)
-      * momoBoost(st, shot.team.id, absT)
-      * clutchFactor(st, shooter, period, shot.t, margin)
-      * offMult * defShield * ppMod
-      * (st.nightOff[shot.team.id] ?? 1) * (st.nightDef[shot.opp.id] ?? 1); // any-given-night form
-    if (rng.chance(p)) {
-      st.box[shot.opp.id].goalie.goalsAgainst++;
-      recordGoal(st, shot.team, shot.opp, period, shot.t, strength);
-      momoOnGoal(st, shot.team.id, shot.opp.id, absT);
-      if (strength === "PP") expireOnePenalty(shot.opp.id, shot.t, active);
-    } else {
-      st.box[shot.opp.id].goalie.saves++;
-    }
-  }
-}
-
 // ---- possession model (STHS-style sequential decision tree) -----------------
-// An opt-in alternative to the shot-volume model (CFG.engineModel === "possession").
+// The league's one and only game model.
 // Each possession is a chain of attribute micro-battles: zone entry (carrier SK
 // vs defender DF), a shoot/pass choice (SC vs PA), a block check (D DF vs SC), the
 // shot itself (SC vs goalie), and a rebound roll (goalie RB). Shots and goals are
@@ -1390,7 +1260,7 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
   if (sh.fElapsed >= (st.v3FatigueDeployment ? v3ShiftLimit(fShiftLimit, sh.fLines[sh.fIdx] ?? []) : fShiftLimit)) {
     flushShift(st, teamId, sh.fLines[sh.fIdx] ?? []);
     let bias: number | undefined;
-    if (st.isNextGen && matchup?.isHome) {
+    if (matchup?.isHome) {
       const oppFIdx = matchup.oppSh.fIdx;
       if (oppFIdx === matchup.oppSh.fTopIdx && sh.fCheckIdx !== sh.fTopIdx) bias = sh.fCheckIdx;
       else if (oppFIdx === matchup.oppSh.fCheckIdx) bias = sh.fTopIdx;
@@ -2060,7 +1930,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     // a fraction of these attempts now sail wide (see the MISS check below) instead
     // of always reaching the net, so the upstream rate is boosted to keep the actual
     // on-goal (SOG) rate the calibration is tuned against unchanged.
-    const lateShell = st.isNextGen ? lateShellShotMult(period, tick, margin) : 1;
+    const lateShell = lateShellShotMult(period, tick, margin);
     const adaptAtk = adapt(carrierTeam, margin).shots, adaptDef = adapt(def, -margin).allow;
     const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
     const armUp = delayedFor === carrierTeam.id ? 1.2 : 1;
@@ -2533,84 +2403,6 @@ function releaseKnocks(st: SimState, period: number, tick: number) {
   }
 }
 
-// FIGHT injuries stay a post-hoc pass, tied to generateFights() (itself a
-// post-hoc, end-of-game system) — a combatant (rare) tweaks a hand.
-function generateFightInjuries(st: SimState, period: number) {
-  if (!CFG.injuriesEnabled) return;
-  const cal = INJURY_BASE / 0.55;
-  const scale = (CFG.injuryChancePct / 100) * cal;
-  for (const team of [st.home, st.away]) {
-    const pool = [...team.forwards, ...team.defense];
-    if (!pool.length) continue;
-    const fighters = st.penalties.filter((p) => p.team === team.id && p.type === "Fighting" && p.period === period);
-    for (const f of fighters) {
-      if (st.injured.has(f.playerId)) continue;
-      if (st.rng.chance(0.06 * scale)) {
-        const victim = pool.find((s) => s.id === f.playerId) ?? pool[0];
-        if (addInjury(st, team, victim, "Fight", f.period, f.seconds)) st.injured.add(victim.id);
-      }
-    }
-  }
-}
-
-// ---- endgame (pulled goalie) ------------------------------------------------
-
-/**
- * Final ~90s of regulation. A team trailing by 1–2 pulls its goalie for a 6th
- * attacker: better odds to tie, but the leader can score into the empty net.
- * Lifts the OT rate and produces realistic empty-net goals.
- */
-function simulateEndgame(st: SimState) {
-  const { home, away, rng } = st;
-  let margin = st.box[home.id].goals - st.box[away.id].goals;
-  if (margin === 0 || Math.abs(margin) > 2) return;
-
-  const oneGoal = Math.abs(margin) === 1;
-  const trailing = margin < 0 ? home : away;
-  const leading = margin < 0 ? away : home;
-  const attempts = 2;
-  const tieP = (oneGoal ? 0.075 : 0.025) * (trailing.offenseRating / LEAGUE.avgOffense);
-  const engP = oneGoal ? 0.11 : 0.13;
-
-  for (let i = 0; i < attempts; i++) {
-    const t = 1120 + i * 30; // ~18:40 and ~19:10 of the 3rd
-    setFreshUnit(st, leading); setFreshUnit(st, trailing);
-    const step = 30;
-    for (const p of [...st.currentOnIce[leading.id].f, ...st.currentOnIce[leading.id].d]) {
-      const line = st.lines[leading.id][p.id];
-      if (line) { line.toi += step; line.situations["EN_OPP"].toi += step; }
-    }
-    for (const p of [...st.currentOnIce[trailing.id].f, ...st.currentOnIce[trailing.id].d]) {
-      const line = st.lines[trailing.id][p.id];
-      if (line) { line.toi += step; line.situations["EN_OWN"].toi += step; }
-    }
-    // empty-net goal for the leader (trailing team's net is empty)
-    if (rng.chance(engP)) {
-      const leadOnIce = [...st.currentOnIce[leading.id].f, ...st.currentOnIce[leading.id].d].filter((s) => !st.injured.has(s.id));
-      const shooter = pickShooterFromPool(rng, leadOnIce.length ? leadOnIce : [...leading.forwards, ...leading.defense]);
-      const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "carry", danger: 1 });
-      const xg = 0.65; // an on-target attempt at an empty net
-      trackSpecialShot(st, leading, trailing, shooter, 3, t, sector, shotType, xg, false, "EN_OPP");
-      recordGoal(st, leading, trailing, 3, t, "EV", true, shooter, { sector, shotType, xg }, "EN_OPP");
-      return; // game iced
-    }
-    // 6-on-5 push for the trailing team
-    const trailOnIce = [...st.currentOnIce[trailing.id].f, ...st.currentOnIce[trailing.id].d].filter((s) => !st.injured.has(s.id));
-    const shooter = pickShooterFromPool(rng, trailOnIce.length ? trailOnIce : [...trailing.forwards, ...trailing.defense]);
-    const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "pass", danger: 1.35 });
-    const xg = expectedGoal(rng, sector, shotType, "EV");
-    const tracked = trackSpecialShot(st, trailing, leading, shooter, 3, t, sector, shotType, xg, true, "EN_OWN");
-    if (rng.chance(tieP)) {
-      tracked.goalie!.goalsAgainst++;
-      recordGoal(st, trailing, leading, 3, t, "EV", false, shooter, { sector, shotType, xg }, "EN_OWN");
-      margin = st.box[home.id].goals - st.box[away.id].goals;
-      if (margin === 0) return; // tied it up -> heading to OT
-    } else {
-      saveSpecialShot(st, leading, shooter, 3, t, sector, shotType, xg, tracked);
-    }
-  }
-}
-
 // ---- overtime / shootout ----------------------------------------------------
 
 // Top OT trio sees the most ice, down to the 3rd — mirrors the depth-weighted
@@ -2758,43 +2550,12 @@ function simulateShootout(st: SimState): number {
 
 // ---- faceoffs, hits, blocks, TOI -------------------------------------------
 
-function simulateFaceoffs(st: SimState) {
-  const centers = (t: SimTeam) => {
-    const byId = new Map(t.forwards.map((f) => [f.id, f]));
-    const assigned = t.units
-      .filter((u) => !u.isDef && u.centerId != null)
-      .map((u) => ({ player: byId.get(u.centerId!), weight: Math.max(1, u.timePct ?? 1) }))
-      .filter((x): x is { player: SimSkater; weight: number } => !!x.player);
-    if (assigned.length) return assigned;
-    const c = t.forwards.filter((f) => f.isCenter);
-    return (c.length ? c : t.forwards).map((player) => ({ player, weight: Math.max(0.01, player.iceTime) }));
-  };
-  const hC = centers(st.home), aC = centers(st.away);
-  for (let i = 0; i < LEAGUE.faceoffsPerGame; i++) {
-    const h = hC[st.rng.weighted(hC.map((x) => x.weight))].player;
-    const a = aC[st.rng.weighted(aC.map((x) => x.weight))].player;
-    const pHome = h.faceoff / (h.faceoff + a.faceoff);
-    if (st.rng.chance(pHome)) {
-      st.box[st.home.id].faceoffWins++; st.box[st.away.id].faceoffLosses++;
-      st.lines[st.home.id][h.id].faceoffWins++; st.lines[st.away.id][a.id].faceoffLosses++;
-    } else {
-      st.box[st.away.id].faceoffWins++; st.box[st.home.id].faceoffLosses++;
-      st.lines[st.away.id][a.id].faceoffWins++; st.lines[st.home.id][h.id].faceoffLosses++;
-    }
-  }
-}
-
 // modeled rink-zone tendencies for defensive actions (not centimetre tracking):
 // where hits/blocks/takeaways typically happen. Per-player maps then vary by volume
 // and position (D block the point/slot; forwards hit along the boards).
 const HIT_ZONES: [string, number][] = [["PERIMETER", 46], ["NET_FRONT", 20], ["CIRCLE", 20], ["POINT", 8], ["SLOT", 6]];
 const BLOCK_ZONES: [string, number][] = [["SLOT", 35], ["POINT", 30], ["NET_FRONT", 20], ["PERIMETER", 10], ["CIRCLE", 5]];
 const TAKE_ZONES: [string, number][] = [["PERIMETER", 35], ["CIRCLE", 25], ["POINT", 20], ["SLOT", 10], ["NET_FRONT", 10]];
-// missed shots skew farther out than the general shot mix (a point shot or a bad-angle
-// perimeter look is far likelier to sail wide than a tap-in from the slot).
-const MISS_ZONES: [string, number][] = [["PERIMETER", 38], ["POINT", 27], ["CIRCLE", 20], ["SLOT", 11], ["NET_FRONT", 4]];
-const ENTRY_LANES: [string, number][] = [["LEFT WING", 33], ["RIGHT WING", 33], ["CENTER", 34]];
-const ENTRY_TYPES: [string, number][] = [["carry", 50], ["dump", 35], ["pass", 15]];
 const pickZone = (rng: RNG, table: [string, number][]) => table[rng.weighted(table.map((z) => z[1]))][0];
 
 function distributeCounting(st: SimState) {
@@ -2867,31 +2628,8 @@ function distributeCounting(st: SimState) {
       const s = pool[st.rng.weighted(pool.map((r) => ((r.attrs.df ?? 50) + (r.attrs.sk ?? 50)) * r.iceTime))];
       emitAction("TAKEAWAY", s, pickZone(st.rng, TAKE_ZONES), undefined, { period, seconds });
     }
-    // missed shots (wide / off the iron) — the possession model now emits these for
-    // REAL, live, from the O-zone shot-resolution branch (see MISS_COMPENSATION and
-    // the MISS check right after the block-check above). This statistical fallback
-    // only fires for the legacy "volume" engine model, same as ZONE_ENTRY below.
-    if (CFG.engineModel !== "possession") {
-      const misses = st.rng.poisson(st.box[team.id].shots * 0.38);
-      for (let i = 0; i < misses; i++) {
-        const s = roster[st.rng.weighted(roster.map((r) => Math.pow((r.offense * 0.7 + r.playmaking * 0.3) / 60, 2) * r.iceTime * (r.isDefense ? 0.35 : 1)))];
-        emitAction("MISS", s, pickZone(st.rng, MISS_ZONES));
-      }
-    }
-    // controlled offensive-zone entries — the possession model now emits these for
-    // REAL, live, from the actual NEU->OFF transition in the tick loop's zone-entry
-    // decision (see the "advance the puck toward the offensive zone" block above).
-    // This statistical fallback only fires for the legacy "volume" engine model,
-    // which has no tick loop / zone concept of its own to hook a live version into.
-    if (CFG.engineModel !== "possession") {
-      const entries = st.rng.poisson(LEAGUE.zoneEntriesPerTeam);
-      for (let i = 0; i < entries; i++) {
-        const s = roster[st.rng.weighted(roster.map((r) => ((r.attrs.sk ?? 50) * 0.6 + r.offense * 0.4) * r.iceTime * (r.isDefense ? 0.3 : 1)))];
-        emitAction("ZONE_ENTRY", s, pickZone(st.rng, ENTRY_LANES), { entryType: pickZone(st.rng, ENTRY_TYPES) });
-      }
-    }
-    // TOI from ice-time share — ONLY as a fallback for the volume model. The possession
-    // engine already accrued real per-second TOI (= ES + PP + PK) in the tick loop, so
+    // TOI from ice-time share — ONLY as a fallback (3-on-3 All-Star, which has no tick loop). The
+    // possession engine already accrued real per-second TOI (= ES + PP + PK) in the tick loop, so
     // don't clobber it (that made TOI come in under a player's PK time).
     for (const s of team.forwards) { const pl = st.lines[team.id][s.id]; if (!pl.toi) pl.toi = Math.round(s.iceTime * LEAGUE.fwdIcePool); }
     for (const s of team.defense) { const pl = st.lines[team.id][s.id]; if (!pl.toi) pl.toi = Math.round(s.iceTime * LEAGUE.defIcePool); }
@@ -2938,7 +2676,6 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     ejections: [],
     shootout: [],
     sink: new EventSink(),
-    isNextGen: isNextGenEngine(opts.engineVersion ?? ENGINE_VERSION),
     isExperimentalV3: isV3,
     v3FatigueDeployment: isV3 && (opts.experimentalV3?.fatigueDeployment ?? true),
     v3CoachAdaptation: isV3 && (opts.experimentalV3?.coachAdaptation ?? true),
@@ -2980,18 +2717,6 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     st.nightDef[team.id] = Math.max(0.66, Math.min(1.28, 1 - rng.gauss() * CFG.nightSigmaGoalie * vScale * tired)); // <1 = goalie stole it; tired = wider boom/bust
   }
 
-  // legacy "volume" model only — the possession model already draws a REAL
-  // faceoff (real centers, real per-stoppage frequency) every time the tick loop
-  // hits its FACEOFF state, so running this flat +46-per-game statistical model
-  // on top, unconditionally, was DOUBLE-counting every draw (a center could rack
-  // up 40-50 faceoffs in one period).
-  if (CFG.engineModel !== "possession") {
-    simulateFaceoffs(st);
-  }
-
-  const homeShotsTotal = Math.max(12, Math.round(rng.poisson(expectedShots(home, away, true))));
-  const awayShotsTotal = Math.max(12, Math.round(rng.poisson(expectedShots(away, home, false))));
-
   if (opts.threeOnThree) {
     const { periods: n, periodSeconds, chanceMult, finishMult } = opts.threeOnThree;
     for (let p = 1; p <= n; p++) {
@@ -3003,55 +2728,14 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     }
   }
   for (let period = 1; period <= (opts.threeOnThree ? 0 : 3); period++) {
-    if (CFG.engineModel === "possession") {
-      // the main fight/line-brawl path now lives INSIDE simulatePeriodPossession's
-      // tick loop (maybeStartFight, hooked to real stoppages) — genuinely live, not
-      // a per-period post-hoc roll, so a fight-injury benches the player for the
-      // REST of the same period too, not just the ones still to come.
-      simulatePeriodPossession(st, period);
-      // scrums/donnybrooks/abuse-of-official stay a per-period post-hoc roll (rare
-      // enough that the same-period residual this leaves is a non-issue) — but
-      // donnybrook Fighting majors resolve their own injury inline now too (see
-      // generateHeatEvents), so no separate generateFightInjuries pass is needed
-      // for the possession model any more.
-      generateHeatEvents(st, period);
-      continue;
-    }
-    const hShare = period === 3 ? 0.34 : 0.33;
-    let hp = Math.round(homeShotsTotal * hShare);
-    let ap = Math.round(awayShotsTotal * hShare);
-
-    // Score effects in the 3rd: the trailing team presses, the leader sits back.
-    if (period === 3) {
-      const margin = st.box[home.id].goals - st.box[away.id].goals;
-      if (margin !== 0) {
-        const trailingIsHome = margin < 0;
-        const boost = Math.min(0.4, 0.17 + 0.06 * Math.abs(margin));
-        if (trailingIsHome) { hp = Math.round(hp * (1 + boost)); ap = Math.round(ap * (1 - boost * 0.5)); }
-        else { ap = Math.round(ap * (1 + boost)); hp = Math.round(hp * (1 - boost * 0.5)); }
-      }
-    }
-    simulatePeriod(st, period, hp, ap);
-  }
-
-  // legacy "volume" model only — simulatePeriod() never models the pulled-goalie
-  // endgame itself, so this bolts it on afterward from the FINAL regulation margin.
-  // The possession model already tracks trailBy live, tick-by-tick, all period long
-  // (st.emptyNet / the eligible check inside simulatePeriodPossession) and pulls the
-  // goalie for real once a team is actually trailing — running this a second time
-  // on top of that, unconditionally, used to insert a fabricated goal at a FIXED
-  // clock position (~18:40) using nothing but the eventual final score, with no
-  // regard for what the score genuinely was at that instant or for whether the
-  // "trailing" team had actually pulled its goalie (its on-ice list was still a
-  // normal 5 skaters) — producing "(EN)" goals in games that were tied, or still
-  // in progress, at that exact moment.
-  if (CFG.engineModel !== "possession" && !opts.threeOnThree) {
-    simulateEndgame(st);
-  }
-  // legacy "volume" model only — the possession model already generated these
-  // per-period, live, inside the loop above (including their injuries).
-  if (CFG.engineModel !== "possession" && !opts.threeOnThree) {
-    for (let p = 1; p <= 3; p++) { generateFights(st, p); generateHeatEvents(st, p); generateFightInjuries(st, p); }
+    // the main fight/line-brawl path lives INSIDE simulatePeriodPossession's tick loop
+    // (maybeStartFight, hooked to real stoppages) — genuinely live, so a fight-injury
+    // benches the player for the REST of the same period too, not just the ones still to come.
+    simulatePeriodPossession(st, period);
+    // scrums/donnybrooks/abuse-of-official stay a per-period post-hoc roll (rare
+    // enough that the same-period residual this leaves is a non-issue); donnybrook
+    // Fighting majors resolve their own injury inline.
+    generateHeatEvents(st, period);
   }
 
   let winnerId: number;
@@ -3065,14 +2749,9 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   } else if (hG === aG) {
     if (opts.noShootout) {
       // playoff sudden death, NHL rules: full 20:00 periods of 5-on-5 (the regular
-      // possession engine — lines, PP/PK, penalties, fatigue all live) until someone
-      // scores. The legacy volume model keeps the old 3-on-3 OT loop.
+      // possession engine — lines, PP/PK, penalties, fatigue all live) until someone scores.
       let w: number | null = null, guard = 0;
-      if (CFG.engineModel === "possession") {
-        while (w == null && guard++ < 12) { otPeriods++; w = simulatePeriodPossession(st, 3 + otPeriods, { suddenDeath: true }); }
-      } else {
-        while (w == null && guard++ < 12) { w = simulateOvertime(st).winner; otPeriods++; }
-      }
+      while (w == null && guard++ < 12) { otPeriods++; w = simulatePeriodPossession(st, 3 + otPeriods, { suddenDeath: true }); }
       winnerId = w ?? home.id; endedIn = "OT"; periods = 3 + Math.max(1, otPeriods);
     } else {
       const ot = simulateOvertime(st);
@@ -3100,7 +2779,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     homeSystem: home.teamTactics,
     awaySystem: away.teamTactics,
   };
-  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all(), isNextGenEngine(result.engineVersion ?? ENGINE_VERSION));
+  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all());
   return result;
 }
 

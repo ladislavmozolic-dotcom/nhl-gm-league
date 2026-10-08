@@ -12,7 +12,6 @@ type Props = {
 
 const GAME_OPTIONS: Array<{ key: keyof EngineSettings; label: string; hint: string }> = [
   { key: "goalsPct", label: "Goals", hint: "scoring / shot conversion" },
-  { key: "shotsPct", label: "Shots", hint: "shot volume" },
   { key: "powerPlayPct", label: "Power Play", hint: "PP conversion" },
   { key: "penaltiesPct", label: "Penalties", hint: "penalty frequency" },
   { key: "severePenaltyPct", label: "Severe penalties", hint: "major + game misconduct / match (ejection + suspension) frequency" },

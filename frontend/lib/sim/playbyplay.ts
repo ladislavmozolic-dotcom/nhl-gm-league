@@ -45,10 +45,10 @@ const centers = (t: SimTeam) => {
 };
 const pool = (t: SimTeam) => [...t.forwards, ...t.defense];
 
-export function generatePlayByPlay(result: GameResult, home: SimTeam, away: SimTeam, stream?: SimEvent[], isNextGen = false): PbpEvent[] {
-  // v2: narrate directly from the real event stream when it carries shot events.
+export function generatePlayByPlay(result: GameResult, home: SimTeam, away: SimTeam, stream?: SimEvent[]): PbpEvent[] {
+  // narrate directly from the real event stream when it carries shot events.
   if (stream && stream.some((e) => e.type === "SHOT")) {
-    return playByPlayFromEvents(result, home, away, stream, isNextGen);
+    return playByPlayFromEvents(result, home, away, stream);
   }
   return legacyPlayByPlay(result, home, away);
 }
@@ -165,7 +165,7 @@ function legacyPlayByPlay(result: GameResult, home: SimTeam, away: SimTeam): Pbp
 
 // ---- v2: play-by-play built from the real event stream ----------------------
 
-function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, stream: SimEvent[], isNextGen: boolean): PbpEvent[] {
+function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, stream: SimEvent[]): PbpEvent[] {
   const rng = new RNG((result.seed ^ 0x27d4eb2f) | 0);
   const sideOf = (teamId: number) => (teamId === home.id ? home : away);
   const oppOf = (teamId: number) => (teamId === home.id ? away : home);
@@ -203,10 +203,10 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
     const label = p <= 3 ? `${p}${["st", "nd", "rd"][p - 1]} period` : p === 4 ? "overtime" : `overtime ${p - 3}`;
     add(p, 0, null, "period", `Start of the ${label}.`, true);
 
-    // opening faceoff. v2: the real first draw of the period (engine.ts's tick-loop
+    // opening faceoff: the real first draw of the period (engine.ts's tick-loop
     // FACEOFF state fires immediately at seconds 0, so it's this period's earliest
-    // FACEOFF event). v1: colour only, re-rolled independently of the sim.
-    const realOpeningFo = isNextGen ? stream.find((e) => e.period === p && e.type === "FACEOFF") : undefined;
+    // FACEOFF event); colour fallback if none was recorded.
+    const realOpeningFo = stream.find((e) => e.period === p && e.type === "FACEOFF");
     if (realOpeningFo) {
       add(p, 1, realOpeningFo.teamId ?? null, "faceoff",
         `${realOpeningFo.playerName ?? "?"} wins face-off versus ${realOpeningFo.targetName ?? "?"} in neutral zone.`);
@@ -221,22 +221,9 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
     const cap = p >= 4 ? (stream.find((e) => e.period === p && e.type === "GOAL")?.seconds ?? pMaxSec) : pMaxSec;
     const rt = () => 5 + rng.int(Math.max(1, cap - 10));
 
-    // atmospheric filler (not simulated as timed events): icings/offsides have no
-    // corresponding real event, so they stay RNG colour in both engines. Hits are
-    // real (distributeCounting attributes each one to a specific player + rink
-    // zone) — v1 keeps the old two-player RNG flavour line for continuity; v2
-    // narrates the actual recorded HIT/BLOCK/TAKEAWAY events instead, below.
-    if (!isNextGen) {
-      const hitCount = Math.round(((result.home.hits ?? 0) + (result.away.hits ?? 0)) / 3 / maxRegPeriod);
-      for (let i = 0; i < hitCount; i++) {
-        const t = sideOf(rng.chance(0.5) ? home.id : away.id);
-        const sec = rt();
-        const victims = availableAt(oppOf(t.id), p, sec), hitters = availableAt(t, p, sec);
-        const victim = victims[rng.weighted(victims.map((s) => s.iceTime))];
-        const hit = hitters[rng.weighted(hitters.map((s) => s.hitting * s.iceTime))];
-        add(p, sec, t.id, "hit", `${victim.name} is hit by ${hit.name} and loses puck.`);
-      }
-    }
+    // atmospheric filler (not simulated as timed events): offsides have no corresponding
+    // real event, so they stay RNG colour. Hits/blocks/takeaways are narrated from the
+    // actual recorded events below.
     // icings are real simulated events now (ICING below) — colour only when the
     // icing rule is switched off in the engine settings
     if (!stream.some((x) => x.type === "ICING")) for (let i = 0; i < 2 + rng.int(3); i++) {
@@ -273,7 +260,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         add(p, e.seconds, tId, "goal",
           `GOAL${tag} scored by ${e.playerName ?? "?"}${assistNames.length ? ` assisted by ${assistNames.join(" and ")}` : " unassisted"}.${gameOver ? " Game over." : ""}`, true);
         if (!gameOver) {
-          const nextFo = isNextGen ? stream.find((x) => x.period === p && x.type === "FACEOFF" && x.seconds > e.seconds) : undefined;
+          const nextFo = stream.find((x) => x.period === p && x.type === "FACEOFF" && x.seconds > e.seconds);
           if (nextFo) add(p, e.seconds + 1, nextFo.teamId ?? null, "faceoff", `${nextFo.playerName ?? "?"} wins face-off versus ${nextFo.targetName ?? "?"} in neutral zone.`);
           else add(p, e.seconds + 1, null, "faceoff", `${center(home, p, e.seconds).name} wins face-off versus ${center(away, p, e.seconds).name} in neutral zone.`);
         }
@@ -316,25 +303,25 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const who = e.teamCode ?? sideOf(e.teamId ?? home.id).name;
         const label = m?.label ?? (m?.unit === "D" ? `D-pair ${m?.lineNo ?? ""}` : `Line ${m?.lineNo ?? ""}`);
         add(p, e.seconds, tId, "change", `${who} — ${label.trim()} on: ${(m?.names ?? []).join(", ")}.`);
-      } else if (isNextGen && e.type === "HIT") {
+      } else if (e.type === "HIT") {
         add(p, e.seconds, tId, "hit", `${e.playerName ?? "?"} throws a hit in the ${(e.sector ?? "").toString().toLowerCase().replace(/_/g, " ") || "corner"}.`);
-      } else if (isNextGen && e.type === "BLOCK") {
+      } else if (e.type === "BLOCK") {
         add(p, e.seconds, tId, "block", `${e.playerName ?? "?"} blocks a shot.`);
-      } else if (isNextGen && e.type === "TAKEAWAY") {
+      } else if (e.type === "TAKEAWAY") {
         add(p, e.seconds, tId, "takeaway", `${e.playerName ?? "?"} strips the puck with a takeaway.`);
-      } else if (isNextGen && e.type === "REBOUND") {
+      } else if (e.type === "REBOUND") {
         add(p, e.seconds, tId, "rebound", `${e.playerName ?? "?"} pounces on the rebound.`);
-      } else if (isNextGen && e.type === "PP_START") {
+      } else if (e.type === "PP_START") {
         add(p, e.seconds, tId, "change", `${e.teamCode ?? sideOf(e.teamId ?? home.id).name} power play begins.`);
-      } else if (isNextGen && e.type === "PP_END") {
+      } else if (e.type === "PP_END") {
         add(p, e.seconds, tId, "change", `${e.teamCode ?? sideOf(e.teamId ?? home.id).name} power play is over.`);
-      } else if (isNextGen && e.type === "MISS") {
+      } else if (e.type === "MISS") {
         add(p, e.seconds, tId, "miss", `Shot by ${e.playerName ?? "?"}. Shot Misses the Net.`);
-      } else if (isNextGen && e.type === "ZONE_ENTRY") {
+      } else if (e.type === "ZONE_ENTRY") {
         const entryType = (e.meta as { entryType?: string } | undefined)?.entryType;
         const verb = entryType === "dump" ? "dumps the puck into the zone" : entryType === "pass" ? "feeds a pass into the zone" : "carries the puck into the zone";
         add(p, e.seconds, tId, "entry", `${e.playerName ?? "?"} ${verb}.`);
-      } else if (isNextGen && e.type === "GOALIE_PULL") {
+      } else if (e.type === "GOALIE_PULL") {
         const pulled = (e.meta as { pulled?: boolean } | undefined)?.pulled;
         add(p, e.seconds, tId, "change",
           pulled ? `${e.teamCode ?? sideOf(e.teamId ?? home.id).name} pulls the goalie for the extra attacker.`
