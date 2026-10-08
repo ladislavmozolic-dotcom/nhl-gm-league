@@ -43,6 +43,7 @@ export type SimSkater = {
   shoots: string | null; // "L" | "R" — natural side (L-shot D = LD, R-shot D = RD)
   offSide: boolean;      // deployed off his natural position/side
   posPenalty: number;    // off-position skill multiplier already baked in (<=1); 1 = in position
+  type?: string | null;  // existing scouting/profile player type (Sniper, Defensive Forward, ...)
 };
 
 /** A forward trio or defense pair, keyed by a stable signature (sorted ids). */
