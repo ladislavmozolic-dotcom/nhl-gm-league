@@ -3,9 +3,10 @@ import { runCalibration } from "../lib/sim/calibration";
 import { prisma } from "../lib/prisma";
 
 async function main() {
-  const r = await runCalibration();
+  const seedBase = Number(process.argv[2]);
+  const r = await runCalibration(Number.isFinite(seedBase) ? { seedBase } : undefined);
   const icon = (s: string) => (s === "ok" ? "✅" : s === "warn" ? "⚠️ " : "❌");
-  console.log(`\n=== CALIBRATION LAB — ${r.games} games, ${r.teams} teams, ${(r.ms / 1000).toFixed(1)}s ===\n`);
+  console.log(`\n=== CALIBRATION LAB — ${r.games} games, ${r.teams} teams, ${(r.ms / 1000).toFixed(1)}s${Number.isFinite(seedBase) ? `, seed ${seedBase}` : ""} ===\n`);
   let group = "";
   for (const m of r.metrics) {
     if (m.group !== group) { group = m.group; console.log(`── ${group} ──`); }

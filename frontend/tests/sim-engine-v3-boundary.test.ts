@@ -1,0 +1,62 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  ENGINE_V1,
+  ENGINE_V2,
+  ENGINE_V3,
+  engineVersionFor,
+  isExperimentalEngine,
+  isNextGenEngine,
+} from "../lib/sim/version";
+import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3ShiftLimit } from "../lib/sim/engine";
+import type { SimSkater } from "../lib/sim/types";
+
+test("V3 is a next-gen workbench version, not a league-selectable engine", () => {
+  assert.equal(ENGINE_V3, "3.0.0-wip");
+  assert.equal(isNextGenEngine(ENGINE_V1), false);
+  assert.equal(isNextGenEngine(ENGINE_V2), true);
+  assert.equal(isNextGenEngine(ENGINE_V3), true);
+  assert.equal(isExperimentalEngine(ENGINE_V2), false);
+  assert.equal(isExperimentalEngine(ENGINE_V3), true);
+  assert.equal(engineVersionFor("current"), ENGINE_V1);
+  assert.equal(engineVersionFor("nextgen"), ENGINE_V2);
+});
+
+function skater(en: number, con: number): SimSkater {
+  return {
+    id: 1, name: "Test", position: "C", isDefense: false, isCenter: true, overall: 60,
+    attrs: { ck: 50, fg: 50, di: 50, sk: 50, st: 50, en, du: 50, ph: 50, fo: 50, pa: 50, sc: 50, df: 50, ps: 50, ex: 50, ld: 50, mo: 50 },
+    offense: 50, playmaking: 50, defense: 50, faceoff: 50, discipline: 50, hitting: 50, blocking: 50,
+    iceTime: 1, con, chem: 100, roleFit: 1, morale: 50, weight: 190, shoots: "L", offSide: false, posPenalty: 1,
+  };
+}
+
+test("V3 only shortens shifts for a genuinely depleted unit and keeps its effect bounded", () => {
+  const base = 48;
+  assert.equal(v3ShiftLimit(base, [skater(50, 100), skater(50, 100), skater(50, 100)]), base);
+  assert.equal(v3ShiftLimit(base, [skater(90, 100), skater(90, 100), skater(90, 100)]), base);
+  assert.equal(v3ShiftLimit(base, [skater(20, 40), skater(20, 40), skater(20, 40)]), 38);
+  assert.equal(v3ShiftLimit(base, []), base);
+});
+
+test("V3 coach adaptation is late, profile-sensitive, and bounded", () => {
+  const offensive = { coachOff: 1.08, coachDef: 0.94, coachEx: 85 };
+  const defensive = { coachOff: 0.94, coachDef: 1.08, coachEx: 85 };
+  assert.deepEqual(v3CoachAdaptation(offensive, 2, 1100, -1), { shots: 1, allow: 1 });
+  assert.deepEqual(v3CoachAdaptation(offensive, 3, 500, 0), { shots: 1, allow: 1 });
+  const earlyThird = v3CoachAdaptation(offensive, 3, 650, -1);
+  const lateThird = v3CoachAdaptation(offensive, 3, 1100, -1);
+  assert.ok(earlyThird.shots > 1 && lateThird.shots > earlyThird.shots);
+  assert.ok(lateThird.shots > v3CoachAdaptation(defensive, 3, 1100, -1).shots);
+  const defensiveShell = v3CoachAdaptation(defensive, 3, 1100, 1);
+  assert.ok(defensiveShell.shots < 1 && defensiveShell.allow < 1);
+  assert.ok(defensiveShell.shots >= 0.95 && defensiveShell.allow >= 0.88);
+});
+
+test("V3 checking matchup uses the existing player types and remains a small effect", () => {
+  const checkers = [skater(60, 100), skater(60, 100), skater(60, 100)].map((s) => ({ ...s, type: "Defensive Forward", attrs: { ...s.attrs, df: 80, ck: 80 } }));
+  const attackers = [skater(60, 100), skater(60, 100), skater(60, 100)].map((s) => ({ ...s, offense: 75, playmaking: 75 }));
+  const mult = v3CheckingMatchupDangerMult(checkers, attackers);
+  assert.ok(mult < 1 && mult >= 0.97);
+  assert.equal(v3CheckingMatchupDangerMult([], attackers), 1);
+});

@@ -5,7 +5,7 @@
 // Used by scripts/calibration-lab.ts and the /admin/calibration page.
 
 import { loadSimTeam } from "./index";
-import { simulateGame } from "./engine";
+import { simulateGame, type SimOptions } from "./engine";
 import { loadSettings, type EngineSettings } from "./settings";
 import { prisma } from "../prisma";
 import type { SimTeam } from "./types";
@@ -33,7 +33,7 @@ function spearman(a: number[], b: number[]): number {
 const grade = (v: number, ok: [number, number], warn: [number, number]): CalStatus =>
   v >= ok[0] && v <= ok[1] ? "ok" : v >= warn[0] && v <= warn[1] ? "warn" : "fail";
 
-export async function runCalibration(opts?: { settings?: EngineSettings; season?: string }): Promise<CalReport> {
+export async function runCalibration(opts?: { settings?: EngineSettings; season?: string; engineVersion?: string; seedBase?: number; experimentalV3?: SimOptions["experimentalV3"] }): Promise<CalReport> {
   const t0 = Date.now();
   const settings = opts?.settings ?? (await loadSettings());
   const season = opts?.season ?? "2026-27";
@@ -57,7 +57,7 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
     if (i === j) continue;
     const home = teams[i], away = teams[j];
-    const r = simulateGame(home, away, { settings, seed: 90000 + i * 100 + j });
+    const r = simulateGame(home, away, { settings, seed: (opts?.seedBase ?? 90000) + i * 100 + j, engineVersion: opts?.engineVersion, experimentalV3: opts?.experimentalV3 });
     games++;
     const hg = r.home.goals, ag = r.away.goals;
     if (r.winner === home.id) homeWins++;

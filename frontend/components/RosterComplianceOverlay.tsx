@@ -48,7 +48,7 @@ export default function RosterComplianceOverlay() {
       </div>
     );
   };
-  const levelLabel: Record<"NHL" | "AHL", string> = { NHL: "NHL zostava", AHL: "AHL zostava" };
+  const levelLabel: Record<"NHL" | "AHL", string> = { NHL: "NHL lineup", AHL: "AHL lineup" };
   const hints = (s: Issue["sides"][number]) => {
     const out: string[] = [];
     for (const g of ["F", "D", "G"] as const) {
@@ -76,14 +76,14 @@ export default function RosterComplianceOverlay() {
             <div key={s.level} className="rounded-xl bg-slate-900/70 border border-slate-800 p-3 text-sm space-y-1.5">
               <div className="text-[11px] font-bold uppercase tracking-wide text-amber-300 mb-1">{levelLabel[s.level]} · {s.teamName}</div>
               {row("Forwards (F)", s.counts.F, DRESS_TARGET.F)}
-              {row("Obrancovia (D)", s.counts.D, DRESS_TARGET.D)}
+              {row("Defensemen (D)", s.counts.D, DRESS_TARGET.D)}
               {row("Goalies (G)", s.counts.G, DRESS_TARGET.G)}
               {hints(s).length > 0 && (
                 <ul className="mt-2 pt-2 border-t border-slate-800 space-y-1 text-xs text-slate-300 list-disc pl-4">
                   {hints(s).map((h, i) => <li key={i}>{h}</li>)}
                 </ul>
               )}
-              <div className="text-[11px] text-rose-300">Penalty: {money(s.level === "NHL" ? f.nhlRoster : f.ahlRoster)} for every day with an invalid roster</div>
+              <div className="text-[11px] text-rose-300">Penalty: {money(s.level === "NHL" ? f.nhlRoster : f.ahlRoster)} for every game day (a day your club has a game) with an invalid roster</div>
             </div>
           ))}
           {issue.cap && (
@@ -95,12 +95,12 @@ export default function RosterComplianceOverlay() {
                   : <>You are <b className="text-rose-300">{money(issue.cap.amount)} under the floor</b> ({money(issue.cap.committed)} of the {money(issue.cap.limit)} minimum). You must add at least {money(issue.cap.amount)} in salary.</>}
               </div>
               <div className="text-[11px] text-rose-300">
-                Penalty: {money(issue.cap.kind === "over" ? f.cap : f.floor)} per day; it also counts toward lowering/raising next season's cap.
+                Penalty: {money(issue.cap.kind === "over" ? f.cap : f.floor)} per game day; it also counts toward lowering/raising next season's cap.
               </div>
             </div>
           )}
           <p className="text-[11px] text-slate-500">
-            Penalties go to the League Bank and are deducted from the team account. The check runs every day at 20:30 (Bratislava time){f.active ? "." : " — automatic penalties are currently off, but the rules still apply."}
+            Penalties go to the League Bank and are deducted from the team account. The check runs at 20:30 (Bratislava time) and only fines a club on a day it has a game{f.active ? "." : " — automatic penalties are currently off, but the rules still apply."}
           </p>
         </div>
         <div className="flex items-center gap-3">

@@ -15,6 +15,7 @@ import { roleFitOf as roleFitPure } from "./role-fit";
 import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics, type PpStyle, type PkStyle } from "./tactics";
 import { PP_LAYOUTS, PP4_LAYOUTS } from "./formation-layout";
 import { cleanName } from "../playerName";
+import { playerType } from "../player-type";
 
 const clamp = (v: number, lo = 20, hi = 99) => Math.max(lo, Math.min(hi, v));
 const w = (parts: Array<[number, number]>) => {
@@ -89,6 +90,7 @@ export function buildSkater(row: {
     shoots: row.shoots ?? null,
     offSide: false, // set in buildTeam from manager line/pair slots
     posPenalty: 1,
+    type: playerType({ id: row.id, position: row.position, sc: a.sc, pa: a.pa, df: a.df, ck: a.ck, st: a.st, sk: a.sk, ph: a.ph }),
   };
 }
 
