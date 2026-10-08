@@ -96,7 +96,6 @@ export const DEFAULT_MENU: MenuItem[] = [
     { label: "🚫 Clauses", href: "/tools/clauses" },
     { label: "🎚️ Parameters (calculator)", href: "/tools/player-calculator" },
     { label: "🎛️ Next Gen Parameters (calculator)", href: "/tools/edge-calculator" },
-    { label: "🔄 Player Data Refresh", href: "/tools/player-data" },
     { label: "📊 Parameters", href: "/league/parameters" },
     { label: "🔍 Audit Log", href: "/league/audit" },
     { label: "🔒 Result Integrity", href: "/league/integrity" },

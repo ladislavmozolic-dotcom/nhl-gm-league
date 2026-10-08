@@ -141,7 +141,7 @@ export async function importNhlSkaterStats(rows: NhlStatRow[], target: "cur" | "
           curSeasonToi: row.toi, curSeasonShots: row.shots, curSeasonPim: row.pim, curSeasonFoPct: row.foPct, curSeasonPpG: row.ppG,
         }
       : {
-          lastSeasonGP: row.gp, lastSeasonG: row.g, lastSeasonA: row.a, lastSeasonHits: row.hits, lastSeasonBlocks: row.blocks,
+          lastSeasonGP: row.gp, lastSeasonG: row.g, lastSeasonA: row.a, lastSeasonPts: row.g + row.a, lastSeasonHits: row.hits, lastSeasonBlocks: row.blocks,
           lastSeasonToi: row.toi, lastSeasonShots: row.shots, lastSeasonPim: row.pim, lastSeasonFoPct: row.foPct, lastSeasonPpG: row.ppG,
           lastSeasonPM: row.pm, lastSeasonTK: row.tk, lastSeasonGV: row.gv, lastSeasonShToi: row.shToi,
         };

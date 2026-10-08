@@ -2,7 +2,7 @@ import { prisma } from "./prisma";
 import { importMoneyPuckSkaters } from "./moneypuck-skater-import";
 import { importMoneyPuckGoalies } from "./moneypuck-import-server";
 import { fetchAhlSkaterStats, importAhlSkaterStats } from "./ahl-import";
-import { fetchNhlCurrentStats, importNhlCurrentStats } from "./nhl-api-import";
+import { fetchNhlCurrentStats, importNhlCurrentStats, importNhlSkaterStats, fetchNhlGoalieStats, importGoalieLastSeason } from "./nhl-api-import";
 import { importNhlEdgeSpeed } from "./nhl-edge-speed-import";
 import { CURRENT_SEASON_START } from "./finance";
 import { getLiveCalculatorConfig } from "./live-calculator-config";
@@ -14,6 +14,8 @@ export type SyncResult = {
   ahlMatchedCur: number;
   ahlMatchedLast: number;
   nhlSkaterMatched?: number;
+  nhlLastSkaterMatched?: number;
+  nhlLastGoaliesMatched?: number;
   edgeSpeedMatched?: number;
   timestamp: string;
   error?: string;
@@ -65,6 +67,22 @@ export async function syncLiveCalculatorData(): Promise<SyncResult> {
       console.warn("[LiveCalcSync] NHL current-season skater sync warning:", e?.message);
     }
 
+    // 1d. Ingest LAST completed season (GP / G / A / points / hits / blocks / SV%) from the same
+    // NHL.com API — this is what the Free Agent Frenzy "down-season" signal, ELC, RFA and the goalie
+    // rule read (it replaced the manual Player Data Refresh import). It only changes when the season
+    // rolls over, but it's a handful of requests and idempotent, so it simply rides the daily sync.
+    let nhlLastSkaterMatched = 0, nhlLastGoaliesMatched = 0;
+    try {
+      const lastSeasonId = (CURRENT_SEASON_START - 1) * 10000 + CURRENT_SEASON_START;
+      const lastRows = await fetchNhlCurrentStats(lastSeasonId);
+      if (lastRows.length > 0) nhlLastSkaterMatched = (await importNhlSkaterStats(lastRows, "last")).matched;
+      const lastGoalies = await fetchNhlGoalieStats(lastSeasonId);
+      if (lastGoalies.length > 0) nhlLastGoaliesMatched = (await importGoalieLastSeason(lastGoalies)).matched;
+      console.log(`[LiveCalcSync] NHL last-season stats synced: ${nhlLastSkaterMatched} skaters, ${nhlLastGoaliesMatched} goalies matched.`);
+    } catch (e: any) {
+      console.warn("[LiveCalcSync] NHL last-season sync warning:", e?.message);
+    }
+
     // 2. Ingest AHL stats
     let ahlCurMatched = 0;
     let ahlLastMatched = 0;
@@ -111,6 +129,8 @@ export async function syncLiveCalculatorData(): Promise<SyncResult> {
       ahlMatchedCur: ahlCurMatched,
       ahlMatchedLast: ahlLastMatched,
       nhlSkaterMatched,
+      nhlLastSkaterMatched,
+      nhlLastGoaliesMatched,
       edgeSpeedMatched,
       timestamp: now.toISOString(),
     };

@@ -23,7 +23,7 @@ export const MP_SEASONS = [2025, 2024, 2023] as const; // 25-26, 24-25, 23-24
 
 const SPECIAL: Record<string, string> = { "ø": "o", "æ": "ae", "œ": "oe", "ß": "ss", "đ": "d", "ł": "l", "ð": "d", "þ": "th" };
 // First-name nickname variants (MoneyPuck's formal names vs. our shorter/alt forms)
-// → canonical form — same map as lib/player-stats-import.ts's FIRST_ALIAS. Without
+// → canonical form — the common nickname → canonical first-name map. Without
 // this, "Jacob Middleton" (our DB) never matches MoneyPuck's "Jake Middleton" and
 // silently keeps whatever stale value he had before any recompute — which then
 // looks like a real (but wrong) result sitting next to genuinely recomputed players.
