@@ -168,8 +168,18 @@ function GmAssistantBriefing({ briefing, lang }: { briefing: NonNullable<Awaited
         })}
       </div>
       <GmMarketRadar briefing={briefing} lang={lang} />
+      <GmRoadmapPanel briefing={briefing} />
     </div>
   </Card>;
+}
+
+function GmRoadmapPanel({ briefing }: { briefing: NonNullable<Awaited<ReturnType<typeof loadGmBriefing>>> }) {
+  const { roadmap } = briefing;
+  const tone = { rose: "border-rose-900/60 bg-rose-950/15 text-rose-300", amber: "border-amber-900/60 bg-amber-950/15 text-amber-300", emerald: "border-emerald-900/60 bg-emerald-950/15 text-emerald-300", sky: "border-sky-900/60 bg-sky-950/15 text-sky-300" };
+  return <div className="rounded-xl border border-slate-700/70 bg-slate-950/35 overflow-hidden">
+    <div className="px-3.5 py-3 border-b border-slate-800"><p className="font-semibold text-sm text-slate-100">{roadmap.title}</p><p className="text-[11px] text-slate-500">{roadmap.subtitle}</p></div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2.5">{roadmap.tasks.map((task) => <Link key={task.id} href={task.href} className={`block rounded-lg border p-3 transition-colors hover:brightness-125 ${tone[task.tone]}`}><p className="text-xs font-bold">{task.label} <span className="float-right">→</span></p><p className="mt-1 text-[11px] leading-relaxed text-slate-400">{task.detail}</p></Link>)}</div>
+  </div>;
 }
 
 function GmMarketRadar({ briefing, lang }: { briefing: NonNullable<Awaited<ReturnType<typeof loadGmBriefing>>>; lang: Lang }) {
@@ -184,7 +194,7 @@ function GmMarketRadar({ briefing, lang }: { briefing: NonNullable<Awaited<Retur
     </div>
     <div className="rounded-xl border border-amber-900/60 bg-amber-950/15 overflow-hidden">
       <div className="flex justify-between items-center gap-3 px-3.5 py-2.5 border-b border-amber-900/50"><div><span className="font-semibold text-sm text-amber-200">📋 Waiver watch</span><p className="text-[11px] text-slate-500">{radar.waiversEnabled ? (cs ? `Tvoja priorita nároku: ${radar.waiverPriority ?? "—"}. z 32` : `Your claim priority: #${radar.waiverPriority ?? "—"} of 32`) : (cs ? "Waivery sú v nastaveniach ligy vypnuté." : "Waivers are disabled in league settings.")}</p></div><Link href="/waivers" className="text-xs text-blue-400 hover:text-blue-300">{cs ? "Waiver wire →" : "Waiver wire →"}</Link></div>
-      {!radar.waiversEnabled ? <p className="px-3.5 py-4 text-xs text-slate-500">Once waivers are enabled, the radar will pick active players that fit your team's needs.</p> : radar.waivers.length ? <div className="divide-y divide-amber-950/80">{radar.waivers.map((p) => <div key={p.id} className="px-3.5 py-2.5 flex items-center gap-2.5"><div className="min-w-0 flex-1"><Link href={playerLink(p)} className="text-sm font-semibold text-slate-200 hover:text-blue-400">{p.name}</Link><p className="text-[11px] text-slate-500">from {p.teamCode ?? p.teamName} · {p.position} · {p.claimCount ? `${p.claimCount} claims` : "no claims"}</p></div><div className="text-right text-xs text-slate-400"><span className="font-semibold text-slate-200">OVR {p.overall ?? "—"}</span><br />{p.age ?? "—"} yo · {money(p.capHit)}</div></div>)}</div> : <p className="px-3.5 py-4 text-xs text-slate-500">{cs ? "Na waiveroch teraz nie je žiadny hráč, ktorý by sedel na sledovanú pozíciu. Sleduje sa živý stav waiver wire." : "No players on waivers matching your team needs right now."}</p>}
+      {!radar.waiversEnabled ? <p className="px-3.5 py-4 text-xs text-slate-500">Once waivers are enabled, the radar will pick active players that fit your team&apos;s needs.</p> : radar.waivers.length ? <div className="divide-y divide-amber-950/80">{radar.waivers.map((p) => <div key={p.id} className="px-3.5 py-2.5 flex items-center gap-2.5"><div className="min-w-0 flex-1"><Link href={playerLink(p)} className="text-sm font-semibold text-slate-200 hover:text-blue-400">{p.name}</Link><p className="text-[11px] text-slate-500">from {p.teamCode ?? p.teamName} · {p.position} · {p.claimCount ? `${p.claimCount} claims` : "no claims"}</p></div><div className="text-right text-xs text-slate-400"><span className="font-semibold text-slate-200">OVR {p.overall ?? "—"}</span><br />{p.age ?? "—"} yo · {money(p.capHit)}</div></div>)}</div> : <p className="px-3.5 py-4 text-xs text-slate-500">{cs ? "Na waiveroch teraz nie je žiadny hráč, ktorý by sedel na sledovanú pozíciu. Sleduje sa živý stav waiver wire." : "No players on waivers matching your team needs right now."}</p>}
     </div>
   </div>;
 }

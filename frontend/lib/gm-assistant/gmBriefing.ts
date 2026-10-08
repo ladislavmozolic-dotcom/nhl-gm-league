@@ -9,6 +9,8 @@ import { activeWaivers, waiverPriorityOrder } from "@/lib/waivers-server";
 import { fillsNeed, tradeBlockBoard } from "@/lib/trade-block-server";
 import { loadSettings } from "@/lib/sim/settings";
 import type { Phase } from "@/lib/calendar";
+import { daysBetween } from "@/lib/calendar";
+import { getTradeDeadline } from "@/lib/trade-deadline";
 
 // The GM Assistant is deliberately a briefing, not an auto-GM. It combines
 // explainable signals that already exist in UNHL Intelligence into a short,
@@ -43,6 +45,14 @@ export type GmBriefing = {
     waiverPriority: number | null;
     waivers: WaiverRadarPlayer[];
   };
+  roadmap: GmRoadmap;
+};
+
+export type GmRoadmap = {
+  mode: "deadline" | "offseason";
+  title: string;
+  subtitle: string;
+  tasks: { id: string; label: string; detail: string; href: string; tone: "rose" | "amber" | "emerald" | "sky" }[];
 };
 
 // These are live market listings, not an AI prediction that a club will accept
@@ -143,6 +153,39 @@ async function marketRadar(teamId: number, analysis: RosterAnalysis, phase: Phas
   return { positions, tradeBlock, waiversEnabled: settings.waiversEnabled, waiverPriority, waivers: waiverRows };
 }
 
+async function buildRoadmap(teamId: number, analysis: RosterAnalysis, contention: Contention, clock: { date: Date; phase: Phase }): Promise<GmRoadmap> {
+  const [team, expiring, deadline, allPicks, config] = await Promise.all([
+    prisma.team.findUnique({ where: { id: teamId }, select: { slug: true } }),
+    prisma.player.findMany({ where: { teamId, rosterType: { in: ["NHL", "AHL"] }, contractYears: 1, extCapHit: null, NOT: { capHit: 100_000 } }, select: { name: true, overall: true, capHit: true }, orderBy: { overall: "desc" }, take: 4 }),
+    getTradeDeadline(),
+    prisma.draftPick.findMany({ where: { teamId, year: { gte: clock.date.getUTCFullYear() } }, select: { year: true, round: true, source: true }, orderBy: [{ year: "asc" }, { round: "asc" }] }),
+    prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } }),
+  ]);
+  const weak = analysis.findings.find((f) => f.severity === "critical") ?? analysis.findings.find((f) => f.severity === "warning");
+  const contractsHref = team?.slug ? `/teams/${team.slug}` : "/tools/all-contracts";
+  const expiringValue = expiring.reduce((sum, player) => sum + liveCapHit(player), 0);
+  const source = config?.rosterMode === "real" ? "real" : "profinhl";
+  const picks = allPicks.filter((pick) => (pick.source || "profinhl") === source);
+  const pickNote = picks.length ? `${picks.length} pickov od ${picks[0].year}; najbližší je ${picks[0].year}, ${picks[0].round}. kolo.` : "Nie je evidovaný budúci draft pick — pred veľkým trade si over draft kapitál.";
+  if (clock.phase === "regular" && deadline && deadline > clock.date) {
+    const days = daysBetween(clock.date, deadline);
+    const tasks: GmRoadmap["tasks"] = [
+      { id: "clock", label: `Deadline o ${days} dní`, detail: days <= 14 ? "Rozhodni sa, ktoré ciele sú nutné pred uzávierkou. Po nej sa trh uzavrie až do konca sezóny tvojho tímu." : "Zbieraj informácie; neobetuj aktíva bez jasnej medzery v zostave.", href: "/trades/deadline", tone: days <= 14 ? "rose" : "amber" },
+      ...(weak ? [{ id: "need", label: `Cieľ posily: ${weak.label}`, detail: `Role Score ${weak.teamValue} je ${weak.leagueRank}. z ${weak.leagueSize}. ${contention === "contender" ? "Pre contendera má zmysel hľadať okamžitý upgrade." : "Najprv porovnaj cenu posily s budúcim draft kapitálom."}`, href: `/tools/assistant/find-trade-partner?slot=${weak.id}`, tone: "sky" as const }] : []),
+      { id: "expiring", label: `${expiring.length} expiring zmlúv`, detail: expiring.length ? `Sledované zmluvy majú hodnotu ${Math.round(expiringValue / 100_000) / 10} mil. $. Rozhodni: predĺžiť, držať pre play-off alebo premeniť na aktíva.` : "Žiadna sledovaná zmluva nekončí po tejto sezóne.", href: contractsHref, tone: "amber" },
+      { id: "assets", label: "Chráň draft kapitál", detail: pickNote, href: "/draft", tone: "emerald" },
+    ];
+    return { mode: "deadline", title: "⏰ Deadline Planner", subtitle: `Plán do trade deadline · smer tímu: ${CONTENTION_LABELS[contention]}`, tasks };
+  }
+  const tasks: GmRoadmap["tasks"] = [
+    { id: "contracts", label: `${expiring.length} zmlúv na rozhodnutie`, detail: expiring.length ? `${expiring.map((p) => p.name).join(", ")}. Rozdeľ ich na predĺžiť, nechať odísť a nahradiť zvnútra organizácie.` : "Nemáš evidovanú končiacu zmluvu, ktorá vyžaduje okamžité rozhodnutie.", href: contractsHref, tone: "amber" },
+    { id: "draft", label: "Draft & pipeline", detail: pickNote, href: "/draft", tone: "sky" },
+    ...(weak ? [{ id: "need", label: `Doplniť organizáciu: ${weak.label}`, detail: "Pred podpisom UFA alebo tradeom si over, či medzeru nevie vyriešiť draft, prospect pipeline alebo lacnejšia hĺbka.", href: `/tools/assistant/find-player?pos=${positionForFinding(weak) ?? "C"}&rosterType=UFA`, tone: "emerald" as const }] : []),
+    { id: "cap", label: "Vytvor cap plán", detail: "Pred novým podpisom otestuj kombináciu predĺžení, UFA a výmien v Scenario Engine — bez zápisu do ligy.", href: "/tools/assistant/scenario", tone: "rose" },
+  ];
+  return { mode: "offseason", title: "☀️ Off-season Planner", subtitle: "Kontrakty, draft, pipeline a cap pre ďalší ročník", tasks };
+}
+
 function strategyItem(contention: Contention, analysis: RosterAnalysis): BriefingItem {
   const strengths = analysis.findings.filter((f) => f.severity === "ok").slice(0, 2).map((f) => f.label);
   const strengthNote = strengths.length ? ` Strengths: ${strengths.join(", ")}.` : "";
@@ -175,16 +218,17 @@ export async function loadGmBriefing(teamId: number, existingAnalysis?: RosterAn
   ]);
   if (!analysis) return null;
   const season = seasonForPhase(clock.phase);
-  const [form, games, radar] = await Promise.all([
+  const contention = contentionMap.get(teamId) ?? "middle";
+  const [form, games, radar, roadmap] = await Promise.all([
     recentForm(teamId, season),
     prisma.game.findMany({
       where: { season, league: "NHL", status: "FINAL", seriesId: null, OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] },
       select: { winnerTeamId: true, endedIn: true },
     }),
     marketRadar(teamId, analysis, clock.phase),
+    buildRoadmap(teamId, analysis, contention, clock),
   ]);
   const points = games.reduce((sum, game) => sum + (game.winnerTeamId === teamId ? 2 : game.endedIn === "REG" ? 0 : 1), 0);
-  const contention = contentionMap.get(teamId) ?? "middle";
   const items: BriefingItem[] = [];
   const weaknesses = analysis.findings.filter((f) => f.severity === "critical").slice(0, 2);
   for (const weakness of weaknesses) {
@@ -227,5 +271,6 @@ export async function loadGmBriefing(teamId: number, existingAnalysis?: RosterAn
     form: form.results.length ? { lastGames: form.results.length, points: form.results.reduce((sum, r) => sum + (r.won ? 2 : r.otLoss ? 1 : 0), 0), streak: form.streak } : null,
     items: items.slice(0, 5),
     radar,
+    roadmap,
   };
 }
