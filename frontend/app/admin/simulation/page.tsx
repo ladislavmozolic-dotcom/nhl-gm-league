@@ -4,7 +4,6 @@ import SimEngineToggle from "@/components/SimEngineToggle";
 import ParamModeToggle from "@/components/ParamModeToggle";
 import { saveSimSettings } from "./actions";
 import { PageHeader, BackPill } from "@/components/ui";
-import { activeSimEngine } from "@/lib/sim/version";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -13,9 +12,8 @@ export const dynamic = "force-dynamic";
 
 export default async function SimulationAdminPage() {
   if (!(await isAdmin())) redirect("/"); // commissioner only
-  const [settings, engine, lc] = await Promise.all([
+  const [settings, lc] = await Promise.all([
     loadSettings(),
-    activeSimEngine(),
     prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { paramMode: true } }),
   ]);
   const paramMode = lc?.paramMode === "edge" ? "nextgen" : lc?.paramMode === "unhl" ? "unhl" : "sths";
@@ -26,7 +24,7 @@ export default async function SimulationAdminPage() {
         subtitle="Tune how games play out. Multipliers are % of the calibrated baseline (100 = default). Changes apply to the next simulation."
         right={<BackPill href="/admin">Admin</BackPill>}
       />
-      <SimEngineToggle engine={engine} />
+      <SimEngineToggle />
       <ParamModeToggle mode={paramMode} />
       <SimSettingsForm initial={settings} onSave={saveSimSettings} />
     </div>

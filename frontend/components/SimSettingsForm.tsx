@@ -98,19 +98,12 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
   return (
     <div className="space-y-5 pb-24">
       <Card title="Simulation Model">
-        <label className="flex items-center justify-between gap-3 text-sm py-1">
+        <div className="flex items-center justify-between gap-3 text-sm py-1">
           <span className="text-slate-300">Engine</span>
-          <select value={s.engineModel}
-            onChange={(e) => set("engineModel", e.target.value as EngineSettings["engineModel"])}
-            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
-            <option value="volume">Shot-volume (calibrated, proven)</option>
-            <option value="possession">Possession decision-tree (default)</option>
-          </select>
-        </label>
+          <span className="rounded bg-slate-900 border border-slate-700 px-2 py-1 text-sm">Possession decision-tree</span>
+        </div>
         <p className="text-[11px] text-slate-500 mt-1">
-          {s.engineModel === "possession"
-            ? "Each possession is a chain of attribute micro-battles — zone entry (SK vs DF), shoot/pass (SC vs PA), block (DF vs SC), the shot (SC vs goalie) and rebounds (RB). Shots & goals are emergent."
-            : "Fast statistical model: shot volume from team ratings, each shot converted by finishing vs goalie. All the chemistry/momentum/clutch/morale modifiers apply to both models."}
+          Each possession is a chain of attribute micro-battles — zone entry (SK vs DF), shoot/pass (SC vs PA), block (DF vs SC), the shot (SC vs goalie) and rebounds (RB). Shots &amp; goals are emergent. This is the only model — the old shot-volume model was retired.
         </p>
       </Card>
 

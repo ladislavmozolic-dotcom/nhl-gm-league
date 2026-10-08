@@ -10,7 +10,7 @@ import { DEFAULT_SETTINGS, chemCurveBonusPct, type EngineSettings } from "./sett
 import { SEVERE_INFRACTIONS, SEVERE_PER_TEAM } from "./infractions";
 import { EventSink, type SimEvent } from "./events";
 import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, oneTimerHandednessMult, type ShotSector, type ShotStrength, type ShotType } from "./shot-quality";
-import { ENGINE_V2 } from "./version";
+import { ENGINE_V2, isExperimentalEngine, isNextGenEngine } from "./version";
 import type {
   SimTeam, SimSkater, SimGoalie, GameResult, TeamBox, PlayerLine, GoalieLine,
   GoalEvent, PenaltyEvent, InjuryEvent, ShootoutAttempt, LineTactic,
@@ -21,7 +21,7 @@ import { DEFAULT_COACHING } from "./types";
 // Engine version stamped on every simulated Game (for reproducibility, history and
 // calibration). The current (stable v1) engine is "1.0.0"; the next-gen rework will
 // ship as "2.x" behind the LeagueConfig.simEngine flag. See lib/sim/version.ts.
-export const ENGINE_VERSION = "1.0.0";
+export const ENGINE_VERSION = ENGINE_V2; // default for calls that pass no version (all-star, previews, scripts) — V1 is retired
 
 const INJURY_BASE = 0.24; // expected injuries per team per game at 100% (~1 in 4.2 games) — calibration-lab target is 0.45-0.62/team/game; retuned after the live per-tick rework (was 0.18, landed at 0.40 in the lab)
 
@@ -153,7 +153,11 @@ type SimState = {
   ejections: { playerId: number; teamId: number; abs: number; applied: boolean }[]; // game misconduct / match penalty → thrown out at abs game-second `abs` (applied into `injured` live)
   shootout: ShootoutAttempt[];      // shootout attempts (empty unless the game went to a shootout)
   sink: EventSink;                  // next-gen typed event stream (v2)
-  isNextGen: boolean;                // v2 only — gates real (non-narration) gameplay differences like line matchups
+  isNextGen: boolean;                // v2+ — gates real (non-narration) gameplay differences like line matchups
+  isExperimentalV3: boolean;         // V3 workbench only; never enabled by LeagueConfig or scheduled games
+  v3FatigueDeployment: boolean;      // V3 diagnostic feature flag
+  v3CoachAdaptation: boolean;        // V3 diagnostic feature flag
+  v3CheckingMatchup: boolean;        // V3 diagnostic feature flag
   officials: { penaltyMult: number; evenUp: number } | null; // tonight's referee crew (null = neutral)
   timeoutUsed: Record<number, boolean>;
   challengeFailed: Record<number, boolean>; // a failed challenge ends a bench's challenges for the night
@@ -1323,6 +1327,19 @@ function fatigueMult(shiftSec: number, en: number): number {
   const drop = Math.min(0.28, over / 65 * 0.28) * (1.3 - (en ?? 50) / 100) * (CFG.inGameFatiguePct / 100);
   return Math.max(0.55, 1 - drop);
 }
+// V3 workbench: a low-energy / low-condition unit is brought off a little earlier.
+// This is intentionally a shift-LENGTH decision, not a second per-player fatigue
+// system: the players already lose effective attributes via fatigueMult() while
+// they are on the ice, and are fresh again after a normal bench rest. EN matters
+// more than season-long CON, while a 50 EN / 100 CON unit is the neutral baseline.
+// No high-stamina bonus is granted — depth is rewarded by avoiding bad overlong
+// shifts, not by letting elite lines take unlimited extra ice time.
+export function v3ShiftLimit(baseSeconds: number, unit: SimSkater[]): number {
+  if (!unit.length) return baseSeconds;
+  const reserve = unit.reduce((sum, s) => sum + 0.7 * (s.attrs.en ?? 50) + 0.3 * s.con, 0) / unit.length;
+  const shorten = Math.min(10, Math.max(0, (65 - reserve) * 0.45));
+  return Math.max(30, Math.round(baseSeconds - shorten));
+}
 // v2-only: how hard the home coach's "last change" reacts to the away team's
 // currently-deployed line — a flat multiplier on that line's rotation weight, on top
 // of the existing depth-chart weighting. Not absolute (real matching isn't perfect
@@ -1369,7 +1386,8 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
   // mid-rush. Keep the shift out (elapsed still climbs, so it swaps the instant the
   // puck is away) so the scorer always matches the line on the ice for the goal.
   if (hold) return;
-  if (sh.fElapsed >= 38 + rng.int(18)) {
+  const fShiftLimit = 38 + rng.int(18);
+  if (sh.fElapsed >= (st.v3FatigueDeployment ? v3ShiftLimit(fShiftLimit, sh.fLines[sh.fIdx] ?? []) : fShiftLimit)) {
     flushShift(st, teamId, sh.fLines[sh.fIdx] ?? []);
     let bias: number | undefined;
     if (st.isNextGen && matchup?.isHome) {
@@ -1380,7 +1398,8 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
     sh.fIdx = pick(sh.fLines, sh.fWeights, sh.fIdx, bias, 3);
     sh.fElapsed = 0;
   }
-  if (sh.dElapsed >= 42 + rng.int(20)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dWeights, sh.dIdx, undefined, 2); sh.dElapsed = 0; }
+  const dShiftLimit = 42 + rng.int(20);
+  if (sh.dElapsed >= (st.v3FatigueDeployment ? v3ShiftLimit(dShiftLimit, sh.dPairs[sh.dIdx] ?? []) : dShiftLimit)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dWeights, sh.dIdx, undefined, 2); sh.dElapsed = 0; }
 }
 // A shift ends for these players: record it, and whether their on-ice xG differential
 // over the shift was positive (Shift Quality → Positive Shift %). Resets the accrual.
@@ -1417,6 +1436,45 @@ function tacticsMult(team: SimTeam, margin: number): { of: number; df: number } 
   const w = margin >= 2 ? s.winning2 : margin === 1 ? s.winning1 : margin <= -2 ? s.losing2 : margin === -1 ? s.losing1 : s.tied;
   const tilt = (w.of + 1) / (w.of + w.df + 2); // 0..1, 0.5 = balanced
   return { of: 0.9 + 0.2 * tilt, df: 0.9 + 0.2 * (1 - tilt) };
+}
+// V3 workbench: the existing V2 score response is fixed for every coach and is
+// active throughout the third. V3 keeps the manager's GameStrategy intact, but
+// makes the *extra* bench reaction ramp up over the final 10 minutes and scale
+// it modestly from the coach's already-resolved OF/DF/EX profile. An attacking
+// coach presses harder when trailing; a defensive coach protects a lead more.
+// The return values are deliberately bounded below the scale of a wholesale
+// tactical-system change, so they augment rather than replace the GM's setup.
+export function v3CoachAdaptation(
+  coach: Pick<SimTeam, "coachOff" | "coachDef" | "coachEx">,
+  period: number,
+  secondsIntoPeriod: number,
+  marginForTeam: number,
+): { shots: number; allow: number } {
+  if (period !== 3 || marginForTeam === 0) return { shots: 1, allow: 1 };
+  const secLeft = PERIOD_SECONDS - secondsIntoPeriod;
+  if (secLeft > 600) return { shots: 1, allow: 1 };
+  const urgency = 1 - Math.max(0, secLeft) / 600;
+  const attackLean = Math.max(0.25, Math.min(0.75,
+    0.5 + (coach.coachOff - coach.coachDef) * 1.25 + (coach.coachEx - 70) * 0.002,
+  ));
+  if (marginForTeam < 0) {
+    const press = (0.04 + 0.06 * urgency) * (0.75 + attackLean * 0.5);
+    return { shots: 1 + press, allow: 1 + press * 0.4 };
+  }
+  const shell = (0.035 + 0.065 * urgency) * (1.25 - attackLean * 0.5);
+  return { shots: 1 - shell * 0.35, allow: 1 - shell };
+}
+// V3: a real checking trio affects the opposing top line's chance quality when
+// home-ice last change has actually produced that matchup. Existing player
+// profile types supply the tactical identity; DF/CK determine its strength.
+export function v3CheckingMatchupDangerMult(checkers: SimSkater[], attackers: SimSkater[]): number {
+  if (!checkers.length || !attackers.length) return 1;
+  const checkingTypes = new Set(["Defensive Forward", "Forechecker / Grinder", "Two-Way Forward"]);
+  const identity = checkers.filter((s) => checkingTypes.has(s.type ?? "")).length / checkers.length;
+  const suppress = checkers.reduce((n, s) => n + 0.65 * (s.attrs.df ?? 50) + 0.35 * (s.attrs.ck ?? 50), 0) / checkers.length;
+  const attack = attackers.reduce((n, s) => n + 0.55 * s.offense + 0.45 * s.playmaking, 0) / attackers.length;
+  const reduction = Math.max(0.004, Math.min(0.03, identity * 0.012 + (suppress - attack) * 0.0012));
+  return 1 - reduction;
 }
 // v2-only: the "protect the lead" defensive shell. GameStrategy's winning1/winning2
 // (tacticsMult, both engines) already tilts a leading team's of/df BALANCE — this is
@@ -1655,6 +1713,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   // from the 3rd period the bench adjusts to the score: press when behind, tighten when ahead
   const adapt = (team: SimTeam, marginFor: number) => {
     if (!CFG.coachAdaptEnabled || !coach[team.id].coachAdapt || period !== 3 || marginFor === 0) return { shots: 1, allow: 1 };
+    if (st.v3CoachAdaptation) return v3CoachAdaptation(team, period, curTick, marginFor);
     // net effect favours the chasing team (a push that sometimes gets burned)
     return marginFor < 0 ? { shots: 1.1, allow: 1.04 } : { shots: 0.94, allow: 0.97 };
   };
@@ -2061,7 +2120,10 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       // home-ice last change: the home coach gets the final matchup, smothering some
       // danger when defending (away team carrying → home defends).
       const lastChange = !isHome ? 1 - 0.035 * (CFG.homeLastChangePct / 100) : 1;
-      const danger = baseDanger * dangerBias * lastChange;
+      const homeHasCheckMatch = !isHome && shifts[def.id].fIdx === shifts[def.id].fCheckIdx && shifts[carrierTeam.id].fIdx === shifts[carrierTeam.id].fTopIdx;
+      const checkMatch = st.v3CheckingMatchup && homeHasCheckMatch
+        ? v3CheckingMatchupDangerMult(onIceF(def), onIceF(carrierTeam)) : 1;
+      const danger = baseDanger * dangerBias * lastChange * checkMatch;
       const strengthInfo = strengthDiffAt(carrierTeam, def, tick, active);
       const strength = strengthInfo.state;
       const manAdv3 = strength === "PP" && strengthInfo.diff >= 2; // true 5-on-3 (or better)
@@ -2849,6 +2911,8 @@ export type SimOptions = {
   officials?: { penaltyMult: number; evenUp: number };
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
+  // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
+  experimentalV3?: { fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2857,6 +2921,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
   const seed = opts.seed ?? fixtureSeed(home.id, away.id);
   const rng = new RNG(seed);
 
+  const isV3 = isExperimentalEngine(opts.engineVersion ?? ENGINE_VERSION);
   const st: SimState = {
     rng, home, away,
     box: { [home.id]: initTeamBox(home), [away.id]: initTeamBox(away) },
@@ -2873,7 +2938,11 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     ejections: [],
     shootout: [],
     sink: new EventSink(),
-    isNextGen: (opts.engineVersion ?? ENGINE_VERSION) === ENGINE_V2,
+    isNextGen: isNextGenEngine(opts.engineVersion ?? ENGINE_VERSION),
+    isExperimentalV3: isV3,
+    v3FatigueDeployment: isV3 && (opts.experimentalV3?.fatigueDeployment ?? true),
+    v3CoachAdaptation: isV3 && (opts.experimentalV3?.coachAdaptation ?? true),
+    v3CheckingMatchup: isV3 && (opts.experimentalV3?.checkingMatchup ?? true),
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
     timeoutUsed: {},
     challengeFailed: {},
@@ -3031,7 +3100,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     homeSystem: home.teamTactics,
     awaySystem: away.teamTactics,
   };
-  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all(), result.engineVersion === ENGINE_V2);
+  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all(), isNextGenEngine(result.engineVersion ?? ENGINE_VERSION));
   return result;
 }
 

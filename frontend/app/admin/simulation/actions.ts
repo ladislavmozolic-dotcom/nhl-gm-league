@@ -6,15 +6,6 @@ import { saveSettings, mergeSettings, DEFAULT_SETTINGS, type EngineSettings } fr
 import { isAdmin } from "@/lib/auth";
 import { promoteParamSet, type ParamSet } from "@/lib/edge-params-server";
 
-/** Switch the whole league between the stable (current) and next-gen (v2) sim engine. */
-export async function setSimEngineAction(choice: "current" | "nextgen") {
-  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
-  const simEngine = choice === "nextgen" ? "nextgen" : "current";
-  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { simEngine }, create: { id: 1, simEngine } });
-  revalidatePath("/admin/simulation");
-  return { ok: true as const };
-}
-
 /** Switch the LEAGUE'S LIVE parameter set — this actually overwrites every player's
  *  and goalie's ck/fg/di/.../overall fields (what the simulation and every roster/
  *  player page read) with the chosen set's values, and switches which calculator

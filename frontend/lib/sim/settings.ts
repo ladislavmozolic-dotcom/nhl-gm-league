@@ -330,7 +330,8 @@ export const DEFAULT_SETTINGS: EngineSettings = {
 
 /** Merge stored partial settings over the defaults (forward-compatible). */
 export function mergeSettings(partial: Partial<EngineSettings> | null | undefined): EngineSettings {
-  return { ...DEFAULT_SETTINGS, ...(partial ?? {}) };
+  // the shot-volume model is retired — whatever an old stored row says, games use the possession model
+  return { ...DEFAULT_SETTINGS, ...(partial ?? {}), engineModel: "possession" };
 }
 
 type ChemPoint = { chem: number; bonusPct: number };
