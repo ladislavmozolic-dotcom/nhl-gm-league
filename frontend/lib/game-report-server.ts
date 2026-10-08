@@ -177,12 +177,15 @@ function buildReport(
     if (gwg) {
       const meta = (gwg.meta ?? {}) as { assistNames?: string[] };
       const a1 = meta.assistNames?.[0];
-      const scoreBefore = winnerId === h.homeId ? `${gwgHome - 1}–${gwgAway}` : `${gwgAway}–${gwgHome - 1}`;
+      // score just before the goal, winner first (home or away winner — the winner's own count loses the 1)
+      const winBefore = (winnerId === h.homeId ? gwgHome : gwgAway) - 1;
+      const loseBefore = winnerId === h.homeId ? gwgAway : gwgHome;
+      const scoreBefore = `${winBefore}–${loseBefore}`;
       const setup = a1 ? ` ${a1} set up ${h.nm(gwg.playerId)}` : ` ${h.nm(gwg.playerId)} scored`;
       turningPoint = {
         time: mmss(gwg.seconds), period: gwg.period,
         player: h.nm(gwg.playerId),
-        text: `With the game ${lG === 0 && gwgAway === 0 && gwgHome === 1 ? "scoreless" : `at ${scoreBefore}`},${setup} for the goal that put ${winCode} ahead to stay${gwg.strength && gwg.strength !== "EV" ? ` on the ${gwg.strength}` : ""}.`,
+        text: `With the game ${winBefore === 0 && loseBefore === 0 ? "scoreless" : `at ${scoreBefore}`},${setup} for the goal that put ${winCode} ahead to stay${gwg.strength && gwg.strength !== "EV" ? ` on the ${gwg.strength}` : ""}.`,
       };
     }
   }
