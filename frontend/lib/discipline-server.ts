@@ -8,6 +8,9 @@
 // suspension in the past 18 months, CBA Art. 18-A) is 1.5× likelier; the player's
 // own discipline rating (DI) shifts it ±20 %. All of it × disciplinePct/100.
 // Outcome: a fine (weaker incidents, CBA max $5,000) or a suspension of 1–10 games.
+// Ejection-grade infractions from lib/sim/infractions.ts (a major + game misconduct, or a match
+// penalty — head-butting, checking from behind, boarding …) skip the dice: they always cost the
+// games listed for that infraction (a repeat offender sits longer).
 // Suspended players don't dress (Player.suspendedGames) and serve in their NHL
 // organisation's games. Forfeited salary (CBA): a first offender loses 1/(days in
 // the season) of his salary per game, a repeat offender 1/82 — the club doesn't
@@ -20,6 +23,7 @@ import { loadSettings } from "./sim/settings";
 import { cleanName } from "./playerName";
 import { money } from "./finance";
 import { suspensionSalaryToBank, playerFineToBank } from "./league-bank-server";
+import { severeInfraction } from "./sim/infractions";
 
 const VIOLENT = ["Boarding", "Cross-checking", "Elbowing", "Charging", "Checking to the head", "Slew-footing", "Kneeing", "Slashing", "High-sticking", "Roughing", "Spearing", "Butt-ending", "Clipping"];
 export const APPEAL_HOURS = 48;
@@ -27,7 +31,7 @@ const REPEAT_WINDOW_DAYS = 548; // 18 months
 const MAX_GAMES = 10;
 const FINE_MAX = 5000;
 
-type Incident = { playerId: number; teamId: number; kind: "GM" | "MAJOR" | "HIT"; text: string; injuryDays?: number; concussion?: boolean };
+type Incident = { playerId: number; teamId: number; kind: "AUTO" | "GM" | "MAJOR" | "HIT"; text: string; injuryDays?: number; concussion?: boolean; range?: [number, number] };
 
 const clockTxt = (period: number, seconds: number) => `${period >= 4 ? "OT" : ["1st", "2nd", "3rd"][period - 1]} ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
@@ -80,8 +84,18 @@ async function incidentsOf(gameId: number): Promise<Incident[]> {
   ]);
   const out: Incident[] = [];
   for (const p of pens) {
-    if (p.severity === "Game Misconduct") {
+    if (p.severity === "Match") {
+      // match penalty (attempt / deliberate injury): ejection + automatic suspension
+      const inf = severeInfraction(p.type);
+      out.push({ playerId: p.playerId, teamId: p.teamId, kind: "AUTO", range: inf?.games ?? [4, 10], text: `${p.type} (match penalty), ${clockTxt(p.period, p.seconds)}` });
+    } else if (p.severity === "Game Misconduct") {
       const base = pens.find((x) => x.playerId === p.playerId && x.period === p.period && x.seconds === p.seconds && x.severity !== "Game Misconduct" && x.severity !== "Misconduct");
+      const inf = base ? severeInfraction(base.type) : undefined;
+      if (inf && !inf.match) {
+        // major + game misconduct for a table infraction → ejection + automatic suspension
+        out.push({ playerId: p.playerId, teamId: p.teamId, kind: "AUTO", range: inf.games, text: `${base!.type} (major + game misconduct), ${clockTxt(p.period, p.seconds)}` });
+        continue;
+      }
       out.push({ playerId: p.playerId, teamId: p.teamId, kind: "GM", text: `${base ? `${base.type} ${base.severity.toLowerCase()} + ` : ""}game misconduct, ${clockTxt(p.period, p.seconds)}` });
     } else if (p.severity === "Major" && VIOLENT.includes(p.type) && !pens.some((x) => x.playerId === p.playerId && x.period === p.period && x.seconds === p.seconds && x.severity === "Game Misconduct")) {
       out.push({ playerId: p.playerId, teamId: p.teamId, kind: "MAJOR", text: `${p.type} major, ${clockTxt(p.period, p.seconds)}` });
@@ -119,6 +133,7 @@ export async function reviewGames(gameIds: number[]): Promise<{ suspensions: num
       if (!pl) continue;
       const rng = new RNG(((g.seed ?? g.id) * 31 + playerId * 7919) >>> 0);
       const repeat = await isRepeat(playerId);
+      const auto = list.find((i) => i.kind === "AUTO");
       let p = 0;
       for (const i of list) {
         const pi = i.kind === "GM" ? 0.4 : i.kind === "MAJOR" ? 0.3 : 0.03 + ((i.injuryDays ?? 0) >= 20 ? 0.08 : (i.injuryDays ?? 0) >= 7 ? 0.04 : 0) + (i.concussion ? 0.06 : 0);
@@ -129,14 +144,13 @@ export async function reviewGames(gameIds: number[]): Promise<{ suspensions: num
       const di = pl.di ?? 50;
       p *= di < 40 ? 1.2 : di > 75 ? 0.8 : 1;
       p = Math.min(0.95, p * scale);
-      if (rng.next() >= p) continue;
-
-      const worst = list.find((i) => i.kind === "GM") ?? list.find((i) => i.kind === "HIT" && (i.injuryDays ?? 0) >= 7) ?? list[0];
+      if (!auto && rng.next() >= p) continue; // ejection-grade infractions are always punished
+      const worst = auto ?? list.find((i) => i.kind === "GM") ?? list.find((i) => i.kind === "HIT" && (i.injuryDays ?? 0) >= 7) ?? list[0];
       const incident = `${list.map((i) => i.text).join("; ")} — ${g.awayTeam.code} @ ${g.homeTeam.code}, ${g.gameDate?.toISOString().slice(0, 10) ?? ""}`;
       const org = await orgOf(pl.teamId);
       const name = cleanName(pl.name);
       // weaker incidents (a lone major / minor injury, no history) are often just a fine
-      const fineOnly = !repeat && worst.kind !== "GM" && !((worst.injuryDays ?? 0) >= 7) && rng.next() < 0.35;
+      const fineOnly = !auto && !repeat && worst.kind !== "GM" && !((worst.injuryDays ?? 0) >= 7) && rng.next() < 0.35;
       if (fineOnly) {
         const fine = Math.round((2000 + rng.next() * (FINE_MAX - 2000)) / 100) * 100;
         await prisma.suspension.create({ data: { season: REGULAR_SEASON, playerId, playerName: name, teamId: org, gameId: g.id, incident, kind: "FINE", fine, status: "SERVED" } });
@@ -147,11 +161,12 @@ export async function reviewGames(gameIds: number[]): Promise<{ suspensions: num
         continue;
       }
       let games = 1;
-      if (worst.kind === "GM") games += 1;
+      if (auto?.range) games = auto.range[0] + rng.int(auto.range[1] - auto.range[0] + 1);
+      else if (worst.kind === "GM") games += 1;
       if ((worst.injuryDays ?? 0) >= 20) games += 1;
       if (list.some((i) => i.concussion)) games += 1;
       if (repeat) games += 1 + rng.int(2);
-      games += rng.next() < 0.3 ? 1 : 0;
+      if (!auto) games += rng.next() < 0.3 ? 1 : 0;
       games = Math.min(MAX_GAMES, games);
       const forfeit = forfeitFor(pl.capHit ?? 0, games, repeat, days);
       await prisma.suspension.create({ data: { season: REGULAR_SEASON, playerId, playerName: name, teamId: org, gameId: g.id, incident, games, forfeit, repeatOffender: repeat } });

@@ -7,6 +7,7 @@ import { RNG, fixtureSeed } from "./rng";
 import { cleanName } from "../playerName";
 import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, chemCurveBonusPct, type EngineSettings } from "./settings";
+import { SEVERE_INFRACTIONS, SEVERE_PER_TEAM } from "./infractions";
 import { EventSink, type SimEvent } from "./events";
 import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, oneTimerHandednessMult, type ShotSector, type ShotStrength, type ShotType } from "./shot-quality";
 import { ENGINE_V2 } from "./version";
@@ -149,6 +150,7 @@ type SimState = {
   emptyNet: Record<number, boolean>; // trailing late in reg. — goalie pulled for the extra attacker (both engines)
   onPp: Record<number, boolean>;    // is this team currently on the power play (for PP_START/PP_END events)
   injured: Set<number>;             // skater ids hurt so far this game — benched for the rest of it, live from the tick they went down
+  ejections: { playerId: number; teamId: number; abs: number; applied: boolean }[]; // game misconduct / match penalty → thrown out at abs game-second `abs` (applied into `injured` live)
   shootout: ShootoutAttempt[];      // shootout attempts (empty unless the game went to a shootout)
   sink: EventSink;                  // next-gen typed event stream (v2)
   isNextGen: boolean;                // v2 only — gates real (non-narration) gameplay differences like line matchups
@@ -772,7 +774,7 @@ const DELAYED_SHIFT_MARGIN = 13;
 /** Record a single penalty (adds PIM, and — unless offsetting — a PP for the opponent). */
 function addPenalty(
   st: SimState, team: SimTeam, offender: SimSkater, period: number, at: number,
-  type: string, minutes: number, severity: string, givesPP = true,
+  type: string, minutes: number, severity: string, givesPP = true, eject = false,
 ) {
   // Whoever is already sitting in the box can't commit another infraction (he isn't on the
   // ice) — a fight / brawl / heat-event / random-penalty pick that lands on him goes to a
@@ -820,6 +822,16 @@ function addPenalty(
     importance: minutes >= 5 ? "MAJOR" : "NOTABLE",
     meta: { penalty: type, minutes, severity, givesPP },
   });
+  // a game misconduct / match penalty ends his night: he is thrown out for the rest of the game
+  // (benched live from this second — see applyEjections — like a player who got hurt)
+  if (eject) {
+    st.ejections.push({ playerId: offender.id, teamId: team.id, abs: (period - 1) * PERIOD_SECONDS + at, applied: false });
+    st.sink.emit({
+      period, seconds: at, type: "EJECTION",
+      teamId: team.id, teamCode: team.code ?? undefined, playerId: offender.id, playerName: offender.name,
+      importance: "MAJOR", meta: { penalty: type, severity },
+    });
+  }
 }
 // active list is period-local; addPenalty pushes to it via a per-period ref
 let _activeRef: Penalty[] | null = null;
@@ -876,7 +888,27 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
     if (SEVERE_TYPES.includes(type) && roll < 0.08) {
       const gm = roll < 0.02;
       addPenalty(st, team, offender, period, at, gm ? "Game Misconduct" : "Misconduct",
-        gm ? 20 : 10, gm ? "Game Misconduct" : "Misconduct", false);
+        gm ? 20 : 10, gm ? "Game Misconduct" : "Misconduct", false, gm);
+    }
+  }
+
+  // Severe infractions (rare; this runs once per period, hence the /3): a 5-minute major + game misconduct (or a match penalty) — the
+  // offender is ejected and Player Safety hands out an automatic suspension afterwards.
+  const severeLambda = (SEVERE_PER_TEAM / 3) * (CFG.severePenaltyPct / 100) * phyFactor * rival * team.coachDisc * crew
+    * (LEAGUE.avgDefense / Math.max(30, avgDiscipline(team)));
+  const severeCount = CFG.severePenaltyPct > 0 ? st.rng.poisson(severeLambda) : 0;
+  for (let i = 0; i < severeCount; i++) {
+    const at = st.rng.int(PERIOD_SECONDS - 130);
+    const absAt = (period - 1) * PERIOD_SECONDS + at;
+    const eligible = pool.filter((s) => !servingAt(s.id, at) && !st.ejections.some((e) => e.playerId === s.id && e.abs <= absAt) && !st.injured.has(s.id));
+    if (!eligible.length) continue;
+    const offender = eligible[st.rng.weighted(eligible.map((s) => (105 - s.discipline) * (0.5 + s.iceTime) * (0.5 + s.hitting / 100)))];
+    const inf = SEVERE_INFRACTIONS[st.rng.weighted(SEVERE_INFRACTIONS.map((x) => x.weight))];
+    if (inf.match) {
+      addPenalty(st, team, offender, period, at, inf.type, 5, "Match", true, true);
+    } else {
+      addPenalty(st, team, offender, period, at, inf.type, 5, "Major", true);
+      addPenalty(st, team, offender, period, at, "Game Misconduct", 20, "Game Misconduct", false, true);
     }
   }
 }
@@ -1637,6 +1669,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
     curTick = tick; // for misconduct-box substitution inside onIceF/onIceD
     releaseKnocks(st, period, tick);
+    applyEjections(st, period, tick);
     // hold a team's line change while it is carrying the puck up ice (not in its own
     // zone) — no mid-rush changes, so the scorer always matches the on-ice unit.
     const carrying = (team: SimTeam) => state === "PLAY" && carrierTeam.id === team.id && zone !== "DEF";
@@ -2413,6 +2446,18 @@ function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimS
   return hurt;
 }
 
+/** Players thrown out (game misconduct / match penalty) leave the game from the second it happens —
+ *  they join `injured`, so every lineup / shootout / counting-stat filter already skips them. */
+function applyEjections(st: SimState, period: number, tick: number) {
+  if (!st.ejections.length) return;
+  const abs = (period - 1) * PERIOD_SECONDS + tick;
+  for (const e of st.ejections) {
+    if (e.applied || abs < e.abs) continue;
+    e.applied = true;
+    st.injured.add(e.playerId);
+  }
+}
+
 /** Shaken-up players whose time is up come back to the bench. */
 function releaseKnocks(st: SimState, period: number, tick: number) {
   if (!st.knocks.size) return;
@@ -2563,6 +2608,7 @@ function simulateOvertime(st: SimState, cfg: { period?: number; seconds?: number
   const fallbackShooterId = rng.chance(0.5) ? home.id : away.id;
   for (let t = step; t <= periodLen; t += step) {
     releaseKnocks(st, per, t);
+    applyEjections(st, per, t);
     // bench change every 15s, same cadence the injury roll already used —
     // rotate BEFORE the injury check so it rolls against whoever is actually
     // deployed this interval, not last interval's trio.
@@ -2824,6 +2870,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     emptyNet: {},
     onPp: {},
     injured: new Set(),
+    ejections: [],
     shootout: [],
     sink: new EventSink(),
     isNextGen: (opts.engineVersion ?? ENGINE_VERSION) === ENGINE_V2,

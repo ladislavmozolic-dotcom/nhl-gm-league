@@ -21,6 +21,7 @@ export type EventType =
   | "TAKEAWAY"
   | "GIVEAWAY"
   | "PENALTY"
+  | "EJECTION"           // game misconduct / match penalty — the player is thrown out for the rest of the game
   | "PP_START"
   | "PP_END"
   | "GOALIE_PULL"

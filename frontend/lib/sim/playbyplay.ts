@@ -281,7 +281,15 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const m = e.meta as { penalty?: string; minutes?: number; severity?: string; washedOut?: boolean } | undefined;
         if (m?.penalty === "Fighting") continue; // paired into a fight line below
         if (m?.washedOut) { add(p, e.seconds, tId, "penalty", `The delayed penalty on ${e.playerName} (${m?.penalty ?? "infraction"}) is washed out by the goal.`); continue; }
-        add(p, e.seconds, tId, "penalty", `${e.playerName} penalty for ${m?.penalty ?? "infraction"} (${m?.minutes ?? 2} min, ${m?.severity ?? "Minor"}).`, true);
+        // a major + game misconduct on the same player in the same second reads as ONE call
+        const sameCall = (x: typeof e) => x.type === "PENALTY" && x.period === e.period && x.seconds === e.seconds && x.playerId === e.playerId;
+        const gmTwin = m?.severity === "Major" && periodEvents.some((x) => sameCall(x) && (x.meta as { severity?: string } | undefined)?.severity === "Game Misconduct");
+        const isGmOfMajor = m?.severity === "Game Misconduct" && periodEvents.some((x) => sameCall(x) && (x.meta as { severity?: string } | undefined)?.severity === "Major");
+        if (isGmOfMajor) continue; // folded into the major's line
+        add(p, e.seconds, tId, "penalty", `${e.playerName} penalty for ${m?.penalty ?? "infraction"} (${m?.minutes ?? 2} min, ${gmTwin ? "Major / Game Misconduct" : (m?.severity ?? "Minor")}).`, true);
+      } else if (e.type === "EJECTION") {
+        const m = e.meta as { severity?: string } | undefined;
+        add(p, e.seconds, tId, "penalty", `${e.playerName ?? "?"} is ejected from the game${m?.severity === "Match" ? " (match penalty)" : ""} — he's done for the night.`, true);
       } else if (e.type === "ICING") {
         add(p, e.seconds, tId, "icing", `Icing by ${e.playerName ?? e.teamCode ?? "?"} — ${e.teamCode ?? "they"} can't change; the draw is in their end.`);
       } else if (e.type === "DELAYED_PENALTY") {

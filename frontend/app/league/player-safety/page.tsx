@@ -1,4 +1,5 @@
 import { PageHeader, Card } from "@/components/ui";
+import { SEVERE_INFRACTIONS } from "@/lib/sim/infractions";
 import { getTeamSession, isAdmin } from "@/lib/auth";
 import { disciplineList, APPEAL_HOURS } from "@/lib/discipline-server";
 import { SuspensionItem } from "@/components/SuspensionList";
@@ -16,6 +17,17 @@ export default async function PlayerSafetyPage() {
       <PageHeader title="⚖️ Player Safety" subtitle={`${rows.filter((r) => r.kind === "SUSPENSION").length} suspensions (${games} games) · ${rows.filter((r) => r.kind === "FINE").length} fines this season`} />
       <Card title="How it works" accent="text-slate-400">
         <p className="text-sm text-slate-400">After every night&apos;s games the Department of Player Safety reviews game misconducts, majors for violent infractions (boarding, cross-checking, elbowing…) and hits that injure an opponent. Repeat offenders (a suspension within 18 months) are punished harder. A suspended player doesn&apos;t dress and serves in his NHL club&apos;s games; he forfeits salary per the CBA (first offence: 1/days-in-season per game, repeat offender: 1/82) — the club keeps that money. His GM can appeal to the commissioner within {APPEAL_HOURS} hours; the player serves while the appeal is heard.</p>
+      </Card>
+      <Card title="Automatic suspensions (ejections)" accent="text-rose-300">
+        <p className="mb-3 text-sm text-slate-400">A severe infraction is a 5-minute major plus a game misconduct (or a match penalty): the player is <b className="text-slate-200">ejected from the game</b> and always gets a suspension afterwards — no dice. The length depends on the infraction; a repeat offender sits 1–2 games longer.</p>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+          {SEVERE_INFRACTIONS.map((i) => (
+            <div key={i.type} className="flex justify-between border-b border-slate-800/60 py-1">
+              <span className="text-slate-200">{i.type}{i.match ? <span className="text-slate-500"> (match penalty)</span> : null}</span>
+              <span className="tabular-nums text-slate-400">{i.games[0] === i.games[1] ? i.games[0] : `${i.games[0]}–${i.games[1]}`} games</span>
+            </div>
+          ))}
+        </div>
       </Card>
       <Card title={`🚫 Currently suspended (${active.length})`} accent="text-red-400">
         {active.length ? <ul className="divide-y divide-slate-800/70">{active.map((r) => <SuspensionItem key={r.id} now={now} r={r} myTeamId={myTeamId} admin={admin} />)}</ul> : <p className="text-sm text-slate-500">Nobody is suspended.</p>}

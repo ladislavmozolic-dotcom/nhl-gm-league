@@ -15,6 +15,7 @@ const GAME_OPTIONS: Array<{ key: keyof EngineSettings; label: string; hint: stri
   { key: "shotsPct", label: "Shots", hint: "shot volume" },
   { key: "powerPlayPct", label: "Power Play", hint: "PP conversion" },
   { key: "penaltiesPct", label: "Penalties", hint: "penalty frequency" },
+  { key: "severePenaltyPct", label: "Severe penalties", hint: "major + game misconduct / match (ejection + suspension) frequency" },
   { key: "hitsPct", label: "Hits", hint: "hits per game" },
   { key: "fightsPct", label: "Fights", hint: "fight frequency" },
   { key: "injuryChancePct", label: "Injuries", hint: "injury frequency — 100% ≈ NHL-realistic (~44/team/season); lower = fewer, higher = more" },

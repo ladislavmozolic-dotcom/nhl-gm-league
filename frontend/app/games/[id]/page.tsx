@@ -7,6 +7,7 @@ import type { PbpEvent, ShootoutAttempt } from "@/lib/sim/types";
 import type { TeamLinesData } from "@/lib/sim/lines";
 import { cleanName } from "@/lib/playerName";
 import GameIntegrity from "@/components/GameIntegrity";
+import GameDiscipline, { type DisciplineItem } from "@/components/GameDiscipline";
 import PostGameIntelCard from "@/components/PostGameIntelCard";
 import { gameStory } from "@/lib/game-report-server";
 import { getTeamSession } from "@/lib/auth";
@@ -852,12 +853,30 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     gameDate: game.gameDate,
   };
 
+  // ejections (game misconduct / match penalty) + the supplementary discipline that followed
+  const pens = game.penaltyEvents;
+  const rulings = game.status === "FINAL" ? await prisma.suspension.findMany({ where: { gameId: game.id }, select: { playerId: true, kind: true, games: true, fine: true, status: true } }) : [];
+  const discipline: DisciplineItem[] = pens
+    .filter((p) => p.severity === "Game Misconduct" || p.severity === "Match")
+    .map((p) => {
+      const base = pens.find((x) => x.playerId === p.playerId && x.period === p.period && x.seconds === p.seconds && x !== p && x.severity !== "Game Misconduct" && x.severity !== "Misconduct");
+      const team = p.teamId === game.homeTeam.id ? game.homeTeam : game.awayTeam;
+      const r = rulings.find((x) => x.playerId === p.playerId);
+      return {
+        key: `${p.playerId}-${p.period}-${p.seconds}`, playerName: cleanName(p.playerName), teamCode: team?.code ?? null, teamName: team?.name ?? null,
+        infraction: p.severity === "Match" ? `${p.type} (Match penalty)` : base ? `${base.type} (${base.severity} / Game Misconduct)` : "Game Misconduct",
+        period: p.period, seconds: p.seconds,
+        ruling: r ? { kind: r.kind as "SUSPENSION" | "FINE", games: r.games, fine: r.fine, status: r.status } : null,
+      };
+    });
+
   return (
     <>
       <GameView
         data={data}
         intelSlot={game.status === "FINAL" && (await getTeamSession()) != null ? <PostGameIntelCard gameId={game.id} /> : undefined}
       />
+      {game.status === "FINAL" && <GameDiscipline items={discipline} reviewable={game.league !== "AHL" && !game.season.endsWith("-PRE")} />}
       {game.status === "FINAL" && (
         <GameIntegrity
           engineVersion={game.engineVersion}
