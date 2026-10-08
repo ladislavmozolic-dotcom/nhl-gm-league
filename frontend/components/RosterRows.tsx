@@ -7,6 +7,7 @@ import PlayerAvatar from "@/components/playerAvatar";
 import { cleanName } from "@/lib/playerName";
 import { posGroup, ratingColor, ovColor } from "@/lib/ratingBands";
 import { isWorthyGoalie } from "@/lib/goalie-rule";
+import { useLang } from "@/components/LangProvider";
 
 const parseCap = (t: string | null) => { if (!t) return 0; const m = t.match(/[\d,]+/); return m ? parseInt(m[0].replace(/,/g, ""), 10) : 0; };
 // A player's capHit freezes at its last value once his contract runs out
@@ -18,19 +19,22 @@ type Col = { key: string; label: string; num: boolean };
 
 /** The interactive (click-to-sort) roster table body for one section. */
 export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs = false, onOfferTwoWay }: { players: any[]; attrs: string[]; isGoalie: boolean; farm?: boolean; hideAttrs?: boolean; onOfferTwoWay?: (player: any) => void }) {
+  const lang = useLang();
+  const isEn = lang === "en";
+
   const displayedSalary = (p: any) => {
     const nhlSalary = salaryOf(p);
     return farm && p.contractType === "TWO_WAY" && p.ahlSalary != null ? p.ahlSalary : nhlSalary;
   };
   const cols: Col[] = [
-    { key: "name", label: "Player", num: false },
+    { key: "name", label: isEn ? "Player" : "Hráč", num: false },
     { key: "number", label: "#", num: true },
-    { key: "position", label: "Pos", num: false },
-    { key: "age", label: "Age", num: true },
+    { key: "position", label: isEn ? "Pos" : "Poz", num: false },
+    { key: "age", label: isEn ? "Age" : "Vek", num: true },
     { key: "condition", label: "CON", num: true },
     ...(hideAttrs ? [] : attrs.map((a) => ({ key: a, label: a.toUpperCase(), num: true }))),
     { key: "overall", label: "OVR", num: true },
-    { key: "salary", label: farm ? "AHL Salary" : "Salary", num: true },
+    { key: "salary", label: farm ? (isEn ? "AHL Salary" : "AHL Plat") : (isEn ? "Salary" : "Plat"), num: true },
   ];
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const click = (c: Col) => setSort((s) => (s && s.key === c.key ? { key: c.key, dir: (s.dir * -1) as 1 | -1 } : { key: c.key, dir: c.num ? -1 : 1 }));
@@ -55,12 +59,12 @@ export default function RosterRows({ players, attrs, isGoalie, farm, hideAttrs =
         <thead>
           <tr className="border-b border-slate-800 text-slate-500 text-[10px] uppercase tracking-wider bg-slate-800/30">
             {cols.map((c, i) => (
-              <th key={c.key} onClick={() => click(c)} title="Sort"
+              <th key={c.key} onClick={() => click(c)} title={isEn ? "Sort" : "Zoradiť"}
                 className={`${thBase} ${sort?.key === c.key ? "text-blue-400" : ""} ${i === 0 ? "text-left sticky left-0 bg-slate-900 z-10 min-w-[190px]" : c.key === "salary" ? "text-right" : "text-center"} ${c.num && c.key !== "salary" ? "w-11" : ""}`}>
                 {c.label}{arrow(c.key)}
               </th>
             ))}
-            {onOfferTwoWay && <th className="px-3 py-3 font-medium text-right whitespace-nowrap">Contract</th>}
+            {onOfferTwoWay && <th className="px-3 py-3 font-medium text-right whitespace-nowrap">{isEn ? "Contract" : "Zmluva"}</th>}
           </tr>
         </thead>
         <tbody>

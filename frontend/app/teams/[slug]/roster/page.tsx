@@ -10,6 +10,8 @@ import { redactAttrs } from "@/lib/player-attrs";
 import { livePlayerOverall } from "@/lib/player-overall";
 import { offerTwoWayFromRoster } from "../rosters/actions";
 
+import { getLang } from "@/lib/lang-server";
+
 export const dynamic = "force-dynamic";
 
 // Read-only organization roster: NHL first, then its AHL affiliate. GM editing
@@ -106,28 +108,40 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
     capRole: farmHasCapField ? p.captaincy : captaincyFromName(p.name),
   }, !loggedIn));
 
+  const lang = await getLang();
+  const isEn = lang === "en";
+
   return (
     <div className="space-y-6">
       <RosterTabs slug={slug} isGm={isGm} />
       {short.length > 0 && (
         <div className="text-sm text-amber-200 bg-amber-950/25 border border-amber-800/40 rounded-lg px-4 py-2.5">
           <div>
-            <b>Below the minimum lineup</b> (12F / 6D / 2G) — you own <b>{nF}F · {nD}D · {nG}G</b>.
+            <b>{isEn ? "Below the minimum lineup" : "Pod minimálnym limitom zostavy"}</b> (12F / 6D / 2G) — {isEn ? "you own" : "v tíme máš"} <b>{nF}F · {nD}D · {nG}G</b>.
             {affiliate
-              ? <> The next simulation promotes the missing <b>{short.join(" · ")}</b> from the farm (<b>{affiliate.name}</b>) onto this roster — <b>they count against the cap and stay until you send them down</b>. Sign or trade to ice your own.</>
-              : <> Missing <b>{short.join(" · ")}</b> — add players to field a full lineup.</>}
+              ? isEn
+                ? <> The next simulation promotes the missing <b>{short.join(" · ")}</b> from the farm (<b>{affiliate.name}</b>) onto this roster — <b>they count against the cap and stay until you send them down</b>. Sign or trade to ice your own.</>
+                : <> Najbližšia simulácia automaticky povolá chýbajúcich <b>{short.join(" · ")}</b> z farmy (<b>{affiliate.name}</b>) — <b>počítajú sa do platového stropu, kým ich nepošleš späť</b>. Podpíš alebo vymeň hráčov, aby si postavil vlastnú súpisku.</>
+              : isEn
+                ? <> Missing <b>{short.join(" · ")}</b> — add players to field a full lineup.</>
+                : <> Chýba <b>{short.join(" · ")}</b> — doplň hráčov pre kompletnú zostavu.</>}
           </div>
           {admin && affiliate && <div className="mt-2"><AutoFillButton /></div>}
         </div>
       )}
       {noWorthyGoalie && (
         <div className="text-sm text-red-200 bg-red-950/25 border border-red-800/40 rounded-lg px-4 py-2.5">
-          <b>🥅 No worthy goalie.</b> League rule: every club must carry at least one goalie who is either {MIN_GOALIE_OV}+ overall, started {MIN_GOALIE_GP}+ real games last season, or started more than {MIN_GOALIE_GP_SVPCT} real games at a save % above 90 — until you do, this roster isn't game-ready. Sign, trade for, or call up a qualifying goalie.
+          <b>🥅 {isEn ? "No worthy goalie." : "Chýba kvalifikovaný brankár."}</b>{" "}
+          {isEn
+            ? `League rule: every club must carry at least one goalie who is either ${MIN_GOALIE_OV}+ overall, started ${MIN_GOALIE_GP}+ real games last season, or started more than ${MIN_GOALIE_GP_SVPCT} real games at a save % above 90 — until you do, this roster isn't game-ready. Sign, trade for, or call up a qualifying goalie.`
+            : `Pravidlo ligy: každý klub musí mať aspoň jedného brankára s OVR ${MIN_GOALIE_OV}+, alebo odchytaných aspoň ${MIN_GOALIE_GP}+ reálnych zápasov, prípadne viac než ${MIN_GOALIE_GP_SVPCT} zápasov s úspešnosťou nad 90% — kým to nesplníš, súpiska nie je spôsobilá na zápas. Podpíš, vymeň alebo povolaj kvalifikovaného brankára.`}
         </div>
       )}
       <section className="space-y-4">
         <div className="border-b border-slate-800 pb-2">
-          <h2 className="text-xl font-bold text-white">{rt} Roster</h2>
+          <h2 className="text-xl font-bold text-white">
+            {rt} {isEn ? "Roster" : "Súpiska"}
+          </h2>
           <p className="text-xs text-slate-500">{team.name}</p>
         </div>
         <RosterView players={rosterWithCap} dressedIds={[...dressed]} hideAttrs={!loggedIn} />
@@ -135,8 +149,10 @@ export default async function TeamRosterPage({ params }: { params: Promise<{ slu
       {affiliate && (
         <section className="space-y-4 pt-4 border-t border-slate-800">
           <div>
-            <h2 className="text-xl font-bold text-white">AHL Roster</h2>
-            <p className="text-xs text-slate-500">{affiliate.name} · {farmRoster.length} players</p>
+            <h2 className="text-xl font-bold text-white">
+              AHL {isEn ? "Roster" : "Súpiska"}
+            </h2>
+            <p className="text-xs text-slate-500">{affiliate.name} · {farmRoster.length} {isEn ? "players" : "hráčov"}</p>
           </div>
           <RosterView
             players={farmRoster}

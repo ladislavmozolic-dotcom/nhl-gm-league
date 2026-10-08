@@ -158,6 +158,11 @@ export const DICT: Dict = {
   "team.dna": { en: "Team DNA", cs: "DNA týmu", de: "Team-DNA", ru: "ДНК команды" },
   "team.depthChart": { en: "Depth Chart", cs: "Hloubka kádru", de: "Kadertiefe", ru: "Глубина состава" },
   "team.injuries": { en: "Injuries", cs: "Zranění", de: "Verletzungen", ru: "Травмы" },
+  "team.tradeTracker": { en: "Trade Tracker", cs: "Prehľad výmen", de: "Transfers", ru: "История обменов" },
+  "team.transactions": { en: "Transactions", cs: "Transakcie", de: "Transaktionen", ru: "Транзакции" },
+  "team.retiredNumbers": { en: "Retired Numbers", cs: "Vyradené čísla", de: "Gesperrte Nummern", ru: "Выведенные номера" },
+  "team.financeContracts": { en: "Finance & Contracts", cs: "Financie & Kontrakty", de: "Finanzen & Verträge", ru: "Финансы и контракты" },
+  "team.arenaTickets": { en: "Arena & Tickets", cs: "Aréna & Vstupné", de: "Arena & Tickets", ru: "Арена и билеты" },
   // Team System / Tactics editor (en base; de/ru fall back to en)
   "sys.identity": { en: "Your team's identity.", cs: "Identita tvojho tímu." },
   "sys.intro1": { en: "Pick four dials (or a ready-made preset). Every dial has an upside and a real cost.", cs: "Vyber štyri nastavenia (alebo hotový preset). Každé má výhodu aj reálnu cenu." },

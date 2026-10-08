@@ -11,9 +11,11 @@ const LABEL_KEY: Record<string, string> = {
   "Schedule": "team.schedule", "Scores": "team.scores", "Statistics": "team.statistics", "NHL Team": "team.nhlTeam",
   "Roster Moves": "team.rosterMoves", "Contracts": "team.contracts", "Free Agents": "team.freeAgents",
   "Team Contracts": "team.teamContracts", "Salary Cap": "team.salaryCap", "Finance": "team.finance",
+  "Finance & Contracts": "team.financeContracts", "Arena & Tickets": "team.arenaTickets",
   "Overview (bank)": "team.overviewBank", "Dashboard & controls": "team.dashboardControls", "Trades": "team.trades",
+  "Trade Tracker": "team.tradeTracker", "Transactions": "team.transactions",
   "Trade Block": "team.tradeBlock", "Prospects": "team.prospects", "Draft Picks": "team.draftPicks",
-  "Rivals": "team.rivals", "Farm": "team.farm", "History": "team.history", "Team DNA": "team.dna",
+  "Rivals": "team.rivals", "Farm": "team.farm", "History": "team.history", "Retired Numbers": "team.retiredNumbers", "Team DNA": "team.dna",
   "Depth Chart": "team.depthChart", "Injuries": "team.injuries",
 };
 

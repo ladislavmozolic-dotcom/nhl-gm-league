@@ -7,6 +7,7 @@ import { teamManagerLabel } from "@/lib/team-gm";
 import { fmtM } from "@/components/TeamRosterTable";
 import { teamCapStatus } from "@/lib/cap";
 import { money } from "@/lib/finance";
+import { getLang } from "@/lib/lang-server";
 
 const SEASON = "2026-27";
 
@@ -101,6 +102,9 @@ export default async function TeamLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const lang = await getLang();
+  const isEn = lang === "en";
+
   const team = await prisma.team.findUnique({
     where: { slug },
     include: {
@@ -143,10 +147,6 @@ export default async function TeamLayout({
   const rank = row ? confRows.findIndex((s: any) => s.teamId === team.id) + 1 : 0;
   const divRows = row?.division ? standings.filter((s: any) => s.division === row.division) : [];
   const divRank = row ? divRows.findIndex((s: any) => s.teamId === team.id) + 1 : 0;
-  const ord = (n: number) => {
-    const s = ["th", "st", "nd", "rd"], v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-  };
 
   // Streak calculation
   let streakType = "";
@@ -169,9 +169,9 @@ export default async function TeamLayout({
   const isNhl = team.league === "NHL" && !team.isAffiliate;
   const capStatus = isNhl ? await teamCapStatus(team.id).catch(() => null) : null;
   let capSpaceStr: string | null = null;
-  let capSpaceSub = "under the cap";
+  let capSpaceSub = isEn ? "under the cap" : "pod stropom";
   let capSpaceColor = "text-emerald-400";
-  let capStatusLabel = "Compliant ✓";
+  let capStatusLabel = isEn ? "Compliant ✓" : "V norme ✓";
   let capStatusColor = "text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
 
   if (capStatus) {
@@ -179,26 +179,26 @@ export default async function TeamLayout({
     const absM = `$${(Math.abs(space) / 1_000_000).toFixed(2)}M`;
     if (space < 0) {
       capSpaceStr = `-${absM}`;
-      capSpaceSub = "over the cap";
+      capSpaceSub = isEn ? "over the cap" : "nad stropom";
       capSpaceColor = "text-rose-400";
     } else if (capStatus.underFloorBy > 0) {
       capSpaceStr = absM;
-      capSpaceSub = "under the floor";
+      capSpaceSub = isEn ? "under the floor" : "pod minimom (floor)";
       capSpaceColor = "text-amber-400";
     } else {
       capSpaceStr = absM;
-      capSpaceSub = "under the cap";
+      capSpaceSub = isEn ? "under the cap" : "pod stropom";
       capSpaceColor = "text-emerald-400";
     }
 
     if (capStatus.overBy > 0) {
-      capStatusLabel = `Over Cap (${fmtM(capStatus.overBy)})`;
+      capStatusLabel = isEn ? `Over Cap (${fmtM(capStatus.overBy)})` : `Nad stropom (${fmtM(capStatus.overBy)})`;
       capStatusColor = "text-rose-400 border-rose-500/30 bg-rose-500/10";
     } else if (capStatus.underFloorBy > 0) {
-      capStatusLabel = `Below Floor (${fmtM(capStatus.underFloorBy)})`;
+      capStatusLabel = isEn ? `Below Floor (${fmtM(capStatus.underFloorBy)})` : `Pod minimom (${fmtM(capStatus.underFloorBy)})`;
       capStatusColor = "text-amber-400 border-amber-500/30 bg-amber-500/10";
     } else {
-      capStatusLabel = "Compliant ✓";
+      capStatusLabel = isEn ? "Compliant ✓" : "V norme ✓";
       capStatusColor = "text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
     }
   }
@@ -227,17 +227,19 @@ export default async function TeamLayout({
               <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
                 {team.division && (
                   <span className={`text-xs font-mono font-bold uppercase tracking-wider ${theme.badge} px-2 py-0.5 rounded border`}>
-                    {team.division.replace(/\s+division$/i, "")} Division
+                    {team.division.replace(/\s+division$/i, "")} {isEn ? "Division" : "Divízia"}
                   </span>
                 )}
                 {team.conference && (
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                    {team.conference.replace(/\s+conference$/i, "")} Conference
+                    {team.conference.replace(/\s+conference$/i, "")} {isEn ? "Conference" : "Konferencia"}
                   </span>
                 )}
                 {divRank > 0 && (
                   <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    {(() => { const n = divRank; const sfx = n % 100 >= 11 && n % 100 <= 13 ? "th" : n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th"; return `${n}${sfx} in Division`; })()}
+                    {isEn
+                      ? (() => { const n = divRank; const sfx = n % 100 >= 11 && n % 100 <= 13 ? "th" : n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th"; return `${n}${sfx} in Division`; })()
+                      : `${divRank}. v divízii`}
                   </span>
                 )}
                 {(team.league === "AHL" || team.isAffiliate) && (
@@ -247,7 +249,7 @@ export default async function TeamLayout({
                 )}
                 {isGm && (
                   <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider border border-blue-500/30">
-                    GM Mode
+                    {isEn ? "GM Mode" : "GM Režim"}
                   </span>
                 )}
               </div>
@@ -261,7 +263,7 @@ export default async function TeamLayout({
                 {team.arena && <span>•</span>}
                 <span>👤 GM: {teamManagerLabel(team)}</span>
                 <span>•</span>
-                <span>👔 Coach: {team.headCoach?.name || team.coach || "TBD"}</span>
+                <span>👔 {isEn ? "Coach" : "Tréner"}: {team.headCoach?.name || team.coach || "TBD"}</span>
               </p>
             </div>
           </div>
@@ -270,25 +272,35 @@ export default async function TeamLayout({
           <div className="flex items-center gap-3 shrink-0 flex-wrap justify-center">
             {row && (
               <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 text-center min-w-[90px]">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">RECORD</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  {isEn ? "RECORD" : "BILANCIA"}
+                </span>
                 <span className="text-lg font-black text-white tabular-nums">{row.w}-{row.l}-{row.otl}</span>
-                <span className="text-[10px] text-emerald-400 font-bold block">{row.points} {row.points === 1 ? "pt" : "pts"}</span>
+                <span className="text-[10px] text-emerald-400 font-bold block">{row.points} {isEn ? (row.points === 1 ? "pt" : "pts") : (row.points === 1 ? "bod" : "bodov")}</span>
               </div>
             )}
             {streakType && (
               <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 text-center min-w-[90px]">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">FORM</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                  {isEn ? "FORM" : "FORMA"}
+                </span>
                 <span className={`text-lg font-black tabular-nums ${streakType === "W" ? "text-amber-400" : "text-rose-400"}`}>{streakLabel}</span>
-                <span className="text-[10px] text-slate-400 block">{streakType === "W" ? `${streakCount}-game win streak` : `${streakCount}-game losing streak`}</span>
+                <span className="text-[10px] text-slate-400 block">
+                  {streakType === "W"
+                    ? isEn ? `${streakCount}-game win streak` : `${streakCount} výhry v rade`
+                    : isEn ? `${streakCount}-game losing streak` : `${streakCount} prehry v rade`}
+                </span>
               </div>
             )}
             {capSpaceStr && (
               <Link
                 href={`/teams/${slug}/salary`}
                 className="bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl px-4 py-2.5 text-center min-w-[90px] transition-colors group"
-                title={capStatus ? `Salary cap: ${money(capStatus.ceiling)}, Committed: ${money(capStatus.committed)}` : undefined}
+                title={capStatus ? (isEn ? `Salary cap: ${money(capStatus.ceiling)}, Committed: ${money(capStatus.committed)}` : `Platový strop: ${money(capStatus.ceiling)}, Záväzky: ${money(capStatus.committed)}`) : undefined}
               >
-                <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-400 uppercase tracking-wider block">CAP SPACE</span>
+                <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-400 uppercase tracking-wider block">
+                  {isEn ? "CAP SPACE" : "CAP PRIESTOR"}
+                </span>
                 <span className={`text-lg font-black tabular-nums ${capSpaceColor}`}>{capSpaceStr}</span>
                 <span className="text-[10px] text-slate-400 block">{capSpaceSub}</span>
               </Link>
@@ -297,16 +309,22 @@ export default async function TeamLayout({
               <Link
                 href="/salary-cap"
                 className={`border rounded-xl px-4 py-2.5 text-center min-w-[90px] transition-colors hover:brightness-110 ${capStatusColor}`}
-                title="Cap and floor compliance status in Cap Central"
+                title={isEn ? "Cap and floor compliance status in Cap Central" : "Súlad s platovým stropom a minimom v Cap Central"}
               >
-                <span className="text-[10px] font-bold uppercase tracking-wider block opacity-80">STATUS</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider block opacity-80">
+                  {isEn ? "STATUS" : "STAV"}
+                </span>
                 <span className="text-xs font-black block mt-1">{capStatusLabel}</span>
               </Link>
             )}
             {!isGm && (
               <Link href={`/teams/${slug}/login`} className="bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl px-4 py-2.5 text-center group transition-colors min-w-[90px]">
-                <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 uppercase tracking-wider block">SIGN IN</span>
-                <span className="text-xs font-bold text-white block mt-0.5">GM Login →</span>
+                <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 uppercase tracking-wider block">
+                  {isEn ? "SIGN IN" : "PRIHLÁSENIE"}
+                </span>
+                <span className="text-xs font-bold text-white block mt-0.5">
+                  {isEn ? "GM Login →" : "GM Prihlásenie →"}
+                </span>
               </Link>
             )}
           </div>
@@ -316,7 +334,9 @@ export default async function TeamLayout({
       {pendingExpansion > 0 && (
         <Link href={`/teams/${slug}/expansion-protection`}
           className="block rounded-lg border border-amber-700/60 bg-amber-950/30 px-4 py-2.5 text-sm text-amber-300 hover:bg-amber-950/50 transition-colors">
-          🏒 Expansion draft protection list open — submit your protected players →
+          {isEn
+            ? "🏒 Expansion draft protection list open — submit your protected players →"
+            : "🏒 Zoznam chránených hráčov pre rozširovací draft je otvorený — odošli svojich hráčov →"}
         </Link>
       )}
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { groupRoster, RosterSection } from "@/components/TeamRosterTable";
 import { cleanName } from "@/lib/playerName";
 import { Card } from "@/components/ui";
+import { useLang } from "@/components/LangProvider";
 
 /** Client roster with a name-search box over the Forwards/Defensemen/Goalies tables. */
 type OfferResult = { ok: boolean; error?: string; name?: string };
@@ -58,34 +59,41 @@ export default function RosterView({ players, dressedIds, hideAttrs = false, far
     });
   } : undefined;
 
+  const lang = useLang();
+  const isEn = lang === "en";
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 px-1">
         <div className="relative">
           <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" /></svg>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player…"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={isEn ? "Search player…" : "Hľadať hráča…"}
             className="w-56 max-w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500" />
         </div>
-        {query && <span className="text-xs text-slate-500">{filtered.length} match{filtered.length === 1 ? "" : "es"}</span>}
-        {pending && <span className="text-xs text-blue-300">Sending offer…</span>}
+        {query && <span className="text-xs text-slate-500">{filtered.length} {isEn ? (filtered.length === 1 ? "match" : "matches") : (filtered.length === 1 ? "zhoda" : "zhôd")}</span>}
+        {pending && <span className="text-xs text-blue-300">{isEn ? "Sending offer…" : "Odosielam ponuku…"}</span>}
       </div>
       {message && <div className={`text-sm rounded-lg border px-3 py-2 ${message.startsWith("✓") ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-300" : "border-red-800/50 bg-red-950/30 text-red-300"}`}>{message}</div>}
 
       {filtered.length === 0 ? (
-        <Card><p className="text-slate-500 text-center py-8">No players match “{q}”.</p></Card>
+        <Card><p className="text-slate-500 text-center py-8">{isEn ? `No players match “${q}”.` : `Žiaden hráč nezodpovedá hľadaniu „${q}“.`}</p></Card>
       ) : (
         <div className="space-y-6">
-          {g.forwards.length > 0 && <RosterSection title="Forwards" players={g.forwards} farm={farm} hideAttrs={hideAttrs} onOfferTwoWay={offerTwoWay} />}
-          {g.defense.length > 0 && <RosterSection title="Defensemen" players={g.defense} farm={farm} hideAttrs={hideAttrs} onOfferTwoWay={offerTwoWay} />}
-          {g.goalies.length > 0 && <RosterSection title="Goalies" players={g.goalies} farm={farm} hideAttrs={hideAttrs} onOfferTwoWay={offerTwoWay} />}
+          {g.forwards.length > 0 && <RosterSection title={isEn ? "Forwards" : "Útočníci"} players={g.forwards} farm={farm} hideAttrs={hideAttrs} onOfferTwoWay={offerTwoWay} />}
+          {g.defense.length > 0 && <RosterSection title={isEn ? "Defensemen" : "Obrancovia"} players={g.defense} farm={farm} hideAttrs={hideAttrs} onOfferTwoWay={offerTwoWay} />}
+          {g.goalies.length > 0 && <RosterSection title={isEn ? "Goalies" : "Brankári"} players={g.goalies} farm={farm} hideAttrs={hideAttrs} onOfferTwoWay={offerTwoWay} />}
           {nonRoster.length > 0 && (
             <div className="space-y-4">
               <div className="px-1 pt-2 border-t border-slate-800">
-                <p className="text-xs text-slate-500 pt-3">Injured or not in the current lineup — dressed players show above.</p>
+                <p className="text-xs text-slate-500 pt-3">
+                  {isEn
+                    ? "Injured or not in the current lineup — dressed players show above."
+                    : "Zranení alebo mimo aktuálnej zápasovej zostavy — nasadení hráči sú zobrazení vyššie."}
+                </p>
               </div>
-              {gn.forwards.length > 0 && <RosterSection title="Non-roster · Forwards" players={gn.forwards} hideAttrs={hideAttrs} />}
-              {gn.defense.length > 0 && <RosterSection title="Non-roster · Defensemen" players={gn.defense} hideAttrs={hideAttrs} />}
-              {gn.goalies.length > 0 && <RosterSection title="Non-roster · Goalies" players={gn.goalies} hideAttrs={hideAttrs} />}
+              {gn.forwards.length > 0 && <RosterSection title={isEn ? "Non-roster · Forwards" : "Mimo zostavy · Útočníci"} players={gn.forwards} hideAttrs={hideAttrs} />}
+              {gn.defense.length > 0 && <RosterSection title={isEn ? "Non-roster · Defensemen" : "Mimo zostavy · Obrancovia"} players={gn.defense} hideAttrs={hideAttrs} />}
+              {gn.goalies.length > 0 && <RosterSection title={isEn ? "Non-roster · Goalies" : "Mimo zostavy · Brankári"} players={gn.goalies} hideAttrs={hideAttrs} />}
             </div>
           )}
         </div>
