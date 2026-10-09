@@ -203,6 +203,13 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
         <p className="text-xs text-slate-500 mt-1">The commissioner always sees every tool. Player-profile, Draft Room and post-game panels are not affected.</p>
       </Card>
 
+      <Card title="📺 Live Matches (V3)">
+        <Toggle k="liveMatchesEnabled" label="Play rounds live — watch games unfold and let GMs coach at stoppages" />
+        <p className="text-xs text-slate-500 mb-2">Off: Simulate Day resolves every game instantly, exactly as before. Needs the V3 engine; ignored on any other engine.</p>
+        <NumField k="livePeriodSec" label="Seconds to watch one period (60–600; 300 = 5 min, so a game ≈ 16 min with breaks)" step={30} />
+        <NumField k="liveIntermissionSec" label="Intermission length (seconds)" step={5} />
+      </Card>
+
       <Card title="Finance & Salary Cap">
         <label className="flex items-center justify-between gap-3 text-sm py-1 mb-2 border-b border-slate-800 pb-3">
           <span className="text-slate-300">Finance system</span>

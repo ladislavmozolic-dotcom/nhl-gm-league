@@ -29,7 +29,7 @@ export const goalieAttrs = (g: any): GoalieAttrs => ({
  * Load a team's active NHL roster and assemble a SimTeam.
  * Uses rosterType='NHL' players; picks the best-overall goalie as starter.
  */
-export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { chemBase?: number; offPos?: { wing: number; center: number; def: number; chemCap: number } }): Promise<SimTeam & { linesUsed: TeamLinesData }> {
+export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { chemBase?: number; offPos?: { wing: number; center: number; def: number; chemCap: number }; linesOverride?: TeamLinesData }): Promise<SimTeam & { linesUsed: TeamLinesData }> {
   const team = await prisma.team.findUnique({ where: { id: teamId }, include: { headCoach: true } });
   if (!team) throw new Error(`Team ${teamId} not found`);
   // AHL affiliates dress their AHL roster; NHL clubs their NHL roster
@@ -80,7 +80,10 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   // Manager lines (if set) — load now so their players are never trimmed below.
   // The team system is loaded separately: a GM can set a system without editing
   // lines, and loadTeamLines returns null when lines are empty.
-  const [dbLines, dbSystem] = await Promise.all([loadTeamLines(teamId), loadTeamSystem(teamId)]);
+  // `linesOverride` (live games): a GM's in-game change, built into a team without ever touching the saved lines
+  const [savedLines, savedSystem] = await Promise.all([opts?.linesOverride ? null : loadTeamLines(teamId), loadTeamSystem(teamId)]);
+  const dbLines = opts?.linesOverride ?? savedLines;
+  const dbSystem = opts?.linesOverride?.system ?? savedSystem;
   // Cap the dressed lineup at exactly a legal 12 F + 6 D so every dressed skater
   // gets real ice (4 lines / 3 pairs). Without this, a deep roster or stacked
   // call-ups leave a 13th/14th forward sitting with a zero-ice, zero-point

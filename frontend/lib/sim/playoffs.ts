@@ -5,6 +5,8 @@ import { assignCrews } from "../officials-server";
 import { prisma } from "./../prisma";
 import { loadSimTeam } from "./index";
 import { simulateGame } from "./engine";
+import type { GameJob } from "./season";
+import type { GameResult } from "./types";
 import { saveGameResult } from "./persist";
 import { secureSeed } from "./secure-seed";
 import { loadSettings } from "./settings";
@@ -236,7 +238,12 @@ export async function startPlayoffs(season = "2026-27", league = "NHL", startDat
 /** Play the playoff games due on one calendar day, update series, and — when the
  *  active round is complete — seed & schedule the next round (after a short break).
  *  Returns games played and, if the Cup was decided, the champion id. */
-export async function advancePlayoffDay(season: string, league: string, dayStart: Date, dayEnd: Date): Promise<{ played: number; championTeamId: number | null; roundAdvanced: number | null }> {
+export async function advancePlayoffDay(
+  season: string, league: string, dayStart: Date, dayEnd: Date,
+  /** Live evening: hand the day's prepared games to this runner (it plays them out over minutes and resolves with every
+   *  result); series, standings and the bracket update only afterwards. Omitted = simulate each game instantly. */
+  opts: { runGames?: (jobs: GameJob[]) => Promise<Map<number, GameResult>> } = {},
+): Promise<{ played: number; championTeamId: number | null; roundAdvanced: number | null }> {
   const settings = await loadSettings();
   const engineVersion = engineVersionFor(await activeSimEngine());
   const due = await prisma.game.findMany({
@@ -249,6 +256,8 @@ export async function advancePlayoffDay(season: string, league: string, dayStart
   const getTeam = async (id: number) => teamCache.get(id) ?? teamCache.set(id, await loadSimTeam(id)).get(id)!;
 
   const crews = league === "NHL" ? await assignCrews(due.map((g) => g.id), { playoffs: true }).catch(() => new Map()) : new Map();
+  // Phase 1 — prepare. A series plays at most one game per day (2-day cadence), so tonight's games are independent.
+  const jobs: Array<GameJob & { seriesId: number; gameNum: number; gameDate: Date }> = [];
   for (const g of due) {
     const s = await prisma.playoffSeries.findUnique({ where: { id: g.seriesId! } });
     if (!s) continue;
@@ -262,11 +271,23 @@ export async function advancePlayoffDay(season: string, league: string, dayStart
     const home = highHome ? high : low, away = highHome ? low : high;
     const seed = secureSeed(); // unpredictable, drawn at sim time (lib/sim/secure-seed.ts)
     const crew = crews.get(g.id);
-    const result = simulateGame(home, away, { seed, settings, noShootout: true, engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined, crowd: league === "NHL" ? { fill: 1 } : undefined });
     if (crew) await prisma.game.update({ where: { id: g.id }, data: { officialIds: crew.ids } }).catch(() => {});
+    jobs.push({
+      gameId: g.id, round: s.round, league, home, away, homeLines: home.linesUsed, awayLines: away.linesUsed,
+      seriesId: s.id, gameNum: g.gameNum ?? 1, gameDate: g.gameDate ?? dayStart,
+      sim: { seed, settings, noShootout: true, engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined, crowd: league === "NHL" ? { fill: 1 } : undefined },
+    });
+  }
+  // Phase 2 — play. Live: all together on one clock. Otherwise each game is simulated right before it is saved.
+  const liveResults = opts.runGames && jobs.length ? await opts.runGames(jobs) : null;
+  // Phase 3 — finish: save each game, then move its series along.
+  for (const job of jobs) {
+    const result = liveResults?.get(job.gameId) ?? simulateGame(job.home, job.away, job.sim);
+    const s = (await prisma.playoffSeries.findUnique({ where: { id: job.seriesId } }))!;
+    const need = Math.ceil(s.bestOf / 2);
     await saveGameResult(result, {
-      gameId: g.id, season, league, round: s.round, seriesId: s.id, gameNum: g.gameNum ?? 1, gameDate: g.gameDate ?? dayStart,
-      homeLines: home.linesUsed, awayLines: away.linesUsed,
+      gameId: job.gameId, season, league, round: s.round, seriesId: s.id, gameNum: job.gameNum, gameDate: job.gameDate,
+      homeLines: job.homeLines, awayLines: job.awayLines,
     });
     const hiW = s.highWins + (result.winner === s.highSeedTeamId ? 1 : 0);
     const loW = s.lowWins + (result.winner === s.lowSeedTeamId ? 1 : 0);

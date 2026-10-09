@@ -4,6 +4,10 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { authConfig } = await import("./lib/auth-config");
   authConfig(); // Fail closed before starting jobs if production secrets are missing.
+  // a live round cut short by this restart picks up where the clock is now (sandbox included — that's where V3/live runs)
+  setTimeout(() => {
+    import("./lib/season-cron").then((m) => m.resumeLiveDayAtBoot()).then((r) => console.log(`[live] boot check: ${r}`)).catch((e) => console.error("[live] boot resume failed", e));
+  }, 5000);
   if (process.env.SANDBOX === "1") { console.log("[sandbox] test mode — auto-sim scheduler disabled"); return; }
   const g = globalThis as unknown as { __autoSimStarted?: boolean };
   if (g.__autoSimStarted) return;

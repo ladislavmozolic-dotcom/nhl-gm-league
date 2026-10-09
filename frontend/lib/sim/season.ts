@@ -10,7 +10,7 @@
 import { assignCrews, type Crew } from "../officials-server";
 import { prisma } from "../prisma";
 import { loadSimTeam } from "./index";
-import { simulateGame } from "./engine";
+import { simulateGame, type SimOptions } from "./engine";
 import { saveGameResult } from "./persist";
 import { secureSeed } from "./secure-seed";
 import { loadSettings, type EngineSettings } from "./settings";
@@ -19,7 +19,7 @@ import { pairSig, unitPairs } from "./chemistry";
 import { computeStandings } from "./standings";
 import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor, projectedPointsPct } from "../finance";
 import { cleanName } from "../playerName";
-import type { SimTeam, SimGoalie, TeamBox } from "./types";
+import type { SimTeam, SimGoalie, TeamBox, GameResult } from "./types";
 import type { TeamLinesData } from "./lines-core";
 
 type SeasonTeam = SimTeam & { linesUsed: TeamLinesData; /** a registered human GM runs this club (AHL farm → its parent club's GM) */ humanGm?: boolean };
@@ -154,6 +154,22 @@ export type PlayOptions = {
   limit?: number;
   actor?: string; // who triggered this sim (commissioner name / "Auto-sim") — for the audit log
   onGame?: (info: { gameId: number; home: string; away: string; hg: number; ag: number; endedIn: string }) => void;
+  /**
+   * Live rounds: instead of simulating each game inline, hand every prepared game to this
+   * runner and wait for ALL results (it may take minutes — games are watched, and coached,
+   * as they unfold). Persisting, chemistry, morale, injuries and audit then run exactly as
+   * for an instant sim. Only valid together with `round` (a single day).
+   */
+  runGames?: (jobs: GameJob[]) => Promise<Map<number, GameResult>>;
+};
+
+/** One fully prepared game: teams loaded, starters chosen, seed drawn — everything but the puck drop. */
+export type GameJob = {
+  gameId: number; round: number; league: string | null;
+  home: SimTeam; away: SimTeam;
+  sim: SimOptions;
+  /** exact lines each side starts with (frozen for the game report) */
+  homeLines: TeamLinesData; awayLines: TeamLinesData;
 };
 
 type GoalieState = { lastStartRound: number; starts: number };
@@ -400,12 +416,13 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   let played = 0;
   const playedIds: number[] = [];
   const skippedIds: number[] = [];
-  for (const gm of scheduled) {
+  type Scheduled = (typeof scheduled)[number];
+  const prepareGame = async (gm: Scheduled): Promise<(GameJob & { gm: Scheduled; home: SeasonTeam; away: SeasonTeam }) | null> => {
     const round = gm.round ?? 0;
     if (round !== currentRound) { await advanceDay(Math.max(1, round - currentRound)); currentRound = round; }
 
     const [home, away] = await Promise.all([getTeam(gm.homeTeamId), getTeam(gm.awayTeamId)]);
-    if (!home || !away) { skippedIds.push(gm.id); continue; } // roster won't load (e.g. farm w/o goalie) — mark no-contest below so it never blocks the day pointer
+    if (!home || !away) { skippedIds.push(gm.id); return null; } // roster won't load (e.g. farm w/o goalie) — mark no-contest below so it never blocks the day pointer
     for (const team of [home, away]) {
       const starter = chooseStarter(team, round - 1, gState);
       starter.fatigued = (gState.get(starter.id)?.lastStartRound ?? -99) === round - 1;
@@ -424,8 +441,13 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     const rivalry = home.rivalTeamIds.includes(away.id) || away.rivalTeamIds.includes(home.id);
     const crew = crews.get(gm.id);
     const crowd = crowdOf(gm);
-    const result = simulateGame(home, away, { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL", engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined, crowd: crowd ? { fill: crowd.frac, neutral: crowd.neutral } : undefined });
+    const sim: SimOptions = { seed, settings, rivalry, league: gm.league === "AHL" ? "AHL" : "NHL", engineVersion, officials: crew ? { penaltyMult: crew.penaltyMult, evenUp: crew.evenUp } : undefined, crowd: crowd ? { fill: crowd.frac, neutral: crowd.neutral } : undefined };
     if (crew) await prisma.game.update({ where: { id: gm.id }, data: { officialIds: crew.ids } }).catch(() => {});
+    return { gm, gameId: gm.id, round, league: gm.league, home, away, sim, homeLines: home.linesUsed, awayLines: away.linesUsed };
+  };
+
+  const finishGame = async (job: NonNullable<Awaited<ReturnType<typeof prepareGame>>>, result: GameResult) => {
+    const { gm, home, away, round } = job;
     await saveGameResult(result, {
       gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round),
       homeLines: home.linesUsed, awayLines: away.linesUsed,
@@ -498,6 +520,22 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       gameId: gm.id, home: home.name, away: away.name,
       hg: result.home.goals, ag: result.away.goals, endedIn: result.endedIn,
     });
+  };
+
+  if (opts.runGames) {
+    // live: prepare the whole day, let the runner play it out, then finish every game
+    const jobs: NonNullable<Awaited<ReturnType<typeof prepareGame>>>[] = [];
+    for (const gm of scheduled) { const job = await prepareGame(gm); if (job) jobs.push(job); }
+    const results = await opts.runGames(jobs);
+    for (const job of jobs) {
+      const result = results.get(job.gameId);
+      if (result) await finishGame(job, result); else skippedIds.push(job.gameId);
+    }
+  } else {
+    for (const gm of scheduled) {
+      const job = await prepareGame(gm);
+      if (job) await finishGame(job, simulateGame(job.home, job.away, job.sim));
+    }
   }
 
   // games we couldn't sim (a roster wouldn't load) are marked FINAL 0-0 no-contests

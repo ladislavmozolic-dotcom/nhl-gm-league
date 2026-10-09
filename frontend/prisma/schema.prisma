@@ -2121,3 +2121,21 @@ model NegotiationLog {
   @@index([playerId, id])
   @@index([createdAt])
 }
+
+// A live round in flight (lib/live-server.ts): enough to rebuild every game after a server restart —
+// the starting teams, seeds and per-game options, plus every in-game change that had taken effect.
+// The games are deterministic from these, so recovery just replays them up to "now".
+model LiveRound {
+  id        String   @id // "<season>:<round>:<startMs>"
+  season    String
+  round     Int
+  status    String   @default("RUNNING") // RUNNING | DONE | ABORTED
+  clock     Json // LiveClock — the original wall-clock schedule
+  games     Json // serialized GameJob[] (Map/Set-safe, see lib/sim/serialize.ts)
+  settings  Json // the EngineSettings every game of the round used
+  commands  Json     @default("[]") // [{ gameId, stopIndex, teamId, team, by, summary }]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}

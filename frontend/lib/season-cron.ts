@@ -25,6 +25,7 @@ import { addDays } from "./calendar";
 import { sweepExpiredContractsToUfa } from "./free-agency-server";
 import { loadCommissionerIntel } from "./gm-assistant/commissionerIntel";
 import { sendAdminAlert } from "./email";
+import { liveMatchesActive } from "./live-server";
 
 const TZ = "Europe/Bratislava";
 const TRIGGER_HOUR = 20;
@@ -71,9 +72,52 @@ export async function simulateDayIfDue(now: Date = new Date()): Promise<AutoAdva
   if (cfg.lastSimulatedDay?.getTime() === cfg.leagueDate.getTime()) return { ran: false, reason: "today's league day is already simulated" };
 
   await preSimHealthCheck(cfg.leagueDate);
+  // Live evening: the day takes ~10 minutes to play out, so it runs in the background (the cron
+  // request returns at once) and a guard keeps the next 5-minute tick from starting it twice.
+  // `lastSimulatedDay` is only set when it really finishes, so the calendar can't roll over early.
+  if (await liveMatchesActive()) {
+    return startLiveDay(cfg.leagueDate)
+      ? { ran: false, reason: "started tonight's live round in the background" }
+      : { ran: false, reason: "tonight's live round is already running" };
+  }
   const result = await simulateLeagueDay(cfg.leagueDate);
   await prisma.leagueConfig.update({ where: { id: 1 }, data: { lastSimulatedDay: cfg.leagueDate } });
   return { ran: true, ...result };
+}
+
+/** Plays league day `day` live in the background (see simulateDayIfDue). One at a time per process;
+ *  returns false if a live day is already running. `lastSimulatedDay` is set only when it truly finishes. */
+function startLiveDay(day: Date): boolean {
+  const g = globalThis as unknown as { __liveDayRunning?: boolean };
+  if (g.__liveDayRunning) return false;
+  g.__liveDayRunning = true;
+  void (async () => {
+    try {
+      await simulateLeagueDay(day, { live: true });
+      await prisma.leagueConfig.update({ where: { id: 1 }, data: { lastSimulatedDay: day } });
+    } catch (err) {
+      console.error("[live] tonight's round failed", err);
+    } finally {
+      g.__liveDayRunning = false;
+    }
+  })();
+  return true;
+}
+
+/** Called once when the server boots: if a live round was cut short by a restart (still RUNNING in the DB,
+ *  started within the last few hours), finish tonight's day — the round resumes where the clock is now. */
+export async function resumeLiveDayAtBoot(): Promise<string> {
+  const fresh = new Date(Date.now() - 6 * 3_600_000);
+  const stale = await prisma.liveRound.updateMany({ where: { status: "RUNNING", createdAt: { lt: fresh } }, data: { status: "ABORTED" } });
+  const saved = await prisma.liveRound.findFirst({ where: { status: "RUNNING" }, orderBy: { createdAt: "desc" }, select: { round: true } });
+  if (!saved) return stale.count ? `dropped ${stale.count} stale live round(s)` : "no live round to resume";
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { leagueDate: true, lastSimulatedDay: true } });
+  if (!cfg?.leagueDate) return "no league date";
+  if (cfg.lastSimulatedDay?.getTime() === cfg.leagueDate.getTime()) {
+    await prisma.liveRound.updateMany({ where: { status: "RUNNING" }, data: { status: "DONE" } });
+    return "that day is already simulated";
+  }
+  return startLiveDay(cfg.leagueDate) ? `resuming live round ${saved.round}` : "a live day is already running";
 }
 
 /** Runs the Commissioner Intelligence scans right before the nightly sim and mails

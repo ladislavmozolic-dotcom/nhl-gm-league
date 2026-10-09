@@ -24,6 +24,8 @@ import { money } from "@/lib/finance";
 import { runLiveCalculatorRecompute } from "@/lib/live-calculator-engine";
 import { refreshPlayoffOdds } from "@/lib/playoff-odds";
 import { reviewGames, serveSuspensions } from "@/lib/discipline-server";
+import { liveMatchesActive, liveRunGames } from "@/lib/live-server";
+import { PLAYOFF_ROUND_BASE } from "@/lib/sim/live-round";
 
 const SEASON = "2026-27";
 
@@ -42,6 +44,12 @@ async function recoverOneDay() {
   await updateInjuryCon();
 }
 
+/** Who to credit in the sim audit. A live day resumed after a restart runs with no HTTP request behind it,
+ *  where reading the session cookie throws — fall back to a neutral name instead of losing the day. */
+async function actorName(): Promise<string> {
+  try { return await commissionerName(); } catch { return "Commissioner"; }
+}
+
 /** Plays out league day `day` — the games/CON-recovery/Frenzy-transition/waiver/
  *  cap-compliance bookkeeping for that ONE calendar day — WITHOUT touching
  *  `LeagueConfig.leagueDate` itself. Shared by the admin "Advance Day" button
@@ -53,7 +61,7 @@ async function recoverOneDay() {
  *  simulated in the evening. If games are scheduled that date, they are
  *  played; a regular-season off-day recovers CON; the off-season simply lets
  *  the date move (Frenzy lives here). */
-export async function simulateLeagueDay(day: Date) {
+export async function simulateLeagueDay(day: Date, opts: { live?: boolean } = {}) {
   const yesterday = addDays(day, -1);
   const cfg0 = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { phaseOverride: true } });
   // computed once, up front — every phYesterday/phToday reference below reuses these
@@ -81,7 +89,12 @@ export async function simulateLeagueDay(day: Date) {
   if (dayGames.length && dayGames[0].round != null) {
     await autoFillRosters("NHL");
     await fillAhlFromScratched();
-    const r = await playScheduledGames({ season: SEASON, round: dayGames[0].round, actor: await commissionerName() });
+    // The 20:30 cron may play the evening round live (V3 + commissioner switch); a manual "Simulate Day" never does.
+    const live = opts.live && (await liveMatchesActive());
+    const r = await playScheduledGames({
+      season: SEASON, round: dayGames[0].round, actor: await actorName(),
+      ...(live ? { runGames: await liveRunGames(SEASON, dayGames[0].round!) } : {}),
+    });
     played = r.played;
     await processFinances(SEASON, "NHL");
     // tonight's Monte Carlo playoff / Cup / lottery odds (Standings ▸ Odds)
@@ -96,7 +109,7 @@ export async function simulateLeagueDay(day: Date) {
     await recoverPreseasonIdleTeams(start, end);
     await autoFillRosters("NHL").catch(() => {});
     await autoFillRosters("AHL").catch(() => {});
-    const pr = await playPreseasonDay(start, end, await commissionerName());
+    const pr = await playPreseasonDay(start, end, await actorName());
     played += pr.played;
   }
   // Playoff games scheduled for today play out (day-by-day, no back-to-backs). When a
@@ -105,7 +118,10 @@ export async function simulateLeagueDay(day: Date) {
   if (poDue > 0) {
     await autoFillRosters("NHL").catch(() => {});
     for (const lg of ["NHL", "AHL"] as const) {
-      const po = await advancePlayoffDay(SEASON, lg, start, end);
+      // the 20:30 cron may play the NHL playoff games live too; the farm league's games always sim instantly afterwards
+      const po = await advancePlayoffDay(SEASON, lg, start, end, opts.live && lg === "NHL" && (await liveMatchesActive())
+        ? { runGames: async (jobs) => (await liveRunGames(SEASON, PLAYOFF_ROUND_BASE + (jobs[0]?.round ?? 0)))(jobs) }
+        : {});
       played += po.played;
     }
     // Playoff gates, merchandise uplift and earned sponsor bonuses are real cash,
@@ -200,8 +216,9 @@ export async function simulateLeagueDay(day: Date) {
     "/league/picks",
     "/tools/picks",
     "/",
-  ])
-    revalidatePath(p);
+  ]) {
+    try { revalidatePath(p); } catch { /* resumed after a restart: no request scope to revalidate in — pages are dynamic anyway */ }
+  }
   return { date: day, phase: phToday, played, signed, warned: promises.warned, requested: promises.requested, capOffenders, expiredToUfa, waiverClaims: waivers.claimed, waiverClears: waivers.cleared };
 }
 

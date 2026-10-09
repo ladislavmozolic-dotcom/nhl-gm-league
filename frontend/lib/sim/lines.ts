@@ -52,7 +52,9 @@ export async function loadTeamSystem(teamId: number): Promise<TeamTactics | null
   return (row?.system as TeamTactics | null) ?? null;
 }
 
-export async function saveTeamLines(teamId: number, data: TeamLinesData, opts: { strict?: boolean } = {}): Promise<TeamLinesData> {
+/** Validate + reconcile a lines object against the club's active roster WITHOUT saving it.
+ *  Same rules the Lines editor applies on save; also used for in-game (live) changes. */
+export async function validateTeamLines(teamId: number, data: TeamLinesData, opts: { strict?: boolean } = {}): Promise<TeamLinesData> {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     select: {
@@ -91,6 +93,11 @@ export async function saveTeamLines(teamId: number, data: TeamLinesData, opts: {
   // 5v5 is already complete and valid, so autoFill leaves the GM's exact lines
   // untouched and only reconciles/fills ancillary special-situation slots.
   const safe = autoFill(normalized, skaters, goalies);
+  return safe;
+}
+
+export async function saveTeamLines(teamId: number, data: TeamLinesData, opts: { strict?: boolean } = {}): Promise<TeamLinesData> {
+  const safe = await validateTeamLines(teamId, data, opts);
   const payload = {
     forwardLines: safe.forwardLines as object,
     defensePairs: safe.defensePairs as object,
