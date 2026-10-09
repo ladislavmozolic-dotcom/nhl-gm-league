@@ -27,3 +27,17 @@ export function placePlayer(forwards: ForwardLine[], defense: DefensePair[], slo
 export function placedIds(forwards: ForwardLine[], defense: DefensePair[]): number[] {
   return [...forwards.flatMap((l) => [l.lw, l.c, l.rw]), ...defense.flatMap((p) => [p.ld, p.rd])].filter((x): x is number => x != null);
 }
+
+/** Put `playerId` into slot `idx` of one special-teams unit. A player already in that unit trades places with the slot's
+ *  occupant (a unit never holds the same skater twice); the same skater MAY appear in another unit or the 5-on-5 lines.
+ *  `null` empties the slot. Not mutating. */
+export function placeInUnit(players: (number | null)[], idx: number, playerId: number | null): (number | null)[] {
+  const next = [...players];
+  const old = next[idx] ?? null;
+  if (playerId != null) {
+    const at = next.findIndex((id, i) => i !== idx && id === playerId);
+    if (at >= 0) next[at] = old;
+  }
+  next[idx] = playerId;
+  return next;
+}

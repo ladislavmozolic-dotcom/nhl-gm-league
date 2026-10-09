@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { placePlayer, placedIds } from "../lib/sim/line-edit";
+import { placePlayer, placedIds, placeInUnit } from "../lib/sim/line-edit";
 import type { ForwardLine, DefensePair } from "../lib/sim/lines-core";
 
 const F = (a: number, b: number, c: number): ForwardLine => ({ lw: a, c: b, rw: c, timePct: 25 });
@@ -44,4 +44,16 @@ test("any sequence of picks keeps every skater in the lineup at most once", () =
     assert.equal(new Set(ids).size, ids.length, `duplicate skater after pick #${i}`);
     assert.equal(ids.length, 18, "swaps must never lose a slot's occupant (only a scratch may displace one)");
   }
+});
+
+test("special-teams slots: picking someone already in the unit swaps, a skater from elsewhere just replaces", () => {
+  const unit = [1, 2, 3, 21, 22];
+  assert.deepEqual(placeInUnit(unit, 0, 3), [3, 2, 1, 21, 22]);
+  assert.deepEqual(placeInUnit(unit, 4, 23), [1, 2, 3, 21, 23], "a new skater replaces the occupant");
+  assert.deepEqual(placeInUnit(unit, 1, null), [1, null, 3, 21, 22]);
+  assert.deepEqual(unit, [1, 2, 3, 21, 22], "input untouched");
+  let u: (number | null)[] = [1, 2, 3, 21, 22];
+  const pool = [1, 2, 3, 4, 5, 21, 22, 23];
+  let seed = 7; const rnd = (n: number) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  for (let i = 0; i < 300; i++) { u = placeInUnit(u, rnd(5), pool[rnd(pool.length)]); const ids = u.filter((x) => x != null); assert.equal(new Set(ids).size, ids.length, "duplicate in a unit"); }
 });

@@ -8,7 +8,7 @@ import { buildTeam } from "../lib/sim/ratings";
 import { ENGINE_V3 } from "../lib/sim/version";
 import type { SimGoalie, SimSkater } from "../lib/sim/types";
 
-function makeTeam(id: number, strength: number, system?: TeamTactics, pullSec?: number, skip: number[] = []) {
+function makeTeam(id: number, strength: number, system?: TeamTactics, pullSec?: number, skip: number[] = [], ppIds?: number[]) {
   const attrs = { ck: strength, fg: strength, di: strength, sk: strength, st: strength, en: strength, du: strength, ph: strength, fo: strength, pa: strength, sc: strength, df: strength, ps: strength, ex: strength, ld: strength, mo: strength };
   const skaters: Array<Omit<SimSkater, "iceTime">> = Array.from({ length: 20 }, (_, i) => {
     const d = i >= 12;
@@ -22,6 +22,7 @@ function makeTeam(id: number, strength: number, system?: TeamTactics, pullSec?: 
     attrs: { sk: strength, du: strength, en: strength, sz: strength, ag: strength, rb: strength, sc: strength, hs: strength, rt: strength, ph: strength, ps: strength, ex: strength, ld: strength, mo: strength },
     quality: strength, con: 100, du: strength, fatigued: false, morale: 70 }));
   const lines = autoLines(dressed.map((s) => ({ id: s.id, position: s.position, overall: s.overall, shoots: s.shoots, df: s.attrs.df })), goalies.map((g) => ({ id: g.id, overall: g.overall })));
+  if (ppIds) { lines.situations.pp[0].players = ppIds; lines.situations.pp[1].players = [id * 100 + 2, id * 100 + 3, id * 100 + 5, id * 100 + 13, id * 100 + 14]; }
   if (pullSec != null) lines.strategy = { ...lines.strategy, goaliePull: { ...lines.strategy.goaliePull, pullSec } };
   return buildTeam({ id, name: `T${id}`, code: `T${id}`, skaters: dressed as SimSkater[], goalies, lines, system });
 }
@@ -215,4 +216,20 @@ test("a goalie change with no backup dressed is ignored", () => {
   const opts = { seed: 94, engineVersion: ENGINE_V3 };
   const { result } = drain(simulateGameLive(solo, makeTeam(2, 66), opts), () => ({ goalie: { home: true } }));
   assert.equal(result.events!.filter((e) => e.type === "GOALIE_CHANGE").length, 0);
+});
+
+test("a power-play unit changed mid-game is the one that takes the ice on the next power play", () => {
+  // forwards idx 9..11 are 4th-liners and idx 16..17 depth D — normally nowhere near the PP
+  const fourth = [10, 11, 12], depthD = [17, 18].map((i) => i); // ids = team*100 + idx + 1
+  const ids = [...fourth, ...depthD].map((n) => 100 + n);
+  let newUnitPp = 0, baselinePp = 0, games = 0;
+  for (let seed = 401; seed < 441; seed++) {
+    const opts = { seed, engineVersion: ENGINE_V3 };
+    const base = drain(simulateGameLive(makeTeam(1, 62), makeTeam(2, 62), opts)).result;
+    let sent = false;
+    const live = drain(simulateGameLive(makeTeam(1, 62), makeTeam(2, 62), opts), (s) => (!sent && s.period === 1 ? (sent = true, { home: makeTeam(1, 62, undefined, undefined, [], ids) }) : undefined)).result;
+    const pp = (r: typeof base) => r.home.skaters.filter((p) => ids.includes(p.id)).reduce((t, p) => t + (p.ppToi ?? 0), 0);
+    newUnitPp += pp(live); baselinePp += pp(base); games++;
+  }
+  assert.ok(newUnitPp > baselinePp * 1.5 + 60, `the new PP1 should log far more PP time (${newUnitPp}s vs ${baselinePp}s over ${games} games)`);
 });

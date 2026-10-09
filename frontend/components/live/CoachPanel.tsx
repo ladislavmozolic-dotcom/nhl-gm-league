@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { PRESETS, type TeamTactics } from "@/lib/sim/tactics";
-import type { ForwardLine, DefensePair } from "@/lib/sim/lines-core";
+import type { ForwardLine, DefensePair, SpecialUnit } from "@/lib/sim/lines-core";
 import LinesEditor, { type RosterPlayer } from "./LinesEditor";
+import UnitsEditor from "./UnitsEditor";
 import type { GoalieInfo } from "@/lib/sim/live";
 
 type GoaliePull = { minGoals: number; savePctUnder: number; pullSec: number };
-type Lines = { forwardLines: ForwardLine[]; defensePairs: DefensePair[]; system?: TeamTactics; strategy?: { goaliePull?: GoaliePull } & Record<string, unknown> } & Record<string, unknown>;
+type Lines = { forwardLines: ForwardLine[]; defensePairs: DefensePair[]; situations?: { pp?: SpecialUnit[]; pk4?: SpecialUnit[] } & Record<string, unknown>; system?: TeamTactics; strategy?: { goaliePull?: GoaliePull } & Record<string, unknown> } & Record<string, unknown>;
 const DEFAULT_PULL: GoaliePull = { minGoals: 4, savePctUnder: 80, pullSec: 90 };
 type Opt = { value: string; label: string };
 
@@ -34,6 +35,8 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
   const [pullSec, setPullSec] = useState(DEFAULT_PULL.pullSec);
   const [fwd, setFwd] = useState<ForwardLine[]>([]);
   const [def, setDef] = useState<DefensePair[]>([]);
+  const [pp, setPp] = useState<SpecialUnit[]>([]);
+  const [pk, setPk] = useState<SpecialUnit[]>([]);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [timeoutQueued, setTimeoutQueued] = useState(false);
   const [goalieQueued, setGoalieQueued] = useState(false);
@@ -47,6 +50,7 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
         if (j.error) { setMsg({ ok: false, text: j.error }); return; }
         setLines(j.lines as Lines); setApplied(j.applied ?? 0);
         setFwd((j.lines as Lines).forwardLines ?? []); setDef((j.lines as Lines).defensePairs ?? []); setRoster(j.roster ?? []);
+        setPp((j.lines as Lines).situations?.pp ?? []); setPk((j.lines as Lines).situations?.pk4 ?? []);
         setDials({ ...DEFAULT_DIALS, ...((j.lines as Lines).system ?? {}) });
         setPullSec((j.lines as Lines).strategy?.goaliePull?.pullSec ?? DEFAULT_PULL.pullSec);
       })
@@ -67,13 +71,16 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
 
   const set = (k: keyof TeamTactics, v: string) => { setDials((d) => ({ ...d, [k]: v })); setDirty(true); setMsg(null); };
   const editLines = (f: ForwardLine[], d: DefensePair[]) => { setFwd(f); setDef(d); setDirty(true); setMsg(null); };
-  const resetLines = () => { if (!lines) return; setFwd(lines.forwardLines); setDef(lines.defensePairs); setMsg(null); };
-  const linesEdited = !!lines && (JSON.stringify(fwd) !== JSON.stringify(lines.forwardLines) || JSON.stringify(def) !== JSON.stringify(lines.defensePairs));
+  const resetLines = () => { if (!lines) return; setFwd(lines.forwardLines); setDef(lines.defensePairs); setPp(lines.situations?.pp ?? []); setPk(lines.situations?.pk4 ?? []); setMsg(null); };
+  const editUnits = (which: "pp" | "pk") => (u: SpecialUnit[]) => { (which === "pp" ? setPp : setPk)(u); setDirty(true); setMsg(null); };
+  const linesEdited = !!lines && (JSON.stringify(fwd) !== JSON.stringify(lines.forwardLines) || JSON.stringify(def) !== JSON.stringify(lines.defensePairs)
+    || JSON.stringify(pp.map((u) => u.players)) !== JSON.stringify((lines.situations?.pp ?? []).map((u) => u.players)) || JSON.stringify(pk.map((u) => u.players)) !== JSON.stringify((lines.situations?.pk4 ?? []).map((u) => u.players)));
   const preset = (name: string) => { setDials((d) => ({ ...d, ...PRESETS[name], preset: name })); setDirty(true); setMsg(null); };
 
   const withEdits = (l: Lines): Lines => ({
     ...l,
     forwardLines: fwd, defensePairs: def,
+    situations: { ...(l.situations ?? {}), pp, pk4: pk } as Lines["situations"],
     system: { ...(l.system ?? {}), ...dials },
     strategy: { ...(l.strategy ?? {}), goaliePull: { ...DEFAULT_PULL, ...(l.strategy?.goaliePull ?? {}), pullSec } },
   });
@@ -147,12 +154,14 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
             ))}
             <details className="rounded-lg border border-slate-800 bg-slate-950/40 open:pb-3">
               <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-slate-200">
-                Lines &amp; pairs {linesEdited && <span className="ml-1 text-amber-300">· edited</span>}
+                Lines, pairs &amp; special teams {linesEdited && <span className="ml-1 text-amber-300">· edited</span>}
               </summary>
               <div className="px-3 pt-1">
                 {roster.length === 0 ? <p className="text-xs text-slate-500">Loading your roster…</p> : (
                   <>
                     <LinesEditor forwards={fwd} defense={def} roster={roster} outIds={outIds} disabled={!lines} onChange={editLines} />
+                    {pp.length > 0 && <div className="mt-4 border-t border-slate-800 pt-3"><UnitsEditor title="Power play" kinds={["F", "F", "F", "D", "D"]} units={pp} roster={roster} outIds={outIds} disabled={!lines} onChange={editUnits("pp")} /></div>}
+                    {pk.length > 0 && <div className="mt-4"><UnitsEditor title="Penalty kill" kinds={["F", "F", "D", "D"]} units={pk} roster={roster} outIds={outIds} disabled={!lines} onChange={editUnits("pk")} /></div>}
                     {linesEdited && <button onClick={resetLines} className="mt-2 text-[11px] text-slate-400 hover:text-white underline">Undo my line edits</button>}
                   </>
                 )}
