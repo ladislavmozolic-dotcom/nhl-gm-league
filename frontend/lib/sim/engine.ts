@@ -163,6 +163,7 @@ type SimState = {
   v3GoalieRhythm: boolean;           // V3 diagnostic feature flag
   v3BlockSkill: boolean;             // V3 diagnostic feature flag
   v3GoalieComposure: boolean;        // V3 diagnostic feature flag
+  v3OvertimeStars: boolean;          // V3 diagnostic feature flag
   goalieStreak: Record<number, number>;      // V3: consecutive saves since the goalie last allowed a goal
   lastGoalAgainst: Record<number, number>;   // V3: absolute game second of the last goal each goalie allowed
   lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
@@ -1372,6 +1373,9 @@ export function v3CoachAdaptation(
   const shell = (0.035 + 0.065 * urgency) * (1.25 - attackLean * 0.5);
   return { shots: 1 - shell * 0.35, allow: 1 - shell };
 }
+// V3: in 3-on-3 the open ice rewards a true finisher more: the finishing exponent is +0.15
+// there only. Anchored at the average finisher (60), so the league 3v3 scoring level holds.
+export const V3_OT_STAR_EXPONENT = 0.15;
 // V3: goalie composure — rattled (+6% goal chance) for 2:00 after allowing a goal, locked in
 // (-4%) after 12+ consecutive saves. The two states are mutually exclusive (a goal resets the streak).
 export function v3GoalieComposureMult(secondsSinceGoalAgainst: number, saveStreak: number): number {
@@ -2166,7 +2170,8 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       // team defence/coaching/chem edge toward 1. Ranks are kept — only the spread
       // narrows — so the scoring race and elite goalies still stand out.
       const pk = 1 - PARITY_CONV * parityAmt();
-      const finishExponent = st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7;
+      const finishExponent = (st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7)
+        + (st.v3OvertimeStars && shotSituation === "3V3" ? V3_OT_STAR_EXPONENT : 0);
       const pTalent = conversion(shOff, effGoalieQuality(gSim), isHome, strength, finishExponent);
       // PARITY compresses only the GOALIE mismatch toward a league-average keeper —
       // a team-level edge — while the SHOOTER's finishing is left FULL, so elite
@@ -2743,7 +2748,7 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
-  experimentalV3?: { goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2783,6 +2788,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     v3GoalieRhythm: isV3 && (opts.experimentalV3?.goalieRhythm ?? true),
     v3BlockSkill: isV3 && (opts.experimentalV3?.blockSkill ?? true),
     v3GoalieComposure: isV3 && (opts.experimentalV3?.goalieComposure ?? true),
+    v3OvertimeStars: isV3 && (opts.experimentalV3?.overtimeStars ?? true),
     goalieStreak: {}, lastGoalAgainst: {},
     lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,

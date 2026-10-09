@@ -306,3 +306,18 @@ Competitive balance and scoring concentration are unchanged. Blowouts +0.4 pts i
 noise and the rattled-goalie window needs no softening. Goals +0.04 (+1.3%) and PIM
 19.8→11.4 (V3 emotional-discipline, in the 7–12 target; V2's 19.8 is the known shared
 failure) are the only real shifts, both intended. Package remains calibration-safe.
+
+### Overtime stars — fourteenth increment, offline — 2026-10-09
+
+Flag `overtimeStars`: in 3-on-3 situations the finishing exponent gets +0.15
+(`V3_OT_STAR_EXPONENT`), so true finishers matter more in the open ice. The curve stays
+anchored at an average finisher (60), so league 3v3 scoring is unchanged; no extra RNG.
+
+Gates: identity with all 14 flags off — identical on 400 games (seed 190,000). Seeds
+90,000 / 190,000 / 290,000: goals 2.98 / 3.04 / 3.06 (identical to before the increment),
+shots 31.3–31.5, save % .911 / .910 / .909, home win 53.6–53.8%, blowouts 14.2 / 13.8 / 12.4%.
+OT/SO share on 8 other seed bases: V2 19.97%, V3 20.10%, V3 without this flag 20.10%
+(a 17.4% / 18.1% reading on two single seeds was noise). **Honest limit:** OT is a small
+slice of games, so the effect is below the noise of every league-level metric; it is safe
+but nearly inert, like the first goalie-rhythm version. V2 itself sits at the bottom of the
+20–26% OT/SO target — a shared item, not a V3 regression.

@@ -9,7 +9,7 @@ import {
   isNextGenEngine,
   resolveSimEngine,
 } from "../lib/sim/version";
-import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
+import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, V3_OT_STAR_EXPONENT, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
 import type { SimSkater } from "../lib/sim/types";
 
 test("V3 is a next-gen workbench version, not a league-selectable engine", () => {
@@ -106,4 +106,8 @@ test("V3 goalie composure: rattled after a goal, locked in after a long save str
   assert.equal(v3GoalieComposureMult(500, 12), 0.96);
   assert.equal(v3GoalieComposureMult(60, 12), 1.06);
   assert.equal(v3GoalieComposureMult(1e9, 0), 1);
+});
+
+test("V3 overtime stars is a small, positive finishing-exponent bump", () => {
+  assert.ok(V3_OT_STAR_EXPONENT > 0 && V3_OT_STAR_EXPONENT <= 0.25);
 });
