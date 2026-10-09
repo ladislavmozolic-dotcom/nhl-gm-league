@@ -13,7 +13,7 @@ import { getLeagueDate, computePhase } from "@/lib/calendar-server";
 import { addDays, utcDay, frenzyRound, roundForDate } from "@/lib/calendar";
 import { processWaivers } from "@/lib/waivers-server";
 import { playPreseasonDay, recoverPreseasonIdleTeams, PRE_SEASON } from "@/lib/preseason";
-import { postWeeklyIfDue } from "@/lib/weekly-digest";
+import { postWeeklyIfDue, postMonthlyIfDue } from "@/lib/weekly-digest";
 import { resolveFrenzy, processRoundEnd, resolveInSeasonWindows } from "@/app/free-agents/actions";
 import { sweepExpiredContractsToUfa, sweepUnsignedRfasToNonRoster } from "@/lib/free-agency-server";
 import { ensureRfaCases, resolveExpiredQODueDates, resolveArbitrationVerdicts, warnMissingQo } from "@/lib/rfa-server";
@@ -119,8 +119,10 @@ export async function simulateLeagueDay(day: Date) {
     await serveSuspensions(tonight, simStart).catch((e) => console.error("[discipline:serve]", e));
     await reviewGames(tonight).catch((e) => console.error("[discipline:review]", e));
   }
-  // weekly newsletter — auto-posts once when a 7-round week completes (self-dedupes)
+  // weekly newsletter — updates commissioner banner on week completion
   await postWeeklyIfDue(roundForDate(day)).catch(() => {});
+  // monthly league report — auto-posts official monthly News article on month completion
+  await postMonthlyIfDue(roundForDate(day)).catch(() => {});
   // ice-time promise check (self-gates to the regular season past 1/3)
   const promises = await checkPromises();
   // ice-time morale for everyone else: warn → trade request → unwinds when fixed

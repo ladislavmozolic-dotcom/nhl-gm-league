@@ -25,7 +25,7 @@ import { renderMarkdown } from "@/lib/markdown";
 import type { HomeBlock } from "@/app/admin/site-editor/actions";
 import { getLang } from "@/lib/lang-server";
 import { t as tt } from "@/lib/i18n";
-import { articlePlainText, sanitizeArticleHtml } from "@/lib/news-html";
+import { articlePlainText, sanitizeArticleHtml, isLeagueArticle } from "@/lib/news-html";
 import { currentInjuries } from "@/lib/injuries-server";
 
 export const dynamic = "force-dynamic";
@@ -762,38 +762,63 @@ export default async function HomePage() {
             const hasMore = cutAt >= 0 || text.length > 500;
             const preview = cutAt >= 0 ? text : text.slice(0, 500);
             const isFeatured = idx === 0;
+            const isLeague = isLeagueArticle(a);
 
             return (
               <article
                 key={a.id}
-                className={`rounded-2xl border transition-all ${
-                  isFeatured
+                className={`rounded-2xl border transition-all relative overflow-hidden ${
+                  isLeague
+                    ? "border-sky-500/40 bg-gradient-to-b from-slate-900/90 via-[#0b1120] to-[#0b1120] p-5 shadow-2xl shadow-sky-950/40 ring-1 ring-sky-500/20"
+                    : isFeatured
                     ? "border-sky-500/30 bg-[#0b1120] p-5 shadow-2xl"
                     : "border-slate-800 bg-[#0b1120] p-4 hover:border-slate-700 shadow-xl"
                 }`}
               >
-                <div className="flex items-center gap-3 mb-3">
-                  {author?.logoUrl ? (
-                    <span className="inline-flex items-center justify-center rounded-xl bg-slate-800/90 border border-slate-700/60 p-1 shrink-0" style={{ width: 38, height: 38, minWidth: 38 }}>
-                      <img src={author.logoUrl} alt="" className="object-contain" style={{ width: 28, height: 28, maxWidth: 28, maxHeight: 28 }} />
-                    </span>
-                  ) : (
-                    <div className="w-9 h-9 rounded-xl bg-slate-800 grid place-items-center font-bold text-sm text-slate-300">
-                      {author?.name?.[0] ?? "?"}
+                {isLeague ? (
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 via-sky-500/20 to-blue-600/30 border border-sky-400/40 p-1 shrink-0 text-xl shadow-inner shadow-sky-500/20" style={{ width: 38, height: 38, minWidth: 38 }}>
+                        🏆
+                      </span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-black text-sky-200 tracking-wide">UNHL Commissioner</p>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30">Official</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-mono">
+                          League Office · {a.createdAt.toLocaleDateString("en-GB")}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                  <div>
-                    <p className="text-xs font-black text-slate-100">
-                      {author?.gmNickname || [author?.gmFirstName, author?.gmLastName].filter(Boolean).join(" ").trim() || author?.gm || author?.name || "GM"}
-                    </p>
-                    <p className="text-[11px] text-slate-400 font-mono">
-                      {author?.name} · {a.createdAt.toLocaleDateString("en-GB")}
-                    </p>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-sky-500/20 text-amber-300 border border-amber-500/30 tracking-wider">
+                      Official Report
+                    </span>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-center gap-3 mb-3">
+                    {author?.logoUrl ? (
+                      <span className="inline-flex items-center justify-center rounded-xl bg-slate-800/90 border border-slate-700/60 p-1 shrink-0" style={{ width: 38, height: 38, minWidth: 38 }}>
+                        <img src={author.logoUrl} alt="" className="object-contain" style={{ width: 28, height: 28, maxWidth: 28, maxHeight: 28 }} />
+                      </span>
+                    ) : (
+                      <div className="w-9 h-9 rounded-xl bg-slate-800 grid place-items-center font-bold text-sm text-slate-300">
+                        {author?.name?.[0] ?? "?"}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs font-black text-slate-100">
+                        {author?.gmNickname || [author?.gmFirstName, author?.gmLastName].filter(Boolean).join(" ").trim() || author?.gm || author?.name || "GM"}
+                      </p>
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        {author?.name} · {a.createdAt.toLocaleDateString("en-GB")}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <Link href={`/news/${a.id}`}>
-                  <h3 className={`font-black mb-2 hover:text-sky-300 transition-colors ${isFeatured ? "text-lg text-white" : "text-base text-slate-100"}`}>
+                  <h3 className={`font-black mb-2 hover:text-sky-300 transition-colors ${isLeague || isFeatured ? "text-lg text-white" : "text-base text-slate-100"}`}>
                     {a.title}
                   </h3>
                 </Link>
@@ -802,12 +827,21 @@ export default async function HomePage() {
                   {preview}{hasMore ? "…" : ""}
                 </p>
 
-                <div className="flex items-center gap-4 text-xs text-slate-400 pt-2 border-t border-slate-800/80">
-                  <Link href={`/news/${a.id}`} className="text-sky-400 hover:text-sky-300 font-bold transition-colors">
-                    Read full article →
-                  </Link>
-                  <span className="flex items-center gap-1 font-mono">👍 {a._count.reactions}</span>
-                  <span className="flex items-center gap-1 font-mono">💬 {a._count.comments}</span>
+                <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center gap-4">
+                    <Link href={`/news/${a.id}`} className="text-sky-400 hover:text-sky-300 font-bold transition-colors">
+                      Read full article →
+                    </Link>
+                    {isLeague && (
+                      <Link href="/league/weekly?period=month" className="text-amber-400/90 hover:text-amber-300 font-bold transition-colors">
+                        Monthly Report 📊
+                      </Link>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1 font-mono">👍 {a._count.reactions}</span>
+                    <span className="flex items-center gap-1 font-mono">💬 {a._count.comments}</span>
+                  </div>
                 </div>
               </article>
             );

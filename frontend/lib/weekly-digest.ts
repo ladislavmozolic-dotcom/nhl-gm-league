@@ -192,8 +192,11 @@ export async function weeklyDigest(round?: number, span: number = WEEK): Promise
   return { weekNo, roundFrom: from, roundTo: to, games: games.length, span, teamOfWeek, topScorer, bestGoalie, stars, gmOfPeriod, surprise, tradeOfWeek: tr?.message ?? null, worstTeam, powerRankings, trades, injuries };
 }
 
-/** Auto-post the weekly recap to human GMs' Messages + a public news line, once per
- *  completed 7-round week. Called from the day-advance. Guarded by LeagueConfig. */
+export const MONTH = 28;
+
+/** Auto-post the weekly recap to human GMs' Messages + commissioner banner, once per
+ *  completed 7-round week. Called from the day-advance. Guarded by LeagueConfig.
+ *  Note: weekly recaps appear in the commissioner banner, not as duplicate news articles. */
 export async function postWeeklyIfDue(currentRound: number): Promise<boolean> {
   if (currentRound < WEEK) return false;
   const weekNo = Math.floor(currentRound / WEEK);
@@ -213,43 +216,82 @@ export async function postWeeklyIfDue(currentRound: number): Promise<boolean> {
   await prisma.commissionerAnnouncement.updateMany({ where: { active: true, body: { startsWith: "📰 Week " } }, data: { active: false } }).catch(() => {});
   await prisma.commissionerAnnouncement.create({ data: { body, linkUrl: "/league/weekly", linkLabel: "Read the full newsletter", active: true } }).catch(() => {});
   await prisma.transaction.create({ data: { type: "NEWS", message: `${body} Full newsletter → /league/weekly` } }).catch(() => {});
-  await publishWeeklyArticle(d).catch((e) => console.error("[weekly] article failed", e));
+  // clean up any legacy weekly articles so they don't duplicate the commissioner banner
+  await prisma.newsArticle.deleteMany({ where: { title: { startsWith: "📰 UNHL Recap — Week " } } }).catch(() => {});
   await postToDiscord(d).catch((e) => console.error("[weekly] discord failed", e));
   await prisma.leagueConfig.update({ where: { id: 1 }, data: { lastWeeklyWeek: weekNo } }).catch(() => {});
+  return true;
+}
+
+/** Auto-post the monthly league report as an official News article once per
+ *  completed 28-round month. Called from the day-advance. */
+export async function postMonthlyIfDue(currentRound: number): Promise<boolean> {
+  if (currentRound < MONTH) return false;
+  const monthNo = Math.floor(currentRound / MONTH);
+  const title = `📰 UNHL Monthly Report — Month ${monthNo}`;
+  if (await prisma.newsArticle.findFirst({ where: { title }, select: { id: true } })) return false; // already posted
+
+  const d = await weeklyDigest(monthNo * MONTH - 1, MONTH);
+  if (!d || d.games === 0) return false;
+
+  await publishMonthlyArticle(d, monthNo).catch((e) => console.error("[monthly] article failed", e));
   return true;
 }
 
 const esc = (v: string | number) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const arrow = (m: number | null) => (m == null || m === 0 ? "" : m > 0 ? ` ▲${m}` : ` ▼${-m}`);
 
-/** The "UNHL Recap" News article — authored by the commissioner's club so it
- *  sits in the normal News feed (home page + /news) with reactions/comments. */
-async function publishWeeklyArticle(d: NonNullable<WeeklyDigest>): Promise<void> {
+/** The official "UNHL Monthly Report" News article — authored as the League Office,
+ *  featuring a structured highlight perex before <hr class="article-cut">,
+ *  followed by the full monthly Power Rankings, Three Stars, and team breakdowns. */
+async function publishMonthlyArticle(d: NonNullable<WeeklyDigest>, monthNo: number): Promise<void> {
   const author = await prisma.team.findFirst({ where: { isAdmin: true }, orderBy: { id: "asc" }, select: { id: true } });
   if (!author) return;
-  const title = `📰 UNHL Recap — Week ${d.weekNo}`;
+  const title = `📰 UNHL Monthly Report — Month ${monthNo}`;
   if (await prisma.newsArticle.findFirst({ where: { title }, select: { id: true } })) return; // idempotent
 
   const pl = (name: string, slug: string | null) => (slug ? `<a href="/players/${esc(slug)}">${esc(name)}</a>` : esc(name));
   const tl = (name: string, slug: string | null) => (slug ? `<a href="/teams/${esc(slug)}">${esc(name)}</a>` : esc(name));
   const parts: string[] = [];
-  parts.push(`<p><i>${d.games} games · rounds ${d.roundFrom + 1}–${d.roundTo + 1}</i></p>`);
-  parts.push(`<h2>📊 Power Rankings</h2><ol>${d.powerRankings.slice(0, 10).map((r) => `<li><b>${tl(r.name, r.slug)}</b>${arrow(r.move)} — week ${esc(r.weekRec)}, season ${esc(r.seasonRec)}</li>`).join("")}</ol>`);
-  parts.push(`<p><i>Score = 60 % season points-% + 40 % this week's points-%. Full table on the <a href="/league/weekly?tab=power">Weekly Report</a>.</i></p>`);
-  if (d.teamOfWeek) parts.push(`<h2>🏆 Team of the Week</h2><p><b>${tl(d.teamOfWeek.name, d.teamOfWeek.slug)}</b> went ${d.teamOfWeek.w}-${d.teamOfWeek.l}-${d.teamOfWeek.otl} (${d.teamOfWeek.gf}-${d.teamOfWeek.ga} in goals).</p>`);
-  if (d.worstTeam) parts.push(`<h2>📉 Rough Week</h2><p><b>${tl(d.worstTeam.name, d.worstTeam.slug)}</b> — ${d.worstTeam.w}-${d.worstTeam.l}-${d.worstTeam.otl}, ${d.worstTeam.gf}-${d.worstTeam.ga} in goals.</p>`);
-  if (d.stars.length) parts.push(`<h2>⭐ Three Stars</h2><ol>${d.stars.map((x) => `<li>${pl(x.name, x.slug)} (${esc(x.team ?? "—")}) — ${esc(x.line)}</li>`).join("")}</ol>`);
-  if (d.bestGoalie) parts.push(`<h2>🧤 Goalie of the Week</h2><p>${pl(d.bestGoalie.name, d.bestGoalie.slug)} (${esc(d.bestGoalie.team ?? "—")}) — ${esc(d.bestGoalie.svPct.toFixed(3).replace(/^0/, ""))} SV%, ${esc(d.bestGoalie.record)}.</p>`);
-  if (d.surprise) parts.push(`<h2>😮 Surprise</h2><p>${tl(d.surprise.name, d.surprise.slug)} went ${d.surprise.w}-${d.surprise.l}-${d.surprise.otl} despite sitting ${d.surprise.overallRank}th overall.</p>`);
-  parts.push(`<h2>🔁 Trades</h2>${d.trades.length ? `<ul>${d.trades.map((t) => `<li>${esc(t.message)}</li>`).join("")}</ul>` : "<p>No trades this week.</p>"}`);
-  parts.push(`<h2>🏥 Injuries</h2>${d.injuries.length ? `<ul>${d.injuries.slice(0, 12).map((i) => `<li>${pl(i.name, i.slug)} (${esc(i.team ?? "—")}) — ${esc(i.part)}, ${esc(i.severity)}${i.days ? `, ~${i.days} days` : ""}</li>`).join("")}</ul>${d.injuries.length > 12 ? `<p>+ ${d.injuries.length - 12} more on the <a href="/players/injuries">Injury Report</a>.</p>` : ""}` : "<p>A clean bill of health — no new injuries.</p>"}`);
+
+  // 1. Structured Perex (previewed on homepage without clutter)
+  parts.push(`<p><b>Oficiálny ligový mesačný sumár za ${monthNo}. mesiac.</b> Počas uplynulých 28 kôl sa odohralo celkovo ${d.games} zápasov (kolá ${d.roundFrom + 1}–${d.roundTo + 1}).</p>`);
+
+  const highlights: string[] = [];
+  if (d.teamOfWeek) highlights.push(`<li>🏆 <b>Tím mesiaca:</b> ${tl(d.teamOfWeek.name, d.teamOfWeek.slug)} — bilancia ${d.teamOfWeek.w}-${d.teamOfWeek.l}-${d.teamOfWeek.otl} (${d.teamOfWeek.gf}:${d.teamOfWeek.ga})</li>`);
+  if (d.stars.length) highlights.push(`<li>⭐ <b>1. hviezda mesiaca:</b> ${pl(d.stars[0].name, d.stars[0].slug)} (${esc(d.stars[0].team ?? "—")}) — ${esc(d.stars[0].line)}</li>`);
+  if (d.bestGoalie) highlights.push(`<li>🧤 <b>Brankár mesiaca:</b> ${pl(d.bestGoalie.name, d.bestGoalie.slug)} (${esc(d.bestGoalie.team ?? "—")}) — ${esc(d.bestGoalie.svPct.toFixed(3).replace(/^0/, ""))} SV%, bilancia ${esc(d.bestGoalie.record)}</li>`);
+  if (d.surprise) highlights.push(`<li>😮 <b>Prekvapenie mesiaca:</b> ${tl(d.surprise.name, d.surprise.slug)} — bilancia ${d.surprise.w}-${d.surprise.l}-${d.surprise.otl}</li>`);
+  if (d.worstTeam) highlights.push(`<li>📉 <b>Náročný mesiac:</b> ${tl(d.worstTeam.name, d.worstTeam.slug)} — bilancia ${d.worstTeam.w}-${d.worstTeam.l}-${d.worstTeam.otl}</li>`);
+
+  if (highlights.length) {
+    parts.push(`<ul>${highlights.join("")}</ul>`);
+  }
+  parts.push(`<p><a href="/league/weekly?period=month">📊 Otvoriť interaktívny Monthly Report s kompletnými tabuľkami a štatistikami →</a></p>`);
+
+  // CUT DIVIDER: Homepage shows only the perex above!
+  parts.push(`<hr class="article-cut" />`);
+
+  // 2. Full Article Body
+  parts.push(`<h2>📊 Mesačné Power Rankings</h2><ol>${d.powerRankings.slice(0, 10).map((r) => `<li><b>${tl(r.name, r.slug)}</b>${arrow(r.move)} — mesiac ${esc(r.weekRec)}, sezóna ${esc(r.seasonRec)}</li>`).join("")}</ol>`);
+  parts.push(`<p><i>Váha Power Rankings: 60 % sezónne body + 40 % body za tento mesiac. Celú tabuľku nájdete na <a href="/league/weekly?period=month&tab=power">Weekly & Monthly Report</a>.</i></p>`);
+
+  if (d.teamOfWeek) parts.push(`<h2>🏆 Tím mesiaca</h2><p><b>${tl(d.teamOfWeek.name, d.teamOfWeek.slug)}</b> zaznamenal skvelú bilanciu ${d.teamOfWeek.w}-${d.teamOfWeek.l}-${d.teamOfWeek.otl} (${d.teamOfWeek.gf}:${d.teamOfWeek.ga} v skóre).</p>`);
+  if (d.stars.length) parts.push(`<h2>⭐ Tri hviezdy mesiaca</h2><ol>${d.stars.map((x) => `<li>${pl(x.name, x.slug)} (${esc(x.team ?? "—")}) — ${esc(x.line)}</li>`).join("")}</ol>`);
+  if (d.bestGoalie) parts.push(`<h2>🧤 Brankár mesiaca</h2><p>${pl(d.bestGoalie.name, d.bestGoalie.slug)} (${esc(d.bestGoalie.team ?? "—")}) — ${esc(d.bestGoalie.svPct.toFixed(3).replace(/^0/, ""))} SV%, ${esc(d.bestGoalie.record)}.</p>`);
+  if (d.surprise) parts.push(`<h2>😮 Prekvapenie mesiaca</h2><p>${tl(d.surprise.name, d.surprise.slug)} dosiahol bilanciu ${d.surprise.w}-${d.surprise.l}-${d.surprise.otl} napriek priebežnému ${d.surprise.overallRank}. miestu v celkovej tabuľke.</p>`);
+  if (d.worstTeam) parts.push(`<h2>📉 Náročný mesiac</h2><p><b>${tl(d.worstTeam.name, d.worstTeam.slug)}</b> — ${d.worstTeam.w}-${d.worstTeam.l}-${d.worstTeam.otl}, ${d.worstTeam.gf}:${d.worstTeam.ga} skóre.</p>`);
+
+  parts.push(`<h2>🔁 Výmeny hráčov za mesiac</h2>${d.trades.length ? `<ul>${d.trades.map((t) => `<li>${esc(t.message)}</li>`).join("")}</ul>` : "<p>V sledovanom období neprebehli žiadne trejdy.</p>"}`);
+  parts.push(`<h2>🏥 Maródka ligy</h2>${d.injuries.length ? `<ul>${d.injuries.slice(0, 15).map((i) => `<li>${pl(i.name, i.slug)} (${esc(i.team ?? "—")}) — ${esc(i.part)}, ${esc(i.severity)}${i.days ? `, ~${i.days} dní` : ""}</li>`).join("")}</ul>${d.injuries.length > 15 ? `<p>+ ďalších ${d.injuries.length - 15} zranených na <a href="/players/injuries">Zozname zranení</a>.</p>` : ""}` : "<p>Bez nových vážnejších zranení.</p>"}`);
+
   await prisma.newsArticle.create({ data: { authorTeamId: author.id, title, bodyHtml: parts.join("") } });
 }
 
 /** Optional: mirror a short recap into a Discord channel. Off unless the server's
  *  .env sets DISCORD_WEBHOOK_URL (kept out of the DB on purpose — it's a secret). */
 async function postToDiscord(d: NonNullable<WeeklyDigest>): Promise<void> {
-  const url = process.env.DISCORD_WEBHOOK_URL;
+  const url = process.env.SANDBOX === "1" ? undefined : process.env.DISCORD_WEBHOOK_URL; // test mode never posts
   if (!url) return;
   const lines = [
     `**📰 UNHL Recap — Week ${d.weekNo}**`,
@@ -262,3 +304,4 @@ async function postToDiscord(d: NonNullable<WeeklyDigest>): Promise<void> {
   ].filter(Boolean).join("\n");
   await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: lines.slice(0, 1900) }) });
 }
+

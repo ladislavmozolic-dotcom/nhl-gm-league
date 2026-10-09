@@ -38,6 +38,15 @@ export async function updateArticle(id: number, title: string, bodyHtml: string)
   redirect(`/news/${id}`);
 }
 
+export async function deleteArticle(id: number) {
+  const article = await prisma.newsArticle.findUnique({ where: { id }, select: { authorTeamId: true } });
+  if (!article) throw new Error("Article not found.");
+  if (!(await canManageTeam(article.authorTeamId))) throw new Error("You can only delete your own club's articles.");
+  await prisma.newsArticle.delete({ where: { id } });
+  revalidatePath("/"); revalidatePath("/news");
+  redirect("/");
+}
+
 const KINDS = ["like", "dislike", "laugh", "heart"] as const;
 
 export async function reactToArticle(articleId: number, kind: string) {

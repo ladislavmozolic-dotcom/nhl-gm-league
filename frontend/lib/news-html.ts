@@ -58,3 +58,21 @@ export function articlePlainText(html: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/** Check if an article is an official league-generated report or announcement */
+export function isLeagueArticle(article?: { title?: string | null } | null): boolean {
+  if (!article?.title) return false;
+  const t = article.title;
+  return (
+    t.includes("Monthly Report") ||
+    t.includes("Mesačný report") ||
+    t.includes("Recap —") ||
+    t.includes("Trade Deadline — Summary") ||
+    t.includes("All-Star") ||
+    t.startsWith("⭐") ||
+    t.startsWith("🔁 Trade Deadline") ||
+    t.startsWith("📰 UNHL") ||
+    t.startsWith("📰 ProfiNHL")
+  );
+}
+

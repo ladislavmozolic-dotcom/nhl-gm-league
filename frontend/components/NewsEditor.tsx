@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { createArticle, updateArticle } from "@/app/news/actions";
+import { createArticle, updateArticle, deleteArticle } from "@/app/news/actions";
 
 function EditorButton({ onClick, children, title }: { onClick: () => void; children: React.ReactNode; title: string }) {
   return (
@@ -83,12 +83,33 @@ export default function NewsEditor({ initial }: { initial?: { id: number; title:
         className="news-body min-h-[280px] bg-slate-900 border border-t-0 border-slate-700 rounded-b-lg px-4 py-3 focus:outline-none prose-invert"
         style={{ maxWidth: "100%" }} />
 
-      <div className="flex items-center gap-3 mt-4">
-        <button onClick={submit} disabled={pending}
-          className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-50">
-          {pending ? (initial ? "Saving…" : "Publishing…") : (initial ? "Save changes" : "Publish")}
-        </button>
-        {err && <span className="text-red-400 text-sm">{err}</span>}
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+        <div className="flex items-center gap-3">
+          <button onClick={submit} disabled={pending}
+            className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold text-sm disabled:opacity-50">
+            {pending ? (initial ? "Saving…" : "Publishing…") : (initial ? "Save changes" : "Publish")}
+          </button>
+          {initial && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirm("Are you sure you want to delete this article?")) return;
+                start(async () => {
+                  try {
+                    await deleteArticle(initial.id);
+                  } catch (e: unknown) {
+                    setErr(e instanceof Error ? e.message : "Failed to delete");
+                  }
+                });
+              }}
+              disabled={pending}
+              className="px-4 py-2 rounded-lg bg-rose-600/80 hover:bg-rose-500 text-white font-semibold text-sm disabled:opacity-50"
+            >
+              Delete article
+            </button>
+          )}
+          {err && <span className="text-red-400 text-sm">{err}</span>}
+        </div>
         <span className="text-xs text-slate-500">Images are embedded in the article. Keep them reasonably small.</span>
       </div>
     </div>

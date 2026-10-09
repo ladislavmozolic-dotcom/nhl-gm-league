@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getTeamSession, canManageTeam } from "@/lib/auth";
 import { ReactionBar, CommentBox } from "@/components/NewsReactions";
 import { BackPill } from "@/components/ui";
-import { sanitizeArticleHtml } from "@/lib/news-html";
+import { sanitizeArticleHtml, isLeagueArticle } from "@/lib/news-html";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   if (!article) notFound();
   const safeBodyHtml = sanitizeArticleHtml(article.bodyHtml);
   const canEdit = await canManageTeam(article.authorTeamId);
+  const isLeague = isLeagueArticle(article);
 
   const teamIds = [article.authorTeamId, ...article.comments.map((c) => c.teamId), ...article.reactions.map((r) => r.teamId)];
   const teams = await prisma.team.findMany({
@@ -45,14 +46,29 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
       <BackPill href="/">Home</BackPill>
       <article className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-lg shadow-black/20 p-6 mt-3">
         <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            {author?.logoUrl ? <img src={author.logoUrl} alt="" className="w-10 h-10 object-contain" />
-              : <div className="w-10 h-10 rounded-full bg-slate-700 grid place-items-center font-bold">{author?.name?.[0] ?? "?"}</div>}
-            <div>
-              <p className="text-sm font-bold">{gmName(author)}</p>
-              <p className="text-xs text-slate-500">{author?.name} · {article.createdAt.toLocaleString("en-GB")}</p>
+          {isLeague ? (
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 via-sky-500/20 to-blue-600/30 border border-sky-400/40 grid place-items-center text-xl shrink-0 shadow-inner shadow-sky-500/20">
+                🏆
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-sky-200">UNHL Commissioner</p>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30">Official</span>
+                </div>
+                <p className="text-xs text-slate-400">League Office · {article.createdAt.toLocaleString("en-GB")}</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              {author?.logoUrl ? <img src={author.logoUrl} alt="" className="w-10 h-10 object-contain" />
+                : <div className="w-10 h-10 rounded-full bg-slate-700 grid place-items-center font-bold">{author?.name?.[0] ?? "?"}</div>}
+              <div>
+                <p className="text-sm font-bold">{gmName(author)}</p>
+                <p className="text-xs text-slate-500">{author?.name} · {article.createdAt.toLocaleString("en-GB")}</p>
+              </div>
+            </div>
+          )}
           {canEdit && <Link href={`/news/${article.id}/edit`} className="text-xs text-blue-400 hover:text-blue-300 shrink-0">Edit →</Link>}
         </div>
         <h1 className="text-2xl font-bold mb-4">{article.title}</h1>
