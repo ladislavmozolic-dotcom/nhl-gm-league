@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { isAdmin } from "@/lib/auth";
+import { liveMatchesActive } from "@/lib/live-server";
 import DaySimControls from "@/components/DaySimControls";
 import { PRE_SEASON } from "@/lib/phase";
 import { getLang } from "@/lib/lang-server";
@@ -141,7 +142,7 @@ export default async function SchedulePage({
 
       {admin && (
         <div className="sticky top-14 z-30 -mx-4 px-4 py-2 bg-[#0a1628]/95 backdrop-blur-md border-b border-slate-800/50 shadow-md">
-          <DaySimControls />
+          <DaySimControls liveEnabled={await liveMatchesActive()} />
         </div>
       )}
 

@@ -25,7 +25,7 @@ import { addDays } from "./calendar";
 import { sweepExpiredContractsToUfa } from "./free-agency-server";
 import { loadCommissionerIntel } from "./gm-assistant/commissionerIntel";
 import { sendAdminAlert } from "./email";
-import { liveMatchesActive } from "./live-server";
+import { liveMatchesActive, tryStartLiveTask } from "./live-server";
 
 const TZ = "Europe/Bratislava";
 const TRIGGER_HOUR = 20;
@@ -88,20 +88,10 @@ export async function simulateDayIfDue(now: Date = new Date()): Promise<AutoAdva
 /** Plays league day `day` live in the background (see simulateDayIfDue). One at a time per process;
  *  returns false if a live day is already running. `lastSimulatedDay` is set only when it truly finishes. */
 function startLiveDay(day: Date): boolean {
-  const g = globalThis as unknown as { __liveDayRunning?: boolean };
-  if (g.__liveDayRunning) return false;
-  g.__liveDayRunning = true;
-  void (async () => {
-    try {
-      await simulateLeagueDay(day, { live: true });
-      await prisma.leagueConfig.update({ where: { id: 1 }, data: { lastSimulatedDay: day } });
-    } catch (err) {
-      console.error("[live] tonight's round failed", err);
-    } finally {
-      g.__liveDayRunning = false;
-    }
-  })();
-  return true;
+  return tryStartLiveTask("tonight's round", async () => {
+    await simulateLeagueDay(day, { live: true });
+    await prisma.leagueConfig.update({ where: { id: 1 }, data: { lastSimulatedDay: day } });
+  });
 }
 
 /** Called once when the server boots: if a live round was cut short by a restart (still RUNNING in the DB,

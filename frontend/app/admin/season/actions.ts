@@ -22,6 +22,7 @@ import { autoImportUpcomingClass } from "@/lib/draft-class-import";
 import { computeContractExpiry } from "@/lib/finance";
 
 import { advanceLeagueDayCore } from "@/lib/season-day";
+import { liveMatchesActive, liveRunGames, tryStartLiveTask } from "@/lib/live-server";
 
 const SEASON = "2026-27";
 
@@ -128,6 +129,30 @@ export async function simNextDayAction() {
   ])
     revalidatePath(p);
   return { played: r.played, round: next.round, date: next.gameDate, done: false, signed: inSeasonFa.signed };
+}
+
+/** Admin: play the NEXT scheduled day LIVE right now — a rehearsal that doesn't wait for the 20:30 window (V3 + live switch on).
+ *  Same steps as "Sim Next Day", but the games are watched and coached over the next minutes; results land when the last one ends. */
+export async function startLiveNextDayAction(): Promise<{ ok: true; round: number; startsInSec: number } | { ok: false; error: string }> {
+  if (!(await isAdmin())) return { ok: false, error: "Only a league admin can run the simulation." };
+  if (!(await liveMatchesActive())) return { ok: false, error: "Live matches are off — turn them on in Admin → Simulation (V3 engine only)." };
+  const next = await prisma.game.findFirst({
+    where: { season: SEASON, status: "SCHEDULED", seriesId: null },
+    orderBy: [{ round: "asc" }, { gameDate: "asc" }, { id: "asc" }],
+    select: { round: true },
+  });
+  if (next?.round == null) return { ok: false, error: "Season complete — no scheduled games left to play." };
+  const round = next.round, actor = await commissionerName();
+  const started = tryStartLiveTask("practice round", async () => {
+    await aiGmDaily();
+    await autoFillRosters("NHL");
+    await fillAhlFromScratched();
+    await playScheduledGames({ season: SEASON, round, actor, runGames: await liveRunGames(SEASON, round) });
+    await processFinances(SEASON, "NHL");
+    await resolveInSeasonWindows(await getLeagueDate());
+  });
+  if (!started) return { ok: false, error: "A live round is already running." };
+  return { ok: true, round, startsInSec: 15 };
 }
 
 const DRAFT_ROUNDS = [1, 2, 3, 4, 5, 6, 7];

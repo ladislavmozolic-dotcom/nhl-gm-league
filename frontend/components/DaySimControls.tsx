@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { simNextDayAction, simNextDaysAction, restDayAction } from "@/app/admin/season/actions";
+import Link from "next/link";
+import { simNextDayAction, simNextDaysAction, restDayAction, startLiveNextDayAction } from "@/app/admin/season/actions";
 
 const DAY_OPTIONS = [1, 3, 5, 7, 10, 14, 21, 30];
 
-export default function DaySimControls() {
+export default function DaySimControls({ liveEnabled = false }: { liveEnabled?: boolean }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [tone, setTone] = useState<"ok" | "err" | "info">("info");
@@ -27,6 +28,15 @@ export default function DaySimControls() {
         setTone("ok");
         setMsg(`Simulated ${r.days} day${r.days === 1 ? "" : "s"} through ${fmt(r.date, r.round)} — ${r.played} game${r.played === 1 ? "" : "s"} played${tail}.`);
       }
+    } catch (e) { setTone("err"); setMsg((e as Error).message); }
+  });
+
+  const liveDay = () => start(async () => {
+    setMsg(null);
+    try {
+      const r = await startLiveNextDayAction();
+      if (!r.ok) { setTone("err"); setMsg(r.error); return; }
+      setTone("ok"); setMsg(`Live practice round started (day ${r.round}) — the puck drops in ~${r.startsInSec}s. Tell the GMs to open Live; results are saved when the last game ends.`);
     } catch (e) { setTone("err"); setMsg((e as Error).message); }
   });
 
@@ -53,6 +63,15 @@ export default function DaySimControls() {
           className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-sm font-semibold">
           {pending ? "Working…" : days <= 1 ? "▶ Sim Next Day" : `▶ Sim ${days} Days`}
         </button>
+        {liveEnabled && (
+          <>
+            <button onClick={liveDay} disabled={pending}
+              className="px-4 py-2 rounded-lg bg-red-600/90 hover:bg-red-500 disabled:opacity-50 text-sm font-semibold" title="Play the next day live right now — a rehearsal that doesn't wait for 20:30">
+              🔴 Live practice round
+            </button>
+            <Link href="/live" className="text-xs text-red-300 hover:text-red-200 underline">open Live →</Link>
+          </>
+        )}
         <button onClick={restDay} disabled={pending}
           className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-sm font-semibold" title="Recover CON + heal injuries a day, no games">
           😴 Rest Day

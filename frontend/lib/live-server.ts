@@ -44,6 +44,20 @@ async function resumableRound(season: string, round: number) {
   return prisma.liveRound.findFirst({ where: { season, round, status: "RUNNING" }, orderBy: { createdAt: "desc" } });
 }
 
+/** One live day at a time per server process (cron evening, boot resume, or an admin practice round). Runs `task`
+ *  in the background; returns false when another live day is already in progress. */
+export function tryStartLiveTask(label: string, task: () => Promise<void>): boolean {
+  const g = globalThis as unknown as { __liveDayRunning?: boolean };
+  if (g.__liveDayRunning) return false;
+  g.__liveDayRunning = true;
+  void (async () => {
+    try { await task(); }
+    catch (err) { console.error(`[live] ${label} failed`, err); }
+    finally { g.__liveDayRunning = false; }
+  })();
+  return true;
+}
+
 /**
  * The `runGames` hook for playScheduledGames. Normally starts a fresh live round (saved as it goes);
  * if this day's round was cut short by a restart it instead RESUMES it: the stored teams are
