@@ -405,3 +405,29 @@ share 29.5–29.9%, top scorer 132 / 123 / 131, blowouts 14.4 / 13.6 / 11.9% (se
 slightly high — seed-specific, 30-seed mean ~13.5%). **Not yet shown:** that a physical
 forward line really scores more on rebounds/screens than a light one; effect is likely small
 (these two shot types are a minor share of shots).
+
+### Full V3 (17 flags) vs V2 — 30 seed bases — 2026-10-09
+
+Same protocol (seed bases 2,000,000 + i·100,000, 992 games each), mean ± se:
+
+| Metric | V2 | V3 (all 17) |
+| --- | ---: | ---: |
+| Quality → points (Spearman) | 0.793 ± 0.008 | 0.811 ± 0.007 |
+| Top scorer (pts/82) | 133.6 ± 1.6 | 130.9 ± 1.6 |
+| Top-8 vs bottom-8 gap | 37.4 ± 0.7 | 38.1 ± 0.7 |
+| Goals / team / game | 2.985 ± 0.008 | 3.018 ± 0.008 |
+| Save % | .911 | .910 |
+| Blowouts % | 13.08 ± 0.19 | 13.72 ± 0.20 |
+| Home win % | 53.2 ± 0.3 | 53.6 ± 0.3 |
+| PIM / team / game | 19.8 ± 0.07 | 11.4 ± 0.05 |
+| Power play % | 21.06 ± 0.09 | 21.26 ± 0.12 |
+| PP opportunities / team / game | 2.988 ± 0.008 | 2.973 ± 0.007 |
+| OT / SO % | 20.5 ± 0.2 | 19.9 ± 0.2 |
+
+Notes: quality → points is now +0.018 above V2 (~1.7 se — the PP-puck-movement, speed and
+net-front increments tie results to team ratings, a mild improvement toward the 0.85 target);
+top scorer is now ~131 (~ceiling 130); goals +0.03; blowouts +0.6 pt (~2.1 se, still under the
+14% ceiling at 13.7%, worth watching); OT/SO 19.9% (V2 20.5%) sits right at the bottom of the
+20–26% target, a shared V2/V3 item. PP% and PP volume hold. Package remains calibration-safe;
+no single metric left its target band on the 30-seed mean except PIM (improved) and OT/SO
+(marginal, shared).
