@@ -6,7 +6,7 @@ import { loadSimTeam } from "../lib/sim/index";
 import { ENGINE_V2, ENGINE_V3 } from "../lib/sim/version";
 import { prisma } from "../lib/prisma";
 
-const OFF = { fatigueDeployment: false, coachAdaptation: false, checkingMatchup: false, qualityDAssists: false, faceoffPressure: false, reboundClearance: false, momentumTimeout: false, assistSpread: false, emotionalDiscipline: false, finishingCurve: false, goalieRhythm: false, blockSkill: false, goalieComposure: false, overtimeStars: false, ppPuckMovement: false, speedDrawsPenalties: false, netFront: false };
+const OFF = { fatigueDeployment: false, coachAdaptation: false, checkingMatchup: false, qualityDAssists: false, faceoffPressure: false, reboundClearance: false, momentumTimeout: false, assistSpread: false, emotionalDiscipline: false, finishingCurve: false, goalieRhythm: false, blockSkill: false, goalieComposure: false, overtimeStars: false, ppPuckMovement: false, speedDrawsPenalties: false, netFront: false, shootoutDuel: false };
 
 async function main() {
   const seedBase = Number(process.argv[2] ?? 290000);

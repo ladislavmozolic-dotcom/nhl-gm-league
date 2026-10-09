@@ -431,3 +431,20 @@ top scorer is now ~131 (~ceiling 130); goals +0.03; blowouts +0.6 pt (~2.1 se, s
 20–26% target, a shared V2/V3 item. PP% and PP volume hold. Package remains calibration-safe;
 no single metric left its target band on the 30-seed mean except PIM (improved) and OT/SO
 (marginal, shared).
+
+### Shootout duel — eighteenth increment, offline — 2026-10-09
+
+The shootout ignored the goalie's own PS (penalty-shot) rating. Flag `shootoutDuel`: attempt
+probability is scaled by `v3ShootoutDuelMult(shooter PS, goalie PS)` — ±0.8% per point, capped
+±15%. `frontend/scripts/so-duel.ts` (14 seed bases, ~11,300 attempts each) set the centre:
+−8 (top-3 shooters vs goalies) cost ~2.2 pts of conversion because many more shooters than
+the top three take attempts; `V3_SHOOTOUT_CENTER = -20` restores it.
+
+| | without flag | with flag |
+| --- | ---: | ---: |
+| SO conversion % | 33.14 | 33.00 |
+| corr(goalie PS, goals allowed %) | −0.455 | −0.615 |
+
+Gates: identity with all 18 flags off — identical on 400 games; 15/15 tests. Regulation
+metrics (3 seeds) unchanged: goals 2.98 / 3.05 / 3.06, shots 31.3–31.5, home win 53.6%,
+blowouts 14.4 / 13.6 / 11.9%, OT/SO 17.7 / 18.4 / 22.3% (seed noise; 30-seed mean 19.9%).

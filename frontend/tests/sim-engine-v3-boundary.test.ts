@@ -9,7 +9,7 @@ import {
   isNextGenEngine,
   resolveSimEngine,
 } from "../lib/sim/version";
-import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, V3_OT_STAR_EXPONENT, V3_NETFRONT_CENTER, v3NetFrontMult, v3SpeedDrawsPenaltiesMult, V3_PP_CENTER, v3PpPuckMovementMult, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
+import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, V3_OT_STAR_EXPONENT, V3_SHOOTOUT_CENTER, v3ShootoutDuelMult, V3_NETFRONT_CENTER, v3NetFrontMult, v3SpeedDrawsPenaltiesMult, V3_PP_CENTER, v3PpPuckMovementMult, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
 import type { SimSkater } from "../lib/sim/types";
 
 test("V3 is a next-gen workbench version, not a league-selectable engine", () => {
@@ -137,4 +137,11 @@ test("V3 net-front is centred, directional and capped", () => {
   assert.equal(v3NetFrontMult([mk(100)], [mk(0)]), 1.08);
   assert.equal(v3NetFrontMult([mk(0)], [mk(100)]), 0.92);
   assert.equal(v3NetFrontMult([], [mk(80)]), 1);
+});
+
+test("V3 shootout duel is centred, directional and capped", () => {
+  assert.ok(Math.abs(v3ShootoutDuelMult(88 + V3_SHOOTOUT_CENTER, 88) - 1) < 1e-9);
+  assert.ok(v3ShootoutDuelMult(95, 85) > v3ShootoutDuelMult(75, 85));
+  assert.equal(v3ShootoutDuelMult(100, 0), 1.15);
+  assert.equal(v3ShootoutDuelMult(0, 100), 0.85);
 });
