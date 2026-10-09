@@ -1368,11 +1368,11 @@ export function v3CoachAdaptation(
   const shell = (0.035 + 0.065 * urgency) * (1.25 - attackLean * 0.5);
   return { shots: 1 - shell * 0.35, allow: 1 - shell };
 }
-// V3: goalie rhythm — after 4+ idle minutes the next shot is ~6% likelier to beat him,
-// ramping in from 4:00 and capped at 8:00 of idleness. Affects only that one shot.
+// V3: goalie rhythm — after 2+ idle minutes the next shot is up to ~12% likelier to beat him,
+// ramping in from 2:00 and capped at 5:00 of idleness. Affects only that one shot.
 export function v3GoalieRhythmMult(idleSeconds: number): number {
-  if (idleSeconds <= 240) return 1;
-  return 1 + 0.06 * Math.min(1, (idleSeconds - 240) / 240);
+  if (idleSeconds <= 120) return 1;
+  return 1 + 0.12 * Math.min(1, (idleSeconds - 120) / 180);
 }
 // V3: a real checking trio affects the opposing top line's chance quality when
 // home-ice last change has actually produced that matchup. Existing player

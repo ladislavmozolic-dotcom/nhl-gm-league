@@ -240,3 +240,13 @@ all in range, and indistinguishable from the pre-increment run. Save % stays .91
 rare at ~31 shots/team), so it is safe but nearly inert; strengthen it (lower the
 idle threshold or raise the 6% cap) only if a visible effect is wanted. Spearman/top
 scorer need the 30-seed protocol before any claim either way.
+
+### Goalie rhythm — strengthened — 2026-10-09
+
+The first version (4:00 threshold, +6% cap) was below measurement noise. Now: idle > 2:00
+ramps to **+12% at 5:00** idle. Seeds 90,000 / 190,000 / 290,000: goals 3.00 / 3.02 / 3.05
+(was 2.97–2.98), save % 0.910 / 0.910 / 0.909 (was .911, the shared warning is gone on
+one seed and borderline on two), GSAx +0.27 / +0.26 / +0.24, shots unchanged
+(31.4–31.5), home win 55.4–55.9%, blowouts 11.7–12.4%, PIM 11.1–11.8. All in range;
+goals sit in the upper half of 2.9–3.15 so watch them when stacking further scoring-
+positive mechanics. Identity gate (all flags off) re-run: identical.

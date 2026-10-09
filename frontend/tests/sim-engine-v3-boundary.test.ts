@@ -86,8 +86,8 @@ test("V3 softly compresses only the finishing curve's elite end", () => {
 
 test("V3 goalie rhythm only chills a goalie after a long idle stretch and is capped", () => {
   assert.equal(v3GoalieRhythmMult(0), 1);
-  assert.equal(v3GoalieRhythmMult(240), 1);
-  assert.ok(v3GoalieRhythmMult(360) > 1 && v3GoalieRhythmMult(360) < 1.06);
-  assert.equal(v3GoalieRhythmMult(480), 1.06);
-  assert.equal(v3GoalieRhythmMult(3000), 1.06);
+  assert.equal(v3GoalieRhythmMult(120), 1);
+  assert.ok(v3GoalieRhythmMult(200) > 1 && v3GoalieRhythmMult(200) < 1.12);
+  assert.ok(Math.abs(v3GoalieRhythmMult(300) - 1.12) < 1e-9);
+  assert.ok(Math.abs(v3GoalieRhythmMult(3000) - 1.12) < 1e-9);
 });
