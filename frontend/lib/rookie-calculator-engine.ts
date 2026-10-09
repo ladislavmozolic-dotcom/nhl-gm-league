@@ -102,10 +102,13 @@ export function calculateRookieRatings(
   const nhlLastGp = Number(p.lastSeasonGP ?? 0);
   const nhlGp = nhlCurGp + nhlLastGp;
 
-  // Current season counts 80%, last season 20% (same rule as the Player Calculator).
-  // Rates are blended per game; if only one season has games, that one is used as-is.
-  const CUR_W = 0.8;
-  const LAST_W = 0.2;
+  // Current season counts 80%, last season 20% (same rule as the Player Calculator,
+  // which only activates at >=10 current GP). Below 10 current GP the 80% would sit on a
+  // tiny sample, so the seasons are weighted by their share of games instead (pure
+  // pooling). Rates are blended per game; if only one season has games, it is used as-is.
+  const ACTIVATE_AT_GP = 10;
+  const CUR_W = nhlCurGp >= ACTIVATE_AT_GP ? 0.8 : nhlGp > 0 ? nhlCurGp / nhlGp : 0;
+  const LAST_W = 1 - CUR_W;
   const blendRate = (cur: unknown, last: unknown): number => {
     const cr = nhlCurGp > 0 ? Number(cur ?? 0) / nhlCurGp : null;
     const lr = nhlLastGp > 0 ? Number(last ?? 0) / nhlLastGp : null;
