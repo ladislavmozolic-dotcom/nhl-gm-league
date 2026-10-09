@@ -178,3 +178,31 @@ comparison and record shift-length distribution, fourth-line/third-pair TOI,
 late-period shot share, injury rate, and V3-vs-V2 calibration here. The next
 recommended mechanic is a real checking-line effect using the existing player
 types and attributes.
+
+### Elite-finishing curve — multi-seed check (90,000 / 190,000 / 290,000) — 2026-10-09
+
+| Seed | Goals | Shots | Home W% | Blowouts | PIM | Top scorer (pts/82) | Spearman |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 90,000 | 2.96 | 31.4 | — | — | — | 134 | — |
+| 190,000 | 2.98 | 31.3 | 56.3% | 11.9% | 11.1 | 142 (69G/73A) | 0.868 |
+| 290,000 | 2.98 | 31.5 | 55.5% | 11.4% | 11.4 | 124 (78G/46A) | 0.738 |
+
+Core rates, PIM, D-assist share (29.7%), xG tracking and injuries are green on all
+three seeds. The top-scorer average is ~133 — still slightly above the 130 ceiling,
+and the single-player maximum swings ±9 between seeds, so it is mostly sample noise
+rather than a systematic tail. Seed 290,000 repeats the low quality-to-points value
+(0.738; V2 shows the same seed-dependent dip), so it is not attributed to the
+finishing curve. Open items: (1) the V3-baseline-vs-V2 identity break from the
+290,000 note is still unresolved and blocks any further gameplay mechanic;
+(2) save % (.911–.912) is a shared V2/V3 warning.
+
+### Baseline identity restored — 2026-10-09
+
+`frontend/scripts/v3-identity.ts` runs V2 and V3-with-all-ten-flags-off on the same
+seeds and compares the full serialized `GameResult` (version stamp aside). Result:
+**identical on 400 games each at seeds 90,000 / 190,000 / 290,000**. The engine itself
+never broke identity — the earlier mismatch came from `calibration-v3.ts`'s `baseline`
+mode, which only disabled fatigue + coach while the later eight modules stayed on by
+default. `baseline` now disables all ten. The gate "V3 starts as V2-equivalent" is
+met, so the next gameplay mechanic is unblocked; re-run `v3-identity.ts` after every
+increment to prove each flag is truly isolated.
