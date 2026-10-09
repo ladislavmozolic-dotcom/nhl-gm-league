@@ -1414,16 +1414,16 @@ export function v3ShootoutDuelMult(shooterPs: number, goaliePs: number): number 
 }
 // V3: net-front battle — on point shots (screens/tips) and rebounds the attacking forwards' ST
 // against the defending pair's ST decides who wins the crease. Centred on the typical F-D gap
-// (forwards run ~2 ST below D), +/-0.5% per point, capped +/-8%, so scoring volume holds.
+// (forwards run ~2 ST below D), +/-1.2% per point, capped +/-15%, so scoring volume holds.
 export const V3_NETFRONT_CENTER = -2;
 export function v3NetFrontMult(attackers: SimSkater[], defenders: SimSkater[]): number {
   if (!attackers.length || !defenders.length) return 1;
   const avg = (xs: SimSkater[]) => xs.reduce((n, s) => n + (s.attrs.st ?? 50), 0) / xs.length;
-  return Math.max(0.92, Math.min(1.08, 1 + 0.005 * (avg(attackers) - avg(defenders) - V3_NETFRONT_CENTER)));
+  return Math.max(0.85, Math.min(1.15, 1 + 0.012 * (avg(attackers) - avg(defenders) - V3_NETFRONT_CENTER)));
 }
-// V3: in 3-on-3 the open ice rewards a true finisher more: the finishing exponent is +0.15
-// there only. Anchored at the average finisher (60), so the league 3v3 scoring level holds.
-export const V3_OT_STAR_EXPONENT = 0.15;
+// V3: in 3-on-3 the open ice rewards a true finisher more: the finishing exponent is +0.3
+// there only (the separate OT model — the possession loop never plays OT). Anchored at the average finisher (60), so the league 3v3 scoring level holds.
+export const V3_OT_STAR_EXPONENT = 0.3;
 // V3: goalie composure — rattled (+6% goal chance) for 2:00 after allowing a goal, locked in
 // (-4%) after 12+ consecutive saves. The two states are mutually exclusive (a goal resets the streak).
 export function v3GoalieComposureMult(secondsSinceGoalAgainst: number, saveStreak: number): number {
@@ -1431,9 +1431,9 @@ export function v3GoalieComposureMult(secondsSinceGoalAgainst: number, saveStrea
   return saveStreak >= 12 ? 0.96 : 1;
 }
 // V3: the shot-block check also looks at the defender's blocking rating (DF-heavy, mean ~71
-// for D). Centred so the league-wide block rate is unchanged: +/-1.2% per point, capped +/-10%.
+// for D). Centred so the league-wide block rate is unchanged: +/-3% per point, capped +/-20%.
 export function v3BlockSkillMult(blocking: number): number {
-  return Math.max(0.9, Math.min(1.1, 1 + 0.012 * (blocking - 71)));
+  return Math.max(0.8, Math.min(1.2, 1 + 0.03 * (blocking - 71)));
 }
 // V3: goalie rhythm — after 2+ idle minutes the next shot is up to ~12% likelier to beat him,
 // ramping in from 2:00 and capped at 5:00 of idleness. Affects only that one shot.
@@ -1471,12 +1471,12 @@ function lateShellShotMult(period: number, secondsIntoPeriod: number, marginForT
   const intensity = 1 - Math.max(0, secLeft) / LATE_SHELL_WINDOW;
   return 1 - 0.12 * intensity; // up to 12% fewer shot attempts right at the horn
 }
-// V3: shooter form — for 10:00 after his own goal a skater's shots are x1.04 likelier to score;
-// once he has put 5+ shots on net since his last goal (or all game) they are x0.97. The two states
+// V3: shooter form — for 10:00 after his own goal a skater's shots are x1.08 likelier to score;
+// once he has put 5+ shots on net since his last goal (or all game) they are x0.95. The two states
 // are exclusive (a goal resets the drought counter), bounded and RNG-free.
 export function v3ShooterFormMult(secondsSinceOwnGoal: number, shotsSinceGoal: number): number {
-  if (secondsSinceOwnGoal >= 0 && secondsSinceOwnGoal <= 600) return 1.04;
-  return shotsSinceGoal >= 5 ? 0.97 : 1;
+  if (secondsSinceOwnGoal >= 0 && secondsSinceOwnGoal <= 600) return 1.08;
+  return shotsSinceGoal >= 5 ? 0.95 : 1;
 }
 // V3: garbage time — V2's shell stops at a 2-goal lead ("3+ is already comfortable"), so a
 // blowout keeps its full tempo. From the 2nd period a team up 3+ eases off (x0.94, x0.90 in the
@@ -2658,7 +2658,8 @@ function simulateOvertime(st: SimState, cfg: { period?: number; seconds?: number
       const xg = expectedGoal(rng, sector, shotType, "EV");
       const tracked = trackSpecialShot(st, att, def, shooter, per, t, sector, shotType, xg, true, "3V3");
       hasOtShot = true;
-      const finishExponent = st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7;
+      const finishExponent = (st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7)
+        + (st.v3OvertimeStars ? V3_OT_STAR_EXPONENT : 0); // the separate 3-on-3 OT model (the possession loop never plays OT)
       const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV", finishExponent) * 2.2 * (cfg.finishMult ?? 1);
       if (rng.chance(p)) {
         tracked.goalie!.goalsAgainst++;

@@ -504,3 +504,37 @@ increment — the +4% and −3% roughly cancel), shots 31.2–31.5, save % .911 
 scorer 130 / 124 / 126, top-5 share 2.9–3.1%, blowouts 14.2 / 14.0 / 12.3%. Not measured: the
 per-player streakiness distribution (a skater's multi-goal-game rate); that needs a dedicated
 multi-seed check before any claim beyond "league-neutral".
+
+### Flag-strength tuning — 2026-10-09
+
+`frontend/scripts/flag-effect.ts <flag> [seeds]` measures a flag's *target* effect (not league
+averages) with the flag on vs off, other 19 flags on, 10 seed bases (9,000,000 + i·100,000).
+First pass showed four weak flags:
+
+| Flag | Target metric | Off → On (before) |
+| --- | --- | --- |
+| blockSkill | corr(D blocking, blocks/game) | 0.518 → 0.532 |
+| netFront | corr(team F ST, goals/game) | 0.163 → 0.160 (nil) |
+| shooterForm | multi-goal skater-games per 1000 | 18.29 → 18.46 |
+| overtimeStars | better-team win % in OT | 54.1 → 54.1, **857 OT games identical** |
+
+**overtimeStars was dead code.** Overtime runs in a separate 3-on-3 model (15 s steps, own
+`conversion()` call); the possession loop never plays OT, so the `shotSituation === "3V3"` hook
+only fired for rare regulation 3-on-3 spells. The exponent bump now lives in the real OT model
+(`V3_OT_STAR_EXPONENT` raised 0.15 → 0.3).
+
+Retuned: blockSkill ±3%/pt cap ±20% (was ±1.2%/±10%); netFront ±1.2%/pt cap ±15% (was ±0.5%/±8%);
+shooterForm ×1.08 / ×0.95 (was ×1.04 / ×0.97). Re-measured:
+
+| Flag | Target metric | Off → On (after) |
+| --- | --- | --- |
+| blockSkill | corr(D blocking, blocks/game) | 0.537 → 0.567 |
+| netFront | corr(team F ST, goals/game) | 0.174 → 0.190 |
+| shooterForm | multi-goal skater-games per 1000 | 18.03 → 18.38 |
+| overtimeStars | better-team win % in OT | 51.2 → 52.1 (868 vs 865 OT games) |
+
+All four now move in the intended direction, still modestly — hockey's randomness caps these.
+Sanity: identity gate (all flags off) identical on 400 games, 17/17 tests, and 3-seed league rates
+unchanged (goals 2.99 / 2.98 / 3.06, shots 31.1–31.4, PP% 21.2–21.3, PIM 10.8–11.7, blowouts
+14.1 / 11.6 / 13.6%; top scorer 120 / 123 / 138 is seed noise). Not yet re-run: the 30-seed package
+check with the retuned strengths. Still open: goalie group's +0.8% goals (see group split).

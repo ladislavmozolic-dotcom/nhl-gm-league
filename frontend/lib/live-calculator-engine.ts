@@ -105,6 +105,22 @@ export async function runLiveCalculatorRecompute(): Promise<{
     },
   });
 
+  // Data guard: some skaters carry their AHL line (same GP/G/A) in the NHL curSeason* fields
+  // (e.g. Polin 17 GP 3G 6A = his AHL line, real NHL GP 0). Treated as NHL data it classifies
+  // farm players as NHL and projects +10 OVR off a tiny AHL sample, so blank those NHL fields.
+  for (const pl of players as any[]) {
+    const ac = (pl.ahlStats as any)?.cur;
+    if (
+      ac && Number(ac.gp) > 0 &&
+      Number(pl.curSeasonGP) === Number(ac.gp) &&
+      Number(pl.curSeasonG ?? 0) === Number(ac.g ?? 0) &&
+      Number(pl.curSeasonA ?? 0) === Number(ac.a ?? 0)
+    ) {
+      for (const k of Object.keys(pl)) if (k.startsWith("curSeason")) pl[k] = null;
+      pl.curSeasonGP = 0;
+    }
+  }
+
   const sumSeasonW = (config.latestWeight || 0) + (config.previousWeight || 0);
   const REC_CUR = sumSeasonW > 0 ? config.latestWeight / sumSeasonW : 0.8;
   const REC_LAST = sumSeasonW > 0 ? config.previousWeight / sumSeasonW : 0.2;
@@ -845,9 +861,11 @@ export async function runLiveCalculatorRecompute(): Promise<{
     }
 
     // Compute overall ratings
+    // Delta is formula-vs-formula so a stored OVR computed differently (it runs ~3-4 above the
+    // formula) can't inflate every player's delta; projected = stored base + that delta.
     const overallActual = baseline?.ov ?? p.overall ?? calculateSimonTOverall(actual);
-    const overallProjected = calculateSimonTOverall(projected);
-    const overallDelta = overallProjected - overallActual;
+    const overallDelta = calculateSimonTOverall(projected) - calculateSimonTOverall(actual);
+    const overallProjected = overallActual + overallDelta;
 
     const liveRating: SkaterLiveRatingBlob = {
       classification: e.classGroup,

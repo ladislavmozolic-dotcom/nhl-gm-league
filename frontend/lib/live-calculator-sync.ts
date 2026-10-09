@@ -87,13 +87,15 @@ export async function syncLiveCalculatorData(): Promise<SyncResult> {
     let ahlCurMatched = 0;
     let ahlLastMatched = 0;
     try {
-      const ahlCurRows = await fetchAhlSkaterStats(90); // Season 90 = 2025-26 AHL
+      // HockeyTech regular-season ids step by 4 per year: 86 = 2024-25, 90 = 2025-26, 94 = 2026-27.
+      // Follows the NHL season clock (was hardcoded 90/86, so "cur" held last season's AHL line).
+      const ahlSeasonId = (startYear: number) => 90 + (startYear - 2025) * 4;
+      const ahlCurRows = await fetchAhlSkaterStats(ahlSeasonId(CURRENT_SEASON_START));
       if (ahlCurRows.length > 0) {
         const res = await importAhlSkaterStats(ahlCurRows, "cur");
         ahlCurMatched = res.matched;
       }
-      // Season 86 = 2024-25 AHL
-      const ahlLastRows = await fetchAhlSkaterStats(86);
+      const ahlLastRows = await fetchAhlSkaterStats(ahlSeasonId(CURRENT_SEASON_START - 1));
       if (ahlLastRows.length > 0) {
         const res = await importAhlSkaterStats(ahlLastRows, "last");
         ahlLastMatched = res.matched;

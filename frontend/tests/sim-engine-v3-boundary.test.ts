@@ -95,8 +95,8 @@ test("V3 goalie rhythm only chills a goalie after a long idle stretch and is cap
 test("V3 block skill is centred on a typical defenceman and bounded", () => {
   assert.equal(v3BlockSkillMult(71), 1);
   assert.ok(v3BlockSkillMult(80) > 1 && v3BlockSkillMult(60) < 1);
-  assert.equal(v3BlockSkillMult(200), 1.1);
-  assert.equal(v3BlockSkillMult(0), 0.9);
+  assert.equal(v3BlockSkillMult(200), 1.2);
+  assert.equal(v3BlockSkillMult(0), 0.8);
 });
 
 test("V3 goalie composure: rattled after a goal, locked in after a long save streak", () => {
@@ -109,7 +109,7 @@ test("V3 goalie composure: rattled after a goal, locked in after a long save str
 });
 
 test("V3 overtime stars is a small, positive finishing-exponent bump", () => {
-  assert.ok(V3_OT_STAR_EXPONENT > 0 && V3_OT_STAR_EXPONENT <= 0.25);
+  assert.ok(V3_OT_STAR_EXPONENT > 0 && V3_OT_STAR_EXPONENT <= 0.4);
 });
 
 test("V3 PP puck movement is centred, directional and capped", () => {
@@ -134,8 +134,8 @@ test("V3 net-front is centred, directional and capped", () => {
   const mk = (st: number) => ({ ...skater(60, 100), attrs: { ...skater(60, 100).attrs, st } });
   assert.ok(Math.abs(v3NetFrontMult([mk(80 + V3_NETFRONT_CENTER)], [mk(80)]) - 1) < 1e-9);
   assert.ok(v3NetFrontMult([mk(90)], [mk(80)]) > 1 && v3NetFrontMult([mk(70)], [mk(80)]) < 1);
-  assert.equal(v3NetFrontMult([mk(100)], [mk(0)]), 1.08);
-  assert.equal(v3NetFrontMult([mk(0)], [mk(100)]), 0.92);
+  assert.equal(v3NetFrontMult([mk(100)], [mk(0)]), 1.15);
+  assert.equal(v3NetFrontMult([mk(0)], [mk(100)]), 0.85);
   assert.equal(v3NetFrontMult([], [mk(80)]), 1);
 });
 
@@ -156,9 +156,9 @@ test("V3 garbage time only eases a 3+ goal lead and nudges the trailing side", (
 });
 
 test("V3 shooter form: confident after a goal, tight after a drought", () => {
-  assert.equal(v3ShooterFormMult(30, 0), 1.04);
-  assert.equal(v3ShooterFormMult(600, 9), 1.04);
+  assert.equal(v3ShooterFormMult(30, 0), 1.08);
+  assert.equal(v3ShooterFormMult(600, 9), 1.08);
   assert.equal(v3ShooterFormMult(601, 4), 1);
-  assert.equal(v3ShooterFormMult(1e9, 5), 0.97);
+  assert.equal(v3ShooterFormMult(1e9, 5), 0.95);
   assert.equal(v3ShooterFormMult(1e9, 0), 1);
 });

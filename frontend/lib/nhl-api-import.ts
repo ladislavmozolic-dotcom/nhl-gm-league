@@ -129,7 +129,7 @@ export async function importGoalieLastSeason(rows: NhlGoalieRow[]) {
 export async function importNhlSkaterStats(rows: NhlStatRow[], target: "cur" | "last") {
   const players = await prisma.player.findMany({ select: { id: true, name: true } });
   const idx = new Map(players.map((p) => [key(cleanName(p.name)), p.id]));
-  let matched = 0; const unmatched: string[] = [];
+  let matched = 0; const unmatched: string[] = []; const seen = new Set<number>();
   for (const row of rows) {
     const id = idx.get(key(row.name));
     if (id == null) { unmatched.push(row.name); continue; }
@@ -146,7 +146,20 @@ export async function importNhlSkaterStats(rows: NhlStatRow[], target: "cur" | "
           lastSeasonPM: row.pm, lastSeasonTK: row.tk, lastSeasonGV: row.gv, lastSeasonShToi: row.shToi,
         };
     await prisma.player.update({ where: { id }, data });
+    seen.add(id);
     matched++;
+  }
+  // A skater absent from the season's NHL report played 0 NHL games that season. Without this
+  // reset, stale values (e.g. an AHL line written earlier) linger and classify farm players as NHL.
+  if (rows.length > 300) {
+    const zero = target === "cur"
+      ? { curSeasonGP: 0, curSeasonG: 0, curSeasonA: 0, curSeasonHits: 0, curSeasonBlocks: 0, curSeasonPM: 0, curSeasonTK: 0, curSeasonGV: 0, curSeasonShots: 0, curSeasonPim: 0, curSeasonPpG: 0 }
+      : { lastSeasonGP: 0, lastSeasonG: 0, lastSeasonA: 0, lastSeasonPts: 0, lastSeasonHits: 0, lastSeasonBlocks: 0, lastSeasonShots: 0, lastSeasonPim: 0, lastSeasonPpG: 0, lastSeasonPM: 0, lastSeasonTK: 0, lastSeasonGV: 0 };
+    const gpField = target === "cur" ? "curSeasonGP" : "lastSeasonGP";
+    await prisma.player.updateMany({
+      where: { isGoalie: false, [gpField]: { gt: 0 }, id: { notIn: [...seen] } },
+      data: zero,
+    });
   }
   return { total: rows.length, matched, unmatched };
 }
