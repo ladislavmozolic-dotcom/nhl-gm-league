@@ -206,3 +206,21 @@ mode, which only disabled fatigue + coach while the later eight modules stayed o
 default. `baseline` now disables all ten. The gate "V3 starts as V2-equivalent" is
 met, so the next gameplay mechanic is unblocked; re-run `v3-identity.ts` after every
 increment to prove each flag is truly isolated.
+
+### Quality→points (Spearman) is seed noise, not a V3 regression — 2026-10-09
+
+Per-seed Spearman has an sd of ~0.045, so 3-seed averages cannot resolve differences
+below ~0.04 (single-flag runs on 3 seeds swung ±0.03 even for harmless modules, and
+any RNG-path change re-rolls the season). Measured on 30 independent seed bases
+(2,000,000 + i·100,000), 992 games each:
+
+| Engine | Spearman mean | sd | se |
+| --- | ---: | ---: | ---: |
+| V2 | 0.793 | 0.045 | 0.008 |
+| V3 (all 10 flags) | 0.794 | 0.058 | 0.011 |
+
+No difference. An earlier 10-seed pass that suggested V3 ≈ 0.76 (rebound clearance
+looked worst) was a ~2σ fluke and an engine tweak to coach adaptation tried on that
+basis was reverted. **Rule going forward: judge Spearman / top-scorer / gap only on
+≥ 30 seed bases; use 3 seeds for the coarse rate checks (goals, shots, PIM, home win %).**
+Note V2 itself averages 0.79, below the 0.85 target — a shared calibration item, not V3.
