@@ -143,10 +143,10 @@ export type LiveCalcConfigData = {
 };
 
 export const DEFAULT_CONFIG: LiveCalcConfigData = {
-  latestSeason: "20252026",
-  previousSeason: "20242025",
-  latestMpYear: 2025,
-  previousMpYear: 2024,
+  latestSeason: "20262027",
+  previousSeason: "20252026",
+  latestMpYear: 2026,
+  previousMpYear: 2025,
   latestWeight: 0.8,
   previousWeight: 0.2,
   nhlGpLatestMin: 1,

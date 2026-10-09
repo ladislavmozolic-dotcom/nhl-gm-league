@@ -186,8 +186,8 @@ export async function runLiveCalculatorRecompute(): Promise<{
     const mpCur = mp[String(config.latestMpYear)] ?? {};
     const mpLast = mp[String(config.previousMpYear)] ?? {};
 
-    const nhlGpLatest = Number(p.curSeasonGP ?? mpCur.gp ?? 0);
-    const nhlGpPrevious = Number(p.lastSeasonGP ?? mpLast.gp ?? 0);
+    const nhlGpLatest = Math.max(Number(p.curSeasonGP ?? 0), Number(mpCur.gp ?? 0));
+    const nhlGpPrevious = Math.max(Number(p.lastSeasonGP ?? 0), Number(mpLast.gp ?? 0));
 
     const ahl = (p.ahlStats as any) ?? {};
     const ahlCur = ahl.cur ?? {};

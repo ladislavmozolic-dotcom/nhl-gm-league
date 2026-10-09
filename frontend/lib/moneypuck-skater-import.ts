@@ -19,7 +19,7 @@ import { prisma } from "./prisma";
 import { cleanName } from "./playerName";
 
 const UA = "Mozilla/5.0 (compatible; ProfiNHL-League/1.0)";
-export const MP_SEASONS = [2025, 2024, 2023] as const; // 25-26, 24-25, 23-24
+export const MP_SEASONS = [2026, 2025, 2024, 2023] as const; // 26-27, 25-26, 24-25, 23-24
 
 const SPECIAL: Record<string, string> = { "ø": "o", "æ": "ae", "œ": "oe", "ß": "ss", "đ": "d", "ł": "l", "ð": "d", "þ": "th" };
 // First-name nickname variants (MoneyPuck's formal names vs. our shorter/alt forms)

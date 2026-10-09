@@ -1032,7 +1032,7 @@ export default function LiveCalculatorConfigModal({
                       <input
                         type="number"
                         value={config.latestMpYear}
-                        onChange={(e) => setConfig({ ...config, latestMpYear: parseInt(e.target.value) || 2025 })}
+                        onChange={(e) => setConfig({ ...config, latestMpYear: parseInt(e.target.value) || 2026 })}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
                       />
                     </div>
@@ -1041,7 +1041,7 @@ export default function LiveCalculatorConfigModal({
                       <input
                         type="number"
                         value={config.previousMpYear}
-                        onChange={(e) => setConfig({ ...config, previousMpYear: parseInt(e.target.value) || 2024 })}
+                        onChange={(e) => setConfig({ ...config, previousMpYear: parseInt(e.target.value) || 2025 })}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono text-xs focus:border-sky-400 outline-none"
                       />
                     </div>
