@@ -168,6 +168,7 @@ type SimState = {
   v3SpeedDrawsPenalties: boolean;    // V3 diagnostic feature flag
   v3NetFront: boolean;               // V3 diagnostic feature flag
   v3ShootoutDuel: boolean;           // V3 diagnostic feature flag
+  v3GarbageTime: boolean;            // V3 diagnostic feature flag
   goalieStreak: Record<number, number>;      // V3: consecutive saves since the goalie last allowed a goal
   lastGoalAgainst: Record<number, number>;   // V3: absolute game second of the last goal each goalie allowed
   lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
@@ -1467,6 +1468,14 @@ function lateShellShotMult(period: number, secondsIntoPeriod: number, marginForT
   const intensity = 1 - Math.max(0, secLeft) / LATE_SHELL_WINDOW;
   return 1 - 0.12 * intensity; // up to 12% fewer shot attempts right at the horn
 }
+// V3: garbage time — V2's shell stops at a 2-goal lead ("3+ is already comfortable"), so a
+// blowout keeps its full tempo. From the 2nd period a team up 3+ eases off (x0.94, x0.90 in the
+// 3rd); a team down 3+ pushes a little in the 3rd (x1.05). Bounded, deterministic, no RNG.
+export function v3GarbageTimeShotMult(period: number, marginForTeam: number): number {
+  if (marginForTeam >= 3 && period >= 2) return period >= 3 ? 0.9 : 0.94;
+  if (marginForTeam <= -3 && period >= 3) return 1.05;
+  return 1;
+}
 // Per-line deployment tactic → {of, df} multipliers around 1.0. Neutral CK1/DF2/OF2
 // gives exactly 1.0; an offensive line (high OF) presses harder, a checking/defensive
 // line (high DF) suppresses. Effect ~±8%, so a good line still needs the players.
@@ -2047,7 +2056,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     // a fraction of these attempts now sail wide (see the MISS check below) instead
     // of always reaching the net, so the upstream rate is boosted to keep the actual
     // on-goal (SOG) rate the calibration is tuned against unchanged.
-    const lateShell = lateShellShotMult(period, tick, margin);
+    const lateShell = lateShellShotMult(period, tick, margin) * (st.v3GarbageTime ? v3GarbageTimeShotMult(period, margin) : 1);
     const faceoffSetPlay = faceoffPressure?.teamId === carrierTeam.id && tick < faceoffPressure.until ? 1.06 : 1;
     const adaptAtk = adapt(carrierTeam, margin).shots, adaptDef = adapt(def, -margin).allow;
     const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
@@ -2794,7 +2803,7 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
-  experimentalV3?: { shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2839,6 +2848,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     v3SpeedDrawsPenalties: isV3 && (opts.experimentalV3?.speedDrawsPenalties ?? true),
     v3NetFront: isV3 && (opts.experimentalV3?.netFront ?? true),
     v3ShootoutDuel: isV3 && (opts.experimentalV3?.shootoutDuel ?? true),
+    v3GarbageTime: isV3 && (opts.experimentalV3?.garbageTime ?? true),
     goalieStreak: {}, lastGoalAgainst: {},
     lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,

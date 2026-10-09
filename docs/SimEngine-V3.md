@@ -448,3 +448,19 @@ the top three take attempts; `V3_SHOOTOUT_CENTER = -20` restores it.
 Gates: identity with all 18 flags off — identical on 400 games; 15/15 tests. Regulation
 metrics (3 seeds) unchanged: goals 2.98 / 3.05 / 3.06, shots 31.3–31.5, home win 53.6%,
 blowouts 14.4 / 13.6 / 11.9%, OT/SO 17.7 / 18.4 / 22.3% (seed noise; 30-seed mean 19.9%).
+
+### Garbage time — nineteenth increment, offline — 2026-10-09
+
+V2's lead-protection shell stops at a 2-goal margin ("3+ is already comfortable"), so a blowout
+keeps full tempo. Flag `garbageTime` (`v3GarbageTimeShotMult`): from the 2nd period a team up 3+
+takes ×0.94 shot attempts (×0.90 in the 3rd); a team down 3+ gets ×1.05 in the 3rd. Bounded,
+deterministic, no RNG.
+
+Gates: identity with all 19 flags off — identical on 400 games (seed 290,000); 16/16 tests.
+Effect on 12 seed bases (7,000,000 + i·100,000), V3 minus the flag vs V3 plus it: blowouts
+13.93 → 13.75%, goals 3.031 → 3.037, Spearman 0.815 → 0.821, upset rate 27.8 → 27.3%
+(all within noise). 3-seed spot check: goals 2.97 / 3.04 / 3.05, shots 31.2–31.5, blowouts
+14.2 / 13.8 / 12.1%. **Honest limit:** the effect on blowouts is only ~−0.2 pt — it does not
+correct the +0.6 pt drift seen against V2; that drift comes from the scoring-positive
+increments and needs a flag-by-flag split. Open observation: the V3 upset rate (~27–28%) sits
+at the bottom of the 28–45% target; V2's value on the same seeds has not been measured here yet.
