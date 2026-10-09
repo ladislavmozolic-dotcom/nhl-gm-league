@@ -21,6 +21,8 @@ import RosterComplianceOverlay from "@/components/RosterComplianceOverlay";
 import VisitBeacon from "@/components/VisitBeacon";
 import DeploymentSync from "@/components/DeploymentSync";
 import SiteBanner from "@/components/SiteBanner";
+import SandboxBanner from "@/components/SandboxBanner";
+import { isSandbox } from "@/lib/sandbox";
 import TeamNavStrip from "@/components/TeamNavStrip";
 import MegaMenu from "@/components/MegaMenu";
 import SiteFooter from "@/components/SiteFooter";
@@ -172,6 +174,7 @@ export default async function RootLayout({
           {gm && <TradeAnnouncementOverlay />}
           {gm && <RosterComplianceOverlay />}
           {!gm && <SessionResume />}
+          {isSandbox() && <SandboxBanner />}
           <SiteBanner branding={branding} />
           <TeamNavStrip teams={nhlTeams} />
           <MegaMenu gm={gm} items={menu} lang={lang} light={branding.navLight} hideForum={hideForum} />

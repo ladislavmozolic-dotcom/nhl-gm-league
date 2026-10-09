@@ -43,3 +43,6 @@ next-env.d.ts
 
 /app/generated/prisma
 /public/mugs/
+
+# sandbox dev build
+/.next-sandbox/

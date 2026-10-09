@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:sandbox": "SANDBOX=1 NEXT_DIST_DIR=.next-sandbox DATABASE_URL=${SANDBOX_DATABASE_URL:?run scripts/ops/sandbox-refresh.sh first} next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "download-logos": "npx tsx scripts/download-logos.ts",

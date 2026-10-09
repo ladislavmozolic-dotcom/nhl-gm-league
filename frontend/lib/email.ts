@@ -10,6 +10,7 @@ const SITE_URL = "https://unhl.eu";
 
 let client: Resend | null = null;
 function resend(): Resend | null {
+  if (process.env.SANDBOX === "1") return null; // test mode never sends mail
   const key = process.env.RESEND_API_KEY;
   if (!key) return null;
   if (!client) client = new Resend(key);

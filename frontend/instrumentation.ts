@@ -4,6 +4,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { authConfig } = await import("./lib/auth-config");
   authConfig(); // Fail closed before starting jobs if production secrets are missing.
+  if (process.env.SANDBOX === "1") { console.log("[sandbox] test mode — auto-sim scheduler disabled"); return; }
   const g = globalThis as unknown as { __autoSimStarted?: boolean };
   if (g.__autoSimStarted) return;
   g.__autoSimStarted = true;
