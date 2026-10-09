@@ -26,6 +26,39 @@ const PARAM_OPTIONS: Array<{ key: ActiveParam; label: string; nameSk: string; na
   { key: "ex", label: "EX", nameSk: "Skúsenosti (Experience / Kariérne GP)", nameEn: "Experience (Career GP)", icon: "⏳" },
 ];
 
+const SKATER_ATTRS: Array<{ key: string; label: string; nameSk: string; nameEn: string; isCore?: boolean }> = [
+  { key: "ck", label: "CK", nameSk: "Fyzická hra", nameEn: "Checking", isCore: true },
+  { key: "pa", label: "PA", nameSk: "Nahrávky", nameEn: "Passing", isCore: true },
+  { key: "sc", label: "SC", nameSk: "Streľba", nameEn: "Scoring", isCore: true },
+  { key: "df", label: "DF", nameSk: "Obrana", nameEn: "Defense", isCore: true },
+  { key: "sk", label: "SK", nameSk: "Rýchlosť", nameEn: "Skating", isCore: true },
+  { key: "st", label: "ST", nameSk: "Sila", nameEn: "Strength", isCore: true },
+  { key: "ph", label: "PH", nameSk: "Puk", nameEn: "Puck Handling", isCore: true },
+  { key: "di", label: "DI", nameSk: "Disciplína", nameEn: "Discipline" },
+  { key: "fo", label: "FO", nameSk: "Vhadzovania", nameEn: "Faceoffs" },
+  { key: "ex", label: "EX", nameSk: "Skúsenosti", nameEn: "Experience" },
+  { key: "du", label: "DU", nameSk: "Odolnosť", nameEn: "Durability" },
+  { key: "en", label: "EN", nameSk: "Výdrž", nameEn: "Endurance" },
+  { key: "ps", label: "PS", nameSk: "Nájazdy", nameEn: "Penalty Shot" },
+  { key: "fg", label: "FG", nameSk: "Bitky", nameEn: "Fighting" },
+  { key: "ld", label: "LD", nameSk: "Líderstvo", nameEn: "Leadership" },
+];
+
+const GOALIE_ATTRS: Array<{ key: string; label: string; nameSk: string; nameEn: string; isCore?: boolean }> = [
+  { key: "sz", label: "SZ", nameSk: "Veľkosť", nameEn: "Size", isCore: true },
+  { key: "ag", label: "AG", nameSk: "Pohyblivosť", nameEn: "Agility", isCore: true },
+  { key: "rb", label: "RB", nameSk: "Vyrážanie", nameEn: "Rebounds", isCore: true },
+  { key: "sc", label: "SC", nameSk: "Štýl / Pokrytie", nameEn: "Style Control", isCore: true },
+  { key: "hs", label: "HS", nameSk: "Vysoké strely", nameEn: "High Shots", isCore: true },
+  { key: "rt", label: "RT", nameSk: "Reflexy / Nízke", nameEn: "Reflexes", isCore: true },
+  { key: "ph", label: "PH", nameSk: "Hra s hokejkou", nameEn: "Puck Handling" },
+  { key: "sk", label: "SK", nameSk: "Korčuľovanie", nameEn: "Skating" },
+  { key: "du", label: "DU", nameSk: "Odolnosť", nameEn: "Durability" },
+  { key: "en", label: "EN", nameSk: "Výdrž", nameEn: "Endurance" },
+  { key: "ex", label: "EX", nameSk: "Skúsenosti", nameEn: "Experience" },
+  { key: "ps", label: "PS", nameSk: "Nájazdy", nameEn: "Penalty Shot" },
+];
+
 function formatDelta(delta: number): string {
   if (delta > 0) return `+${delta}`;
   return `${delta}`;
@@ -53,6 +86,37 @@ function posBadge(pos: string | null): { text: string; bg: string } {
   return { text: p, bg: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" };
 }
 
+function getPopoverStyle(rect: DOMRect): React.CSSProperties {
+  const width = 380;
+  const padding = 16;
+  const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const windowHeight = typeof window !== "undefined" ? window.innerHeight : 800;
+
+  // Decide if placement is to the right or left of hovered element
+  let left = rect.right + 12;
+  if (left + width > windowWidth - padding) {
+    left = rect.left - width - 12;
+  }
+  if (left < padding) {
+    left = Math.max(padding, windowWidth - width - padding);
+  }
+
+  // Vertical placement
+  const estimatedHeight = 360;
+  let top = rect.top - 8;
+  if (top + estimatedHeight > windowHeight - padding) {
+    top = windowHeight - estimatedHeight - padding;
+  }
+  if (top < padding) {
+    top = padding;
+  }
+
+  return {
+    top: `${Math.round(top)}px`,
+    left: `${Math.round(left)}px`,
+  };
+}
+
 export default function PlayerProgressView({ data }: { data: PlayerProgressData }) {
   const lang = useLang();
   const isSk = lang === "cs";
@@ -66,6 +130,21 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
   const [minGpOnly, setMinGpOnly] = useState<boolean>(false);
   const [pageSize, setPageSize] = useState<number>(50);
   const [page, setPage] = useState<number>(1);
+
+  // Hover preview state
+  const [hoveredPlayerInfo, setHoveredPlayerInfo] = useState<{
+    player: PlayerProgressItem;
+    rect: DOMRect;
+  } | null>(null);
+
+  const handleMouseEnter = (player: PlayerProgressItem, e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoveredPlayerInfo({ player, rect });
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredPlayerInfo(null);
+  };
 
   // Helper to extract param value for current player
   const getParamInfo = (player: PlayerProgressItem, paramKey: ActiveParam) => {
@@ -201,8 +280,8 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
             </div>
             <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
               {isSk
-                ? "Sledujte odozvu hráčov na prepočet parametrov a nastavené váhy. Rýchle filtrovanie najväčších skokanov a prepadov pre hlavné atribúty."
-                : "Inspect player rating response to formula recomputations and weight settings. Fast filtering of top risers and fallers across key attributes."}
+                ? "Sledujte odozvu hráčov na prepočet parametrov a nastavené váhy. Prejdite kurzorom myši na ľubovoľného hráča pre kompletný náhľad zmeny všetkých atribútov (Pôvodné vs. Prepočítané)."
+                : "Inspect player rating response to formula recomputations and weight settings. Hover over any player for a full breakdown of all attribute shifts (Base vs. Projected)."}
             </p>
           </div>
 
@@ -375,7 +454,9 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
               return (
                 <div
                   key={player.id}
-                  className={`relative rounded-2xl border bg-gradient-to-br ${rankColor} p-4 shadow-lg backdrop-blur-md transition-all hover:border-blue-500/50 flex flex-col justify-between gap-3`}
+                  onMouseEnter={(e) => handleMouseEnter(player, e)}
+                  onMouseLeave={handleMouseLeave}
+                  className={`relative rounded-2xl border bg-gradient-to-br ${rankColor} p-4 shadow-lg backdrop-blur-md transition-all hover:border-blue-500/50 flex flex-col justify-between gap-3 cursor-pointer group`}
                 >
                   <div className="flex items-start justify-between">
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-slate-900/80 border border-slate-700">
@@ -394,8 +475,11 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
                   <div className="flex items-center gap-3">
                     <PlayerAvatar src={player.photoUrl} alt={player.name} size={48} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-bold text-white text-sm hover:text-blue-400 transition-colors">
+                      <div className="truncate font-bold text-white text-sm group-hover:text-blue-400 transition-colors flex items-center gap-1.5">
                         <PlayerLink slug={player.slug} name={player.cleanName} />
+                        <span className="text-[10px] text-blue-400/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                          📊
+                        </span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
                         {player.team.logoUrl && (
@@ -589,6 +673,16 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
         </div>
       </div>
 
+      {/* Hover Instruction Banner */}
+      <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-950/20 border border-blue-500/20 text-xs text-blue-300/90">
+        <span className="text-sm">💡</span>
+        <span>
+          {isSk
+            ? "Prejdite kurzorom myši na ľubovoľného hráča alebo kartu v tabuľke pre okamžitý náhľad posunu všetkých parametrov (Pôvodné vs. Prepočítané)."
+            : "Hover your mouse over any player row or card to reveal a complete popover preview of all parameter shifts (Base vs. Projected)."}
+        </span>
+      </div>
+
       {/* Main Players Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl backdrop-blur-md">
         <div className="overflow-x-auto">
@@ -596,7 +690,7 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
             <thead>
               <tr className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 <th className="py-3 px-3 w-10 text-center">#</th>
-                <th className="py-3 px-4">{isSk ? "Hráč" : "Player"}</th>
+                <th className="py-3 px-4">{isSk ? "Hráč (Náhľad 📊)" : "Player (Preview 📊)"}</th>
                 <th className="py-3 px-3">{isSk ? "Tím" : "Team"}</th>
                 <th className="py-3 px-2 text-center">{isSk ? "Poz." : "Pos."}</th>
                 <th className="py-3 px-2 text-center">GP</th>
@@ -643,13 +737,20 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
                         {rank}
                       </td>
 
-                      {/* Player Name, Avatar, Age */}
-                      <td className="py-2.5 px-4">
+                      {/* Player Name, Avatar, Age - hover trigger */}
+                      <td
+                        className="py-2.5 px-4 cursor-pointer"
+                        onMouseEnter={(e) => handleMouseEnter(player, e)}
+                        onMouseLeave={handleMouseLeave}
+                      >
                         <div className="flex items-center gap-2.5">
                           <PlayerAvatar src={player.photoUrl} alt={player.name} size={32} />
                           <div className="min-w-0">
-                            <div className="font-bold text-white group-hover:text-blue-400 transition-colors truncate">
+                            <div className="font-bold text-white group-hover:text-blue-400 transition-colors truncate flex items-center gap-1.5">
                               <PlayerLink slug={player.slug} name={player.cleanName} />
+                              <span className="text-[10px] text-blue-400/70 opacity-0 group-hover:opacity-100 transition-opacity font-normal">
+                                📊
+                              </span>
                             </div>
                             <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
                               {player.age ? <span>{player.age} r.</span> : null}
@@ -702,8 +803,12 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
                         {paramInfo.projected}
                       </td>
 
-                      {/* Param Delta Badge */}
-                      <td className="py-2.5 px-4 text-center bg-blue-950/20">
+                      {/* Param Delta Badge - hover trigger */}
+                      <td
+                        className="py-2.5 px-4 text-center bg-blue-950/20 cursor-pointer"
+                        onMouseEnter={(e) => handleMouseEnter(player, e)}
+                        onMouseLeave={handleMouseLeave}
+                      >
                         <span
                           className={`inline-block min-w-[42px] px-2 py-0.5 rounded-lg text-xs border ${getDeltaBadgeClass(
                             paramInfo.delta
@@ -714,7 +819,11 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
                       </td>
 
                       {/* Snapshot deltas for OVR, CK, PA, SC, DF */}
-                      <td className="py-2.5 px-2 text-center">
+                      <td
+                        className="py-2.5 px-2 text-center cursor-pointer"
+                        onMouseEnter={(e) => handleMouseEnter(player, e)}
+                        onMouseLeave={handleMouseLeave}
+                      >
                         <span
                           className={`text-[11px] font-bold ${
                             player.ov.delta > 0
@@ -728,7 +837,11 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
                         </span>
                       </td>
 
-                      <td className="py-2.5 px-2 text-center">
+                      <td
+                        className="py-2.5 px-2 text-center cursor-pointer"
+                        onMouseEnter={(e) => handleMouseEnter(player, e)}
+                        onMouseLeave={handleMouseLeave}
+                      >
                         <span
                           className={`text-[11px] font-semibold ${
                             player.ck.delta > 0
@@ -742,7 +855,11 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
                         </span>
                       </td>
 
-                      <td className="py-2.5 px-2 text-center">
+                      <td
+                        className="py-2.5 px-2 text-center cursor-pointer"
+                        onMouseEnter={(e) => handleMouseEnter(player, e)}
+                        onMouseLeave={handleMouseLeave}
+                      >
                         <span
                           className={`text-[11px] font-semibold ${
                             player.pa.delta > 0
@@ -756,7 +873,11 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
                         </span>
                       </td>
 
-                      <td className="py-2.5 px-2 text-center">
+                      <td
+                        className="py-2.5 px-2 text-center cursor-pointer"
+                        onMouseEnter={(e) => handleMouseEnter(player, e)}
+                        onMouseLeave={handleMouseLeave}
+                      >
                         <span
                           className={`text-[11px] font-semibold ${
                             player.sc.delta > 0
@@ -770,7 +891,11 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
                         </span>
                       </td>
 
-                      <td className="py-2.5 px-2 text-center">
+                      <td
+                        className="py-2.5 px-2 text-center cursor-pointer"
+                        onMouseEnter={(e) => handleMouseEnter(player, e)}
+                        onMouseLeave={handleMouseLeave}
+                      >
                         <span
                           className={`text-[11px] font-semibold ${
                             player.df.delta > 0
@@ -842,6 +967,144 @@ export default function PlayerProgressView({ data }: { data: PlayerProgressData 
           </div>
         )}
       </div>
+
+      {/* Floating Hover Preview Card (Fixed Portal) */}
+      {hoveredPlayerInfo && (
+        <div
+          className="fixed z-50 pointer-events-none transition-opacity duration-150 animate-in fade-in zoom-in-95"
+          style={getPopoverStyle(hoveredPlayerInfo.rect)}
+        >
+          <div className="w-[380px] rounded-2xl bg-slate-950/95 border border-slate-700/80 shadow-[0_25px_60px_rgba(0,0,0,0.85)] backdrop-blur-2xl p-4 text-xs text-white space-y-3 ring-1 ring-blue-500/20">
+            {/* Player Header */}
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <PlayerAvatar src={hoveredPlayerInfo.player.photoUrl} alt={hoveredPlayerInfo.player.name} size={42} />
+                <div className="min-w-0">
+                  <div className="font-bold text-white text-sm truncate">
+                    {hoveredPlayerInfo.player.cleanName}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                    {hoveredPlayerInfo.player.team.logoUrl && (
+                      <img
+                        src={hoveredPlayerInfo.player.team.logoUrl}
+                        alt=""
+                        className="w-3.5 h-3.5 object-contain inline-block shrink-0"
+                      />
+                    )}
+                    <span className="truncate">{hoveredPlayerInfo.player.team.name}</span>
+                    <span>•</span>
+                    <span className={`px-1 rounded text-[9px] font-bold border ${posBadge(hoveredPlayerInfo.player.position).bg}`}>
+                      {hoveredPlayerInfo.player.position}
+                    </span>
+                    <span>•</span>
+                    <span>{hoveredPlayerInfo.player.gp} GP</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Overall comparison */}
+              <div className="text-right shrink-0 pl-2">
+                <div className="text-[10px] uppercase font-bold text-slate-400">OVR</div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-xs font-semibold text-slate-400">{hoveredPlayerInfo.player.ov.actual}</span>
+                  <span className="text-slate-500 text-[10px]">→</span>
+                  <span className="text-sm font-black text-white">{hoveredPlayerInfo.player.ov.projected}</span>
+                  <span className={`px-1.5 py-0.2 rounded text-[10px] border ${getDeltaBadgeClass(hoveredPlayerInfo.player.ov.delta)}`}>
+                    {formatDelta(hoveredPlayerInfo.player.ov.delta)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Core Attributes comparison */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span>{isSk ? "Kľúčové parametre" : "Core Parameters"}</span>
+                <span className="text-[9px] font-normal text-slate-400 opacity-80">
+                  {isSk ? "Pôvodné → Nové (Posun)" : "Base → Proj (Delta)"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5">
+                {(hoveredPlayerInfo.player.isGoalie ? GOALIE_ATTRS.slice(0, 6) : SKATER_ATTRS.slice(0, 6)).map((attr) => {
+                  const pInfo = hoveredPlayerInfo.player.allParams[attr.key] || { actual: 0, projected: 0, delta: 0 };
+                  const d = pInfo.delta;
+                  return (
+                    <div
+                      key={attr.key}
+                      className={`flex items-center justify-between p-1.5 rounded-xl border text-[11px] ${
+                        d > 0
+                          ? "bg-emerald-950/25 border-emerald-500/35"
+                          : d < 0
+                          ? "bg-rose-950/25 border-rose-500/35"
+                          : "bg-slate-900/60 border-slate-800"
+                      }`}
+                    >
+                      <div className="min-w-0 pr-1">
+                        <span className="font-black text-white mr-1">{attr.label}</span>
+                        <span className="text-[10px] text-slate-400 truncate hidden sm:inline">
+                          {isSk ? attr.nameSk : attr.nameEn}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 font-mono">
+                        <span className="text-slate-400 text-[10px]">{pInfo.actual}</span>
+                        <span className="text-slate-500 text-[9px]">→</span>
+                        <span className="font-bold text-white text-[11px]">{pInfo.projected}</span>
+                        <span
+                          className={`px-1 py-0.2 rounded text-[10px] font-bold ${
+                            d > 0 ? "text-emerald-400" : d < 0 ? "text-rose-400" : "text-slate-400"
+                          }`}
+                        >
+                          ({formatDelta(d)})
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Secondary Attributes comparison */}
+            <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {isSk ? "Ostatné atribúty" : "Other Attributes"}
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {(hoveredPlayerInfo.player.isGoalie ? GOALIE_ATTRS.slice(6) : SKATER_ATTRS.slice(6)).map((attr) => {
+                  const pInfo = hoveredPlayerInfo.player.allParams[attr.key] || { actual: 0, projected: 0, delta: 0 };
+                  const d = pInfo.delta;
+                  return (
+                    <div
+                      key={attr.key}
+                      className={`p-1 rounded-lg border text-center text-[10px] ${
+                        d > 0
+                          ? "bg-emerald-950/25 border-emerald-500/35 text-emerald-300"
+                          : d < 0
+                          ? "bg-rose-950/25 border-rose-500/35 text-rose-300"
+                          : "bg-slate-900/50 border-slate-800 text-slate-400"
+                      }`}
+                    >
+                      <div className="font-bold text-white">{attr.label}</div>
+                      <div className="font-mono mt-0.5 text-[9px]">
+                        {pInfo.actual}→<strong className="text-white">{pInfo.projected}</strong>
+                      </div>
+                      <div className="font-bold text-[9px]">
+                        {formatDelta(d)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-1 border-t border-slate-800/60 text-[10px] text-slate-400 flex items-center justify-between">
+              <span>✨ {isSk ? "Náhľad prepočtu v reálnom čase" : "Real-time recomputed preview"}</span>
+              <span className="font-mono">{hoveredPlayerInfo.player.classification}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
