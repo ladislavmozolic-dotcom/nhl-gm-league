@@ -375,3 +375,18 @@ Seeds 90,000 / 190,000 / 290,000: goals 2.98 / 3.05 / 3.06, PIM 11.7 / 11.0 / 11
 18.3 / 22.4% (seed noise). Spearman 0.881 / 0.851 / 0.781 is within the known ±0.045 per-seed
 noise. **Not yet shown:** that fast teams actually end up with more PP opportunities than
 slow ones — a per-team PP-opportunity vs team-SK correlation over many seeds is still to do.
+
+### Speed draws penalties — per-team check — 2026-10-09
+
+`frontend/scripts/pp-opp-speed.ts` (12 seed bases 5,000,000 + i·100,000; team SK sd 3.15, range
+42.1–54.8) compares V3 minus the flag with V3 plus it:
+
+| | without flag | with flag |
+| --- | ---: | ---: |
+| PP opps / team / game (mean) | 2.968 | 2.972 |
+| corr(team SK, PP opps) | 0.223 | 0.495 |
+| slope (opps per SK point) | 0.0053 | 0.0126 |
+
+Mean volume is unchanged and faster teams now draw clearly more power plays, as designed. The
+total effect across the league's 12-point SK range is about ±0.08 opportunities per game,
+a believable, modest edge.
