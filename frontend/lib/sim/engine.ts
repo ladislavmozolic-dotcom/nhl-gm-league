@@ -161,6 +161,7 @@ type SimState = {
   v3EmotionalDiscipline: boolean;    // V3 diagnostic feature flag
   v3FinishingCurve: boolean;         // V3 diagnostic feature flag
   v3GoalieRhythm: boolean;           // V3 diagnostic feature flag
+  v3BlockSkill: boolean;             // V3 diagnostic feature flag
   lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
   officials: { penaltyMult: number; evenUp: number } | null; // tonight's referee crew (null = neutral)
   timeoutUsed: Record<number, boolean>;
@@ -1368,6 +1369,11 @@ export function v3CoachAdaptation(
   const shell = (0.035 + 0.065 * urgency) * (1.25 - attackLean * 0.5);
   return { shots: 1 - shell * 0.35, allow: 1 - shell };
 }
+// V3: the shot-block check also looks at the defender's blocking rating (DF-heavy, mean ~71
+// for D). Centred so the league-wide block rate is unchanged: +/-1.2% per point, capped +/-10%.
+export function v3BlockSkillMult(blocking: number): number {
+  return Math.max(0.9, Math.min(1.1, 1 + 0.012 * (blocking - 71)));
+}
 // V3: goalie rhythm — after 2+ idle minutes the next shot is up to ~12% likelier to beat him,
 // ramping in from 2:00 and capped at 5:00 of idleness. Affects only that one shot.
 export function v3GoalieRhythmMult(idleSeconds: number): number {
@@ -2013,7 +2019,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       // front, so it's blocked less (and isn't judged by the D's weak SC) — this
       // stops the diversion from leaking goals to blocks and keeps scoring neutral.
       const blockP = pointShot ? 0.32 : 0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50));
-      if (rng.chance(blockP)) { setup = "carry"; continue; } // blocked
+      if (rng.chance(st.v3BlockSkill ? blockP * v3BlockSkillMult(dman.blocking) : blockP)) { setup = "carry"; continue; } // blocked
       // MISS — sails wide or off the iron, before it ever reaches the net (so it
       // does NOT count toward st.box[...].shots or xG — those stay SOG-only, exactly
       // as calibrated). A longer point shot misses more than an in-tight look; a
@@ -2722,7 +2728,7 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
-  experimentalV3?: { goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2760,6 +2766,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     v3EmotionalDiscipline: isV3 && (opts.experimentalV3?.emotionalDiscipline ?? true),
     v3FinishingCurve: isV3 && (opts.experimentalV3?.finishingCurve ?? true),
     v3GoalieRhythm: isV3 && (opts.experimentalV3?.goalieRhythm ?? true),
+    v3BlockSkill: isV3 && (opts.experimentalV3?.blockSkill ?? true),
     lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
     timeoutUsed: {},

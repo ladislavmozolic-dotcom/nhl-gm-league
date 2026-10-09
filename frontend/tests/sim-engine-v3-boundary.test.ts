@@ -9,7 +9,7 @@ import {
   isNextGenEngine,
   resolveSimEngine,
 } from "../lib/sim/version";
-import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
+import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
 import type { SimSkater } from "../lib/sim/types";
 
 test("V3 is a next-gen workbench version, not a league-selectable engine", () => {
@@ -90,4 +90,11 @@ test("V3 goalie rhythm only chills a goalie after a long idle stretch and is cap
   assert.ok(v3GoalieRhythmMult(200) > 1 && v3GoalieRhythmMult(200) < 1.12);
   assert.ok(Math.abs(v3GoalieRhythmMult(300) - 1.12) < 1e-9);
   assert.ok(Math.abs(v3GoalieRhythmMult(3000) - 1.12) < 1e-9);
+});
+
+test("V3 block skill is centred on a typical defenceman and bounded", () => {
+  assert.equal(v3BlockSkillMult(71), 1);
+  assert.ok(v3BlockSkillMult(80) > 1 && v3BlockSkillMult(60) < 1);
+  assert.equal(v3BlockSkillMult(200), 1.1);
+  assert.equal(v3BlockSkillMult(0), 0.9);
 });
