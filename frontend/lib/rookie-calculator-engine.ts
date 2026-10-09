@@ -173,8 +173,14 @@ export function calculateRookieRatings(
   const mp = (p as any).mpSkater ?? {};
   const mpCur = mp["2026"] ?? mp["2025"] ?? {};
 
+  // Unproven rookies start near the bottom (a player with no/low production should sit at ~PA/SC 49-50).
+  const PA_SC_PRIOR = isD ? 0.10 : 0.08;
+  // Raw rate/benchmark ratios are generous at the low end (3G+6A in 58 GP is not the 25th percentile);
+  // a power curve pushes weak producers down while leaving strong ones nearly untouched.
+  const LOW_END_SKEW = 1.5;
+
   // 1. PA (Passing) — from A/GP, A/60 all, A/60 5v5 + custom
-  let livePaPct = isD ? 0.20 : 0.22;
+  let livePaPct = PA_SC_PRIOR;
   if (nhlGp > 0) {
     const apg = perGame(p.curSeasonA, p.lastSeasonA);
     const toiSec = pooledToiSec;
@@ -193,11 +199,11 @@ export function calculateRookieRatings(
     const nhleApg = (ahlA / ahlGp) * 0.446;
     livePaPct = clamp(0, 1, nhleApg / (isD ? 0.35 : 0.50));
   }
-  const paPct = regress(livePaPct, isD ? 0.20 : 0.22);
+  const paPct = regress(Math.pow(livePaPct, LOW_END_SKEW), PA_SC_PRIOR);
   const pa = lookupRatingFromPercentile("PA", posGroup, paPct);
 
   // 2. SC (Scoring) — from G/GP, G/60, xG/60, (G-xG)/60 + custom
-  let liveScPct = isD ? 0.20 : 0.22;
+  let liveScPct = PA_SC_PRIOR;
   if (nhlGp > 0) {
     const gpg = perGame(p.curSeasonG, p.lastSeasonG);
     const toiSec = pooledToiSec;
@@ -220,7 +226,7 @@ export function calculateRookieRatings(
     const pctShots = ahlGp > 0 ? clamp(0, 1, (ahlShots / ahlGp) / (isD ? 2.0 : 3.0)) : 0.5;
     liveScPct = w.ahl.scEqGpg * clamp(0, 1, nhleGpg / (isD ? 0.15 : 0.35)) + w.ahl.scShots * pctShots;
   }
-  const scPct = regress(liveScPct, isD ? 0.20 : 0.22);
+  const scPct = regress(Math.pow(liveScPct, LOW_END_SKEW), PA_SC_PRIOR);
   const sc = lookupRatingFromPercentile("SC", posGroup, scPct);
 
   // 3. CK (Checking) — Hits/60, Hits/GP + custom
