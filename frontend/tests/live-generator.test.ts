@@ -189,3 +189,30 @@ test("a healthy scratch can be dressed mid-game, and the skater he replaces keep
   }
   assert.ok(swapped >= 3, `the scratch should get ice time in most games (${swapped}/4)`);
 });
+
+test("a goalie change swaps in the backup once, flows through the box score, and can't be repeated", () => {
+  for (const seed of [91, 92, 93]) {
+    const opts = { seed, engineVersion: ENGINE_V3, liveFeed: true };
+    let asked = 0;
+    const { result, stops } = drain(simulateGameLive(makeTeam(1, 62), makeTeam(2, 66), opts), (s) => (s.period >= 2 ? (asked++, { goalie: { home: true } }) : undefined));
+    assert.ok(asked > 1, "the bench asks at every stoppage");
+    const changes = result.events!.filter((e) => e.type === "GOALIE_CHANGE");
+    assert.equal(changes.length, 1, "exactly one swap");
+    assert.equal(changes[0].teamId, 1);
+    const box = result.home;
+    assert.ok(box.backupGoalie && box.backupGoalie.started, "the backup is marked as having entered");
+    assert.ok(box.backupGoalie!.decision != null && box.goalie.decision === null, "the decision goes to the goalie of record, the starter gets none");
+    assert.ok(box.goalie.shotsAgainst > 0 && box.backupGoalie!.shotsAgainst > 0, "both goalies faced shots");
+    assert.equal(box.goalie.shotsAgainst + box.backupGoalie!.shotsAgainst, result.away.shots, "no shot against the home net is lost in the swap");
+    assert.equal(result.away.goalie.decision !== undefined, true);
+    assert.ok(stops.some((s) => s.backupInTeamIds.includes(1)), "the stoppage feed reports the backup as in net");
+  }
+});
+
+test("a goalie change with no backup dressed is ignored", () => {
+  const solo = makeTeam(1, 62);
+  solo.backup = null;
+  const opts = { seed: 94, engineVersion: ENGINE_V3 };
+  const { result } = drain(simulateGameLive(solo, makeTeam(2, 66), opts), () => ({ goalie: { home: true } }));
+  assert.equal(result.events!.filter((e) => e.type === "GOALIE_CHANGE").length, 0);
+});

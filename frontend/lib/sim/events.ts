@@ -36,6 +36,7 @@ export type EventType =
   | "COINCIDENTAL"      // coincidental minors at full strength → 4-on-4
   | "KNOCK"             // shaken up — to the room for a few minutes
   | "RETURN"            // …and back on the bench
+  | "GOALIE_CHANGE"     // a bench swaps its starter for the backup (called live; the automatic "shelled starter" pull stays silent)
   | "SHOOTOUT";         // one shootout attempt — only synthesized for the LIVE feed (the engine keeps attempts in result.shootout)
 
 // Rising importance — controls what gets persisted and how loud the PBP is.

@@ -30,7 +30,7 @@ function dbPersistence(settings: EngineSettings, resumedId?: string): LivePersis
         .catch(log("round snapshot"));
     },
     command: (c) => {
-      const row = { gameId: c.gameId, stopIndex: c.stopIndex, teamId: c.teamId, team: c.team, timeout: c.timeout, by: c.by, summary: c.summary };
+      const row = { gameId: c.gameId, stopIndex: c.stopIndex, teamId: c.teamId, team: c.team, timeout: c.timeout, goalie: c.goalie, by: c.by, summary: c.summary };
       // append to the jsonb array in one statement — no read-modify-write race between games
       prisma.$executeRawUnsafe(`UPDATE "LiveRound" SET commands = commands || $1::jsonb, "updatedAt" = now() WHERE id = $2`, `[${encodeSim(row)}]`, roundId ?? "")
         .catch(log("an in-game change"));
@@ -79,10 +79,10 @@ export async function liveRunGames(season: string, round: number): Promise<(jobs
  * the club into a SimTeam from them WITHOUT touching the saved lines, and queue it for the next
  * stoppage. Caller must already have checked `canManageTeam(teamId)`.
  */
-export async function submitLiveChange(input: { gameId: number; teamId: number; lines?: TeamLinesData; timeout?: boolean; by: string }): Promise<{ ok: boolean; error?: string }> {
+export async function submitLiveChange(input: { gameId: number; teamId: number; lines?: TeamLinesData; timeout?: boolean; goalie?: boolean; by: string }): Promise<{ ok: boolean; error?: string }> {
   if (!input.lines) {
-    if (!input.timeout) return { ok: false, error: "Nothing to change." };
-    return queueLiveChange(input.gameId, { teamId: input.teamId, timeout: true, by: input.by, summary: "timeout" });
+    if (!input.timeout && !input.goalie) return { ok: false, error: "Nothing to change." };
+    return queueLiveChange(input.gameId, { teamId: input.teamId, timeout: input.timeout, goalie: input.goalie, by: input.by, summary: input.goalie ? "goalie change" : "timeout" });
   }
   let safe: TeamLinesData;
   try { safe = await validateTeamLines(input.teamId, input.lines, { strict: true }); }
@@ -97,5 +97,5 @@ export async function submitLiveChange(input: { gameId: number; teamId: number; 
     });
   } catch (e) { return { ok: false, error: `Couldn't build that lineup: ${(e as Error).message}` }; }
   syncChem(team, settings.chemistryBase);
-  return queueLiveChange(input.gameId, { teamId: input.teamId, team, timeout: input.timeout, by: input.by, summary: input.timeout ? "timeout + lines/tactics change" : "lines/tactics change", lines: safe });
+  return queueLiveChange(input.gameId, { teamId: input.teamId, team, timeout: input.timeout, goalie: input.goalie, by: input.by, summary: input.timeout ? "timeout + lines/tactics change" : "lines/tactics change", lines: safe });
 }

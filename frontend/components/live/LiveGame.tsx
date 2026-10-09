@@ -7,13 +7,14 @@ import LiveBoard from "./LiveBoard";
 import CoachPanel from "./CoachPanel";
 import { describeLiveEvents, fmtClock, periodLabel, type LiveLine } from "@/lib/sim/live-text";
 import type { SimEvent } from "@/lib/sim/events";
+import type { GoalieInfo } from "@/lib/sim/live";
 
 type Side = { id: number; code: string | null; name: string };
 type View = {
   now: number; startsAt: number; round: number; home: Side; away: Side;
   status: "pending" | "live" | "final"; period: number; clock: number; absSeconds: number;
   score: { home: number; away: number }; shots: { home: number; away: number };
-  events: SimEvent[]; cursor: number; nextChangeAt: number | null; endedIn?: string; pausedWhy: string | null; timeoutUsed: number[]; shootout: { home: number; away: number } | null;
+  events: SimEvent[]; cursor: number; nextChangeAt: number | null; endedIn?: string; pausedWhy: string | null; timeoutUsed: number[]; goalies: { home: GoalieInfo; away: GoalieInfo }; shootout: { home: number; away: number } | null;
 };
 
 type Props = {
@@ -91,7 +92,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
           )}
         </div>
 
-        {coachTeams.map((t) => <CoachPanel key={t.id} gameId={gameId} teamId={t.id} teamName={t.name} over={view?.status === "final"} timeoutUsed={view?.timeoutUsed.includes(t.id) ?? false} outIds={outIds} />)}
+        {coachTeams.map((t) => <CoachPanel key={t.id} gameId={gameId} teamId={t.id} teamName={t.name} over={view?.status === "final"} timeoutUsed={view?.timeoutUsed.includes(t.id) ?? false} outIds={outIds} goalies={view ? (view.goalies.home.teamId === t.id ? view.goalies.home : view.goalies.away) : undefined} />)}
 
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden">
           <div className="px-4 py-2.5 border-b border-slate-800 bg-slate-800/30"><h2 className="text-sm font-bold uppercase tracking-wide text-slate-200">Play-by-play</h2></div>

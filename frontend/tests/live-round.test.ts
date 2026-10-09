@@ -170,3 +170,28 @@ test("a timeout needs no lineup, shows as used, and is replayed after a restart"
   assert.ok(JSON.stringify(resumed.get(41)) === JSON.stringify(reference.get(41)), "timeout replay diverged");
   _resetLiveRound();
 });
+
+test("a goalie change is shown to viewers, persisted without a lineup, and replayed after a restart", async () => {
+  _resetLiveRound();
+  const jobs = [job(51, 1, 2, 601)];
+  let snapshot = ""; const commands: string[] = [];
+  const persist: LivePersistence = { start: (r) => { snapshot = encodeSim({ id: r.id, clock: r.clock, jobs: r.jobs }); }, command: (c) => { commands.push(encodeSim(c)); }, finish: () => {} };
+  const done = liveRunner({ season: "2026-27", round: 1 }, FAST, { persist })(jobs);
+  const before = liveGameView(51, -1)!;
+  assert.equal(before.goalies.home.backupIn, false);
+  assert.ok(before.goalies.home.backup, "the view names the backup");
+  await sleep(1200);
+  assert.ok(queueLiveChange(51, { teamId: 1, goalie: true, by: "GM" }).ok);
+  await sleep(1500);
+  assert.equal(liveGameView(51, -1)!.goalies.home.backupIn, true, "viewers see the backup in net");
+  const reference = await done;
+  assert.equal(reference.get(51)!.events!.filter((e) => e.type === "GOALIE_CHANGE").length, 1);
+  _resetLiveRound();
+  const snap = decodeSim<{ id: string; clock: ReturnType<typeof import("../lib/sim/live").makeClock>; jobs: GameJob[] }>(snapshot);
+  const replay = new Map<number, ReplayCommand[]>();
+  for (const raw of commands) { const c = decodeSim<ReplayCommand & { gameId: number }>(raw); replay.set(c.gameId, [...(replay.get(c.gameId) ?? []), c]); }
+  assert.ok([...replay.values()].flat().some((c) => c.goalie && !c.team));
+  const resumed = await liveRunner({ season: "2026-27", round: 1 }, FAST, { resume: { id: snap.id, clock: snap.clock, replay } })(snap.jobs);
+  assert.ok(JSON.stringify(resumed.get(51)) === JSON.stringify(reference.get(51)), "goalie-change replay diverged");
+  _resetLiveRound();
+});

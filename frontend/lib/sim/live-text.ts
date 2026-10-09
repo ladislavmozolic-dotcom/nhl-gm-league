@@ -50,6 +50,7 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
     case "RETURN": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} is back on the bench.` };
     case "INJURY": return { ...base, outPlayerId: e.playerId, kind: "note", major: true, text: `${e.playerName ?? "?"} is injured and will not return.` };
     case "FIGHT": return { ...base, kind: "penalty", major: true, text: `Fight: ${e.playerName ?? "?"}${e.targetName ? ` versus ${e.targetName}` : ""}.` };
+    case "GOALIE_CHANGE": return { ...base, kind: "note", major: true, text: `🥅 ${who} goalie change — ${e.playerName ?? "the backup"} replaces ${e.targetName ?? "the starter"}.` };
     case "SHOOTOUT": {
       const mm = m<{ round?: number; result?: string; homeSo?: number; awaySo?: number }>(e);
       const who = `${e.playerName ?? "?"}${e.teamCode ? ` (${e.teamCode})` : ""}`;

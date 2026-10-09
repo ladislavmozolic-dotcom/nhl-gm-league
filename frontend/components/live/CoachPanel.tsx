@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PRESETS, type TeamTactics } from "@/lib/sim/tactics";
 import type { ForwardLine, DefensePair } from "@/lib/sim/lines-core";
 import LinesEditor, { type RosterPlayer } from "./LinesEditor";
+import type { GoalieInfo } from "@/lib/sim/live";
 
 type GoaliePull = { minGoals: number; savePctUnder: number; pullSec: number };
 type Lines = { forwardLines: ForwardLine[]; defensePairs: DefensePair[]; system?: TeamTactics; strategy?: { goaliePull?: GoaliePull } & Record<string, unknown> } & Record<string, unknown>;
@@ -22,7 +23,7 @@ const DIALS: Array<{ key: keyof TeamTactics; label: string; hint: string; option
 const DEFAULT_DIALS: TeamTactics = { tempo: "balanced", forecheck: "balanced", puckStyle: "balanced", dZone: "balanced", ppStyle: "balanced", pkStyle: "balanced" };
 
 /** In-game coaching: change the team system; it takes effect at the next whistle the broadcast hasn't reached. */
-export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed, outIds }: { gameId: number; teamId: number; teamName: string; over: boolean; timeoutUsed: boolean; outIds: number[] }) {
+export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed, outIds, goalies }: { gameId: number; teamId: number; teamName: string; over: boolean; timeoutUsed: boolean; outIds: number[]; goalies?: GoalieInfo }) {
   const [lines, setLines] = useState<Lines | null>(null);
   const [dials, setDials] = useState<TeamTactics>(DEFAULT_DIALS);
   const [applied, setApplied] = useState(0);
@@ -35,6 +36,7 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
   const [def, setDef] = useState<DefensePair[]>([]);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [timeoutQueued, setTimeoutQueued] = useState(false);
+  const [goalieQueued, setGoalieQueued] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -82,6 +84,18 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
       const r = await fetch(`/api/live/games/${gameId}/change`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ teamId, timeout: true }) });
       const j = await r.json();
       if (j.ok) { setTimeoutQueued(true); setMsg({ ok: true, text: "Timeout called — it happens at the next whistle." }); }
+      else setMsg({ ok: false, text: j.error ?? "That was refused." });
+    } catch { setMsg({ ok: false, text: "Network error — try again." }); }
+    setBusy(false);
+  };
+
+  const swapGoalie = async () => {
+    if (!goalies?.backup || !window.confirm(`Replace ${goalies.starter} with ${goalies.backup} at the next whistle? He will not come back.`)) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await fetch(`/api/live/games/${gameId}/change`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ teamId, goalie: true }) });
+      const j = await r.json();
+      if (j.ok) { setGoalieQueued(true); setMsg({ ok: true, text: "Goalie change called — it happens at the next whistle." }); }
       else setMsg({ ok: false, text: j.error ?? "That was refused." });
     } catch { setMsg({ ok: false, text: "Network error — try again." }); }
     setBusy(false);
@@ -158,6 +172,12 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
                 className="px-4 py-2 rounded-lg border border-amber-500/60 text-amber-200 hover:bg-amber-500/10 disabled:opacity-40 disabled:hover:bg-transparent text-sm font-semibold">
                 {timeoutUsed ? "⏱ Timeout used" : timeoutQueued ? "⏱ Timeout called" : "⏱ Call timeout"}
               </button>
+              {goalies && (
+                <button onClick={swapGoalie} disabled={busy || !goalies.backup || goalies.backupIn || goalieQueued}
+                  className="px-4 py-2 rounded-lg border border-sky-500/60 text-sky-200 hover:bg-sky-500/10 disabled:opacity-40 disabled:hover:bg-transparent text-sm font-semibold">
+                  {goalies.backupIn ? `🥅 ${goalies.backup ?? "Backup"} in net` : !goalies.backup ? "🥅 No backup dressed" : goalieQueued ? "🥅 Goalie change called" : `🥅 Replace ${goalies.starter.split(" ").slice(-1)[0]} with ${goalies.backup.split(" ").slice(-1)[0]}`}
+                </button>
+              )}
               <button onClick={apply} disabled={busy || !dirty || !lines}
                 className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:hover:bg-blue-600 text-sm font-semibold">
                 {busy ? "Sending…" : "Send to the bench"}

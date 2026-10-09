@@ -169,7 +169,7 @@ export function liveGameView(gameId: number, since: number, nowMs = Date.now()) 
 }
 
 /** Queue a ready-built team change for a club in a live game (cooldown + game checks). */
-export function queueLiveChange(gameId: number, change: { teamId: number; team?: GameJob["home"]; timeout?: boolean; by?: string; summary?: string; lines?: unknown }, nowMs = Date.now()): { ok: boolean; error?: string } {
+export function queueLiveChange(gameId: number, change: { teamId: number; team?: GameJob["home"]; timeout?: boolean; goalie?: boolean; by?: string; summary?: string; lines?: unknown }, nowMs = Date.now()): { ok: boolean; error?: string } {
   const r = registry.current;
   const e = r?.entries.get(gameId);
   if (!r || !e || r.status !== "running") return { ok: false, error: "That game is not live." };

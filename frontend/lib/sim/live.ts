@@ -84,11 +84,13 @@ function shootoutEvents(result: GameResult, home: SimTeam, away: SimTeam, firstS
 // ---- game -------------------------------------------------------------------
 
 /** A GM's change, already turned into a ready-to-adopt SimTeam by the caller (which has the DB). */
-export type LiveCommand = { teamId: number; team?: SimTeam; timeout?: boolean; by?: string; summary?: string; at?: number };
+export type LiveCommand = { teamId: number; team?: SimTeam; timeout?: boolean; goalie?: boolean; by?: string; summary?: string; at?: number };
 /** What actually happened to a command — the replay log. */
 export type AppliedCommand = { stopIndex: number; absSeconds: number; teamId: number; by?: string; summary?: string };
 /** A command as persisted for crash recovery: which stoppage it landed on, and the team it installed. */
-export type ReplayCommand = { stopIndex: number; teamId: number; team?: SimTeam; timeout?: boolean; by?: string; summary?: string };
+export type ReplayCommand = { stopIndex: number; teamId: number; team?: SimTeam; timeout?: boolean; goalie?: boolean; by?: string; summary?: string };
+
+export type GoalieInfo = { teamId: number; starter: string; backup: string | null; backupIn: boolean };
 
 export type LiveSnapshot = {
   gameId: number;
@@ -105,6 +107,8 @@ export type LiveSnapshot = {
   nextChangeAt: number | null;
   /** benches that have already spent their one timeout */
   timeoutUsed: number[];
+  /** each bench's goalies: names, and whether the backup is already in net */
+  goalies: { home: GoalieInfo; away: GoalieInfo };
   /** shootout tally as the viewer has seen it — null until the shootout starts */
   shootout: { home: number; away: number } | null;
   endedIn?: GameResult["endedIn"];
@@ -125,6 +129,7 @@ export class LiveGame {
   private events: SimEvent[] = [];
   private sortedEvents: SimEvent[] | null = null; // time-ordered view of `events`, rebuilt lazily
   private timeoutUsedIds: number[] = [];
+  private backupInIds: number[] = [];
   private replay: Map<number, ReplayCommand[]>;
   private onApplied?: (cmd: ReplayCommand & { absSeconds: number }) => void;
 
@@ -151,7 +156,7 @@ export class LiveGame {
     // newest lineup change per club wins; a pending lineup change and a timeout from the same bench both stand
     const prev = this.pending.find((p) => p.teamId === cmd.teamId);
     this.pending = this.pending.filter((p) => p.teamId !== cmd.teamId);
-    this.pending.push({ ...cmd, team: cmd.team ?? prev?.team, timeout: !!(cmd.timeout || prev?.timeout), by: cmd.by ?? prev?.by, summary: cmd.summary ?? prev?.summary, at: Date.now() });
+    this.pending.push({ ...cmd, team: cmd.team ?? prev?.team, timeout: !!(cmd.timeout || prev?.timeout), goalie: !!(cmd.goalie || prev?.goalie), by: cmd.by ?? prev?.by, summary: cmd.summary ?? prev?.summary, at: Date.now() });
     return { ok: true };
   }
 
@@ -169,6 +174,7 @@ export class LiveGame {
           const home = cmd.teamId === this.home.id;
           if (cmd.team) { if (home) change.home = cmd.team; else change.away = cmd.team; }
           if (cmd.timeout) change.timeout = { ...change.timeout, [home ? "home" : "away"]: true };
+          if (cmd.goalie) change.goalie = { ...change.goalie, [home ? "home" : "away"]: true };
           this.log.push({ stopIndex: this.stopIndex, absSeconds: stop.absSeconds, teamId: cmd.teamId, by: cmd.by, summary: cmd.summary });
         }
         this.replay.delete(this.stopIndex);
@@ -179,17 +185,18 @@ export class LiveGame {
           // a timeout is always allowed; a lineup change from the club that just iced the puck is held for the next whistle
           const barred = stop.noChangeTeamIds.includes(cmd.teamId);
           const applyTeam = cmd.team && !barred ? cmd.team : undefined;
-          if (!applyTeam && !cmd.timeout) { rest.push(cmd); continue; }
-          if (cmd.team && barred) rest.push({ ...cmd, timeout: false });
+          if (!applyTeam && !cmd.timeout && !cmd.goalie) { rest.push(cmd); continue; }
+          if (cmd.team && barred) rest.push({ ...cmd, timeout: false, goalie: false });
           if (applyTeam) { if (home) change.home = applyTeam; else change.away = applyTeam; }
           if (cmd.timeout) change.timeout = { ...change.timeout, [home ? "home" : "away"]: true };
+          if (cmd.goalie) change.goalie = { ...change.goalie, [home ? "home" : "away"]: true };
           this.log.push({ stopIndex: this.stopIndex, absSeconds: stop.absSeconds, teamId: cmd.teamId, by: cmd.by, summary: cmd.summary });
-          this.onApplied?.({ stopIndex: this.stopIndex, absSeconds: stop.absSeconds, teamId: cmd.teamId, team: applyTeam, timeout: cmd.timeout, by: cmd.by, summary: cmd.summary });
+          this.onApplied?.({ stopIndex: this.stopIndex, absSeconds: stop.absSeconds, teamId: cmd.teamId, team: applyTeam, timeout: cmd.timeout, goalie: cmd.goalie, by: cmd.by, summary: cmd.summary });
         }
       }
       this.pending = rest;
       this.stopIndex++;
-      this.take(this.gen.next(change.home || change.away || change.timeout ? change : undefined));
+      this.take(this.gen.next(change.home || change.away || change.timeout || change.goalie ? change : undefined));
       moved = true;
     }
     return moved;
@@ -206,6 +213,7 @@ export class LiveGame {
     }
     this.paused = r.value;
     this.timeoutUsedIds = r.value.timeoutUsedTeamIds;
+    this.backupInIds = r.value.backupInTeamIds;
     this.events.push(...r.value.events); this.sortedEvents = null;
   }
 
@@ -245,6 +253,10 @@ export class LiveGame {
       nextChangeAt: this.paused ? this.paused.absSeconds : null,
       timeoutUsed: this.timeoutUsedIds,
       shootout: soTally,
+      goalies: {
+        home: { teamId: this.home.id, starter: this.home.goalie.name, backup: this.home.backup?.name ?? null, backupIn: this.backupInIds.includes(this.home.id) },
+        away: { teamId: this.away.id, starter: this.away.goalie.name, backup: this.away.backup?.name ?? null, backupIn: this.backupInIds.includes(this.away.id) },
+      },
       endedIn: over ? this.result?.endedIn : undefined,
     };
   }

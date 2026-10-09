@@ -224,6 +224,21 @@ function maybePullGoalie(st: SimState, team: SimTeam) {
   }
 }
 
+/** The GM replaces his starter with the backup. Same state the automatic "shelled starter" pull sets, so stats, decisions
+ *  and conditioning all flow through the existing path. No-op without a backup or once the backup is already in. */
+function swapToBackupGoalie(st: SimState, team: SimTeam, period: number, tick: number): boolean {
+  const box = st.box[team.id];
+  if (st.pulled[team.id] || !box.backupGoalie || !team.backup) return false;
+  st.pulled[team.id] = true;
+  box.backupGoalie.started = true;
+  st.sink.emit({
+    period, seconds: tick, type: "GOALIE_CHANGE", teamId: team.id, teamCode: team.code ?? undefined,
+    playerId: team.backup.id, playerName: team.backup.name, targetName: team.goalie.name, importance: "NOTABLE",
+    meta: { in: team.backup.name, out: team.goalie.name },
+  });
+  return true;
+}
+
 function fmt(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -1550,6 +1565,8 @@ export type TeamChange = {
   home?: SimTeam; away?: SimTeam;
   /** a bench calls its (one per game) timeout at this whistle — the unit on the ice gets its breath back */
   timeout?: { home?: boolean; away?: boolean };
+  /** a bench replaces its starter with the backup goalie (one way — he does not come back) */
+  goalie?: { home?: boolean; away?: boolean };
 };
 export type Stoppage = {
   period: number; tick: number; absSeconds: number; why: StopReason;
@@ -1561,9 +1578,10 @@ export type Stoppage = {
   shots: { home: number; away: number };
   events: SimEvent[];
   timeoutUsedTeamIds: number[];     // benches that have already spent their timeout
+  backupInTeamIds: number[];        // benches whose backup goalie is in net (swapped by the GM or pulled automatically)
 };
 // The live driver's view of the game right now (cheap no-op unless the caller asked for the feed).
-function liveFeedOf(st: SimState): Pick<Stoppage, "score" | "shots" | "events" | "timeoutUsedTeamIds"> {
+function liveFeedOf(st: SimState): Pick<Stoppage, "score" | "shots" | "events" | "timeoutUsedTeamIds" | "backupInTeamIds"> {
   const events = st.liveFeed ? st.sink.persistableSince(st.liveCursor) : [];
   if (st.liveFeed) st.liveCursor = st.sink.count;
   return {
@@ -1571,6 +1589,7 @@ function liveFeedOf(st: SimState): Pick<Stoppage, "score" | "shots" | "events" |
     shots: { home: st.box[st.home.id].shots, away: st.box[st.away.id].shots },
     events,
     timeoutUsedTeamIds: [st.home.id, st.away.id].filter((id) => st.timeoutUsed[id]),
+    backupInTeamIds: [st.home.id, st.away.id].filter((id) => st.pulled[id]),
   };
 }
 
@@ -1948,6 +1967,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
         // a called timeout is always allowed — even right after an icing (that's when a tired unit needs it most)
         if (change.timeout?.home) useTimeout(home, tick, "to give the unit on the ice a breather", true);
         if (change.timeout?.away) useTimeout(away, tick, "to give the unit on the ice a breather", true);
+        if (change.goalie?.home) swapToBackupGoalie(st, home, period, tick);
+        if (change.goalie?.away) swapToBackupGoalie(st, away, period, tick);
         for (const [team, next] of [[home, change.home], [away, change.away]] as const) {
           if (!next || noChange[team.id] || !adoptTeamChange(st, team, next)) continue; // the icing team stays out for this draw
           // keep each unit's running clock / rotation slot, swap in the new personnel
