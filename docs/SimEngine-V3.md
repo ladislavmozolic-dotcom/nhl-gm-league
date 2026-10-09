@@ -390,3 +390,18 @@ slow ones — a per-team PP-opportunity vs team-SK correlation over many seeds i
 Mean volume is unchanged and faster teams now draw clearly more power plays, as designed. The
 total effect across the league's 12-point SK range is about ±0.08 opportunities per game,
 a believable, modest edge.
+
+### Net-front battle — seventeenth increment, offline — 2026-10-09
+
+Flag `netFront`: on point shots (screens/tips) and rebounds, goal probability is scaled by
+`v3NetFrontMult` — the on-ice attacking forwards' mean ST against the defending pair's mean
+ST, ±0.5% per point, capped ±8%. Forwards run ~2 ST below D (79.2 vs 81.0 on ice-time-weighted
+means), so `V3_NETFRONT_CENTER = -2` keeps the league level. No extra RNG draws.
+
+Gates: identity with all 17 flags off — identical on 400 games (seed 90,000); 14/14 tests.
+Seeds 90,000 / 190,000 / 290,000: goals 2.98 / 3.05 / 3.06 (unchanged from the previous
+increment), shots 31.3–31.5, save % .911 / .909 / .909, PP% 21.3 / 21.8 / 21.4, D-assist
+share 29.5–29.9%, top scorer 132 / 123 / 131, blowouts 14.4 / 13.6 / 11.9% (seed 90,000 again
+slightly high — seed-specific, 30-seed mean ~13.5%). **Not yet shown:** that a physical
+forward line really scores more on rebounds/screens than a light one; effect is likely small
+(these two shot types are a minor share of shots).

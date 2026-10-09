@@ -166,6 +166,7 @@ type SimState = {
   v3OvertimeStars: boolean;          // V3 diagnostic feature flag
   v3PpPuckMovement: boolean;         // V3 diagnostic feature flag
   v3SpeedDrawsPenalties: boolean;    // V3 diagnostic feature flag
+  v3NetFront: boolean;               // V3 diagnostic feature flag
   goalieStreak: Record<number, number>;      // V3: consecutive saves since the goalie last allowed a goal
   lastGoalAgainst: Record<number, number>;   // V3: absolute game second of the last goal each goalie allowed
   lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
@@ -1399,6 +1400,15 @@ export function v3PpPuckMovementMult(attackers: SimSkater[], killers: SimSkater[
   const gap = avg(attackers, (s) => s.attrs.pa ?? 50) - avg(killers, (s) => s.attrs.df ?? 50) - V3_PP_CENTER;
   return Math.max(0.88, Math.min(1.12, 1 + 0.006 * gap));
 }
+// V3: net-front battle — on point shots (screens/tips) and rebounds the attacking forwards' ST
+// against the defending pair's ST decides who wins the crease. Centred on the typical F-D gap
+// (forwards run ~2 ST below D), +/-0.5% per point, capped +/-8%, so scoring volume holds.
+export const V3_NETFRONT_CENTER = -2;
+export function v3NetFrontMult(attackers: SimSkater[], defenders: SimSkater[]): number {
+  if (!attackers.length || !defenders.length) return 1;
+  const avg = (xs: SimSkater[]) => xs.reduce((n, s) => n + (s.attrs.st ?? 50), 0) / xs.length;
+  return Math.max(0.92, Math.min(1.08, 1 + 0.005 * (avg(attackers) - avg(defenders) - V3_NETFRONT_CENTER)));
+}
 // V3: in 3-on-3 the open ice rewards a true finisher more: the finishing exponent is +0.15
 // there only. Anchored at the average finisher (60), so the league 3v3 scoring level holds.
 export const V3_OT_STAR_EXPONENT = 0.15;
@@ -2213,7 +2223,8 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       let p = pConv * danger * pressBonus * pointFinish * handMult
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
         * teamEdge * catchUp * ppMod
-        * (st.nightOff[carrierTeam.id] ?? 1) * (st.nightDef[def.id] ?? 1); // any-given-night form
+        * (st.nightOff[carrierTeam.id] ?? 1) * (st.nightDef[def.id] ?? 1) // any-given-night form
+        * (st.v3NetFront && (pointShot || setup === "rebound") ? v3NetFrontMult(onIceF(carrierTeam), onIceD(def)) : 1);
       // V3: a goalie who has been idle for a long stretch is colder on the next shot.
       if (st.v3GoalieRhythm && !defEmptyNet) {
         p *= v3GoalieRhythmMult(absT - (st.lastShotAgainst[def.id] ?? 0));
@@ -2774,7 +2785,7 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
-  experimentalV3?: { speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2817,6 +2828,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     v3OvertimeStars: isV3 && (opts.experimentalV3?.overtimeStars ?? true),
     v3PpPuckMovement: isV3 && (opts.experimentalV3?.ppPuckMovement ?? true),
     v3SpeedDrawsPenalties: isV3 && (opts.experimentalV3?.speedDrawsPenalties ?? true),
+    v3NetFront: isV3 && (opts.experimentalV3?.netFront ?? true),
     goalieStreak: {}, lastGoalAgainst: {},
     lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
