@@ -164,6 +164,7 @@ type SimState = {
   v3BlockSkill: boolean;             // V3 diagnostic feature flag
   v3GoalieComposure: boolean;        // V3 diagnostic feature flag
   v3OvertimeStars: boolean;          // V3 diagnostic feature flag
+  v3PpPuckMovement: boolean;         // V3 diagnostic feature flag
   goalieStreak: Record<number, number>;      // V3: consecutive saves since the goalie last allowed a goal
   lastGoalAgainst: Record<number, number>;   // V3: absolute game second of the last goal each goalie allowed
   lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
@@ -1373,6 +1374,17 @@ export function v3CoachAdaptation(
   const shell = (0.035 + 0.065 * urgency) * (1.25 - attackLean * 0.5);
   return { shots: 1 - shell * 0.35, allow: 1 - shell };
 }
+// V3: power-play puck movement — the five PP skaters' passing (PA) against the PK skaters'
+// defending (DF). Centred on the typical league gap (V3_PP_CENTER) so league PP% holds; it
+// only spreads PP efficiency toward teams whose unit can really move the puck. +/-0.6% per
+// point of gap, capped +/-12%.
+export const V3_PP_CENTER = -12;
+export function v3PpPuckMovementMult(attackers: SimSkater[], killers: SimSkater[]): number {
+  if (!attackers.length || !killers.length) return 1;
+  const avg = (xs: SimSkater[], f: (s: SimSkater) => number) => xs.reduce((n, s) => n + f(s), 0) / xs.length;
+  const gap = avg(attackers, (s) => s.attrs.pa ?? 50) - avg(killers, (s) => s.attrs.df ?? 50) - V3_PP_CENTER;
+  return Math.max(0.88, Math.min(1.12, 1 + 0.006 * gap));
+}
 // V3: in 3-on-3 the open ice rewards a true finisher more: the finishing exponent is +0.15
 // there only. Anchored at the average finisher (60), so the league 3v3 scoring level holds.
 export const V3_OT_STAR_EXPONENT = 0.15;
@@ -2161,7 +2173,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       // a true 5-on-3 is far more dangerous than a plain 5-on-4 — the extra open
       // ice on top of the formation/chemistry edge, not a replacement for it.
       const manAdvMult = manAdv3 ? 1.35 : 1;
-      const ppMod = strength === "PP" ? (carrierTeam.ppChem / def.pkChem) * atkFx.ppConv * defFx.pkSuppress * manAdvMult : 1; // gelled PP1 + PP formation vs gelled PK1 + PK structure
+      const ppMod = strength === "PP" ? (carrierTeam.ppChem / def.pkChem) * atkFx.ppConv * defFx.pkSuppress * manAdvMult * (st.v3PpPuckMovement ? v3PpPuckMovementMult(onIceF(carrierTeam).concat(onIceD(carrierTeam)), onIceF(def).concat(onIceD(def))) : 1) : 1; // gelled PP1 + PP formation vs gelled PK1 + PK structure
       const shOffRaw = strength !== "EV" ? carrier.offense / carrier.posPenalty : carrier.offense; // off-position waived on ST
       const shOff = dp > 0 && !carrier.isDefense ? shOffRaw + dp * (dpRef - shOffRaw) * 0.5 : shOffRaw;
       // PARITY: compress the talent mismatch so favourites don't run away. The
@@ -2748,7 +2760,7 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
-  experimentalV3?: { overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2789,6 +2801,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     v3BlockSkill: isV3 && (opts.experimentalV3?.blockSkill ?? true),
     v3GoalieComposure: isV3 && (opts.experimentalV3?.goalieComposure ?? true),
     v3OvertimeStars: isV3 && (opts.experimentalV3?.overtimeStars ?? true),
+    v3PpPuckMovement: isV3 && (opts.experimentalV3?.ppPuckMovement ?? true),
     goalieStreak: {}, lastGoalAgainst: {},
     lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,

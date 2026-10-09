@@ -321,3 +321,22 @@ OT/SO share on 8 other seed bases: V2 19.97%, V3 20.10%, V3 without this flag 20
 slice of games, so the effect is below the noise of every league-level metric; it is safe
 but nearly inert, like the first goalie-rhythm version. V2 itself sits at the bottom of the
 20–26% OT/SO target — a shared item, not a V3 regression.
+
+### Power-play puck movement — fifteenth increment, offline — 2026-10-09
+
+Calibration Lab now reports **Power play %** (target 19–23%; PK % is its complement) and
+**PP opportunities / team / game** (2.8–3.8). V2 baseline at seed 90,000: PP 20.5%, 3.01 opps.
+
+Flag `ppPuckMovement`: PP shot probability is scaled by `v3PpPuckMovementMult` — the five PP
+skaters' mean PA against the PK skaters' mean DF, ±0.6% per point of gap, capped ±12%.
+**Centring matters:** the typical gap is strongly negative (PK defenders out-rate PP
+passers on DF vs PA), so a centre of 0 cost ~1 pt of PP% (21.1→20.2) and -5 still ~0.9;
+`V3_PP_CENTER = -12` restores it. On 8 seed bases (3,000,000 + i·100,000): PP% 21.00 with
+the flag vs 21.09 without; goals 3.012 vs 3.014. Shots, PP opportunities (2.96) unchanged.
+
+Gates: identity with all 15 flags off — identical on 400 games (seed 90,000); 12/12 tests.
+Seeds 90,000 / 190,000 / 290,000: goals 2.98 / 3.04 / 3.06, PP% 21.2 / 21.6 / 21.5, PP opps
+2.94–2.96, blowouts 14.4 / 13.7 / 12.5% (seed 90,000 marginally over the 14% ceiling for the
+second time on that seed — a seed-specific reading, the 30-seed mean was 13.5%), OT/SO 17.8 /
+18.3 / 22.0% (seed noise; 8-seed mean ~20.1%). **Not yet shown:** that the flag widens the
+team-to-team PP% spread as designed — this needs a per-team PP% histogram over many seeds.

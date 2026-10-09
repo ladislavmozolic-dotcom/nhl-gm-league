@@ -9,7 +9,7 @@ import {
   isNextGenEngine,
   resolveSimEngine,
 } from "../lib/sim/version";
-import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, V3_OT_STAR_EXPONENT, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
+import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, V3_OT_STAR_EXPONENT, V3_PP_CENTER, v3PpPuckMovementMult, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
 import type { SimSkater } from "../lib/sim/types";
 
 test("V3 is a next-gen workbench version, not a league-selectable engine", () => {
@@ -110,4 +110,14 @@ test("V3 goalie composure: rattled after a goal, locked in after a long save str
 
 test("V3 overtime stars is a small, positive finishing-exponent bump", () => {
   assert.ok(V3_OT_STAR_EXPONENT > 0 && V3_OT_STAR_EXPONENT <= 0.25);
+});
+
+test("V3 PP puck movement is centred, directional and capped", () => {
+  const mk = (pa: number, df: number) => ({ ...skater(60, 100), attrs: { ...skater(60, 100).attrs, pa, df } });
+  const onCentre = 60 + V3_PP_CENTER; // attacker PA that makes (PA - killer DF) land exactly on the centre
+  assert.ok(Math.abs(v3PpPuckMovementMult([mk(onCentre, 0)], [mk(0, 60)]) - 1) < 1e-9);
+  assert.ok(v3PpPuckMovementMult([mk(90, 60)], [mk(0, 60)]) > v3PpPuckMovementMult([mk(60, 60)], [mk(0, 60)]));
+  assert.equal(v3PpPuckMovementMult([mk(100, 0)], [mk(0, 40)]), 1.12);
+  assert.equal(v3PpPuckMovementMult([mk(0, 0)], [mk(0, 100)]), 0.88);
+  assert.equal(v3PpPuckMovementMult([], [mk(0, 60)]), 1);
 });

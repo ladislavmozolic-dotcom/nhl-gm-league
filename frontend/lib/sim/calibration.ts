@@ -49,6 +49,7 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
   let inj = 0; const injMech: Record<string, number> = {};
   let assists = 0, dAssists = 0;
   const pimByType: Record<string, number> = {};
+  let ppGoalsAll = 0, ppOppAll = 0;
   let pim = 0, blowouts = 0, upsetGames = 0, upsets = 0;
   const points: Record<number, number> = {};
   const strength: Record<number, number> = {};
@@ -71,7 +72,7 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
     for (const b of [r.home, r.away]) {
       const g = b.goalie; if (g.shotsAgainst > 0) { gsaxSum += g.xga - g.goalsAgainst; gsaxN++; }
       const zt = b.ozTime + b.nzTime + b.dzTime; oz += b.ozTime; znTot += zt;
-      hits += b.hits; pim += b.pim;
+      hits += b.hits; pim += b.pim; ppGoalsAll += b.ppGoals; ppOppAll += b.ppOpp;
       for (const s of b.skaters) {
         const total = scorer[s.id] ?? { points: 0, goals: 0, assists: 0, toi: 0, games: 0 };
         total.points += s.points; total.goals += s.goals; total.assists += s.assists; total.toi += s.toi; total.games++;
@@ -130,6 +131,8 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
     { group: "Core rates", label: "Save %", value: svp.toFixed(3), target: ".900 – .910", status: grade(svp, [0.9, 0.91], [0.895, 0.915]) },
     { group: "Core rates", label: "Home win %", value: (homeWins / games * 100).toFixed(1) + "%", target: "52 – 56%", status: grade(homeWins / games * 100, [51, 57], [48, 60]) },
     { group: "Core rates", label: "OT / SO games", value: (extra / games * 100).toFixed(1) + "%", target: "20 – 26%", status: grade(extra / games * 100, [19, 27], [15, 32]) },
+    { group: "Core rates", label: "Power play %", value: (ppGoalsAll / Math.max(1, ppOppAll) * 100).toFixed(1) + "%", target: "19 – 23%", status: grade(ppGoalsAll / Math.max(1, ppOppAll) * 100, [19, 23], [17, 25]), hint: "PK % is its complement" },
+    { group: "Core rates", label: "PP opportunities / team / game", value: perTeamGame(ppOppAll).toFixed(2), target: "2.8 – 3.8", status: grade(perTeamGame(ppOppAll), [2.8, 3.8], [2.3, 4.3]) },
     { group: "Core rates", label: "PIM / team / game", value: perTeamGame(pim).toFixed(1), target: "7 – 12", status: grade(perTeamGame(pim), [7, 12], [5, 15]) },
     { group: "Core rates", label: "Top PIM sources / team / game", value: topPim, target: "diagnostic", status: "ok", hint: "minutes by penalty type" },
     // balance

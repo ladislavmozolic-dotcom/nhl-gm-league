@@ -9,7 +9,7 @@ async function main() {
   const mode = process.argv[3];
   const experimentalV3 = mode === "fatigue-only" ? { fatigueDeployment: true, coachAdaptation: false }
     : mode === "coach-only" ? { fatigueDeployment: false, coachAdaptation: true }
-      : mode === "baseline" ? { fatigueDeployment: false, coachAdaptation: false, checkingMatchup: false, qualityDAssists: false, faceoffPressure: false, reboundClearance: false, momentumTimeout: false, assistSpread: false, emotionalDiscipline: false, finishingCurve: false, goalieRhythm: false, blockSkill: false, goalieComposure: false, overtimeStars: false }
+      : mode === "baseline" ? { fatigueDeployment: false, coachAdaptation: false, checkingMatchup: false, qualityDAssists: false, faceoffPressure: false, reboundClearance: false, momentumTimeout: false, assistSpread: false, emotionalDiscipline: false, finishingCurve: false, goalieRhythm: false, blockSkill: false, goalieComposure: false, overtimeStars: false, ppPuckMovement: false }
         : undefined;
   const r = await runCalibration({ engineVersion: ENGINE_V3, ...(Number.isFinite(seedBase) ? { seedBase } : {}), ...(experimentalV3 ? { experimentalV3 } : {}) });
   const icon = (s: string) => (s === "ok" ? "✅" : s === "warn" ? "⚠️ " : "❌");
