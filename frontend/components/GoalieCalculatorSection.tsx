@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import PlayerAvatar from "@/components/playerAvatar";
 import PlayerLink from "@/components/PlayerLink";
 import { cleanName } from "@/lib/playerName";
 import {
@@ -78,27 +79,24 @@ export default function GoalieCalculatorSection({
 }) {
   const [hovered, setHovered] = useState<{
     player: ProjGoalie;
-    x: number;
-    y: number;
+    rect: DOMRect;
   } | null>(null);
-  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMouseEnter = (e: React.MouseEvent, p: ProjGoalie) => {
-    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-    const r = e.currentTarget.getBoundingClientRect();
-    const x = r.left;
-    const y = r.bottom;
-    hoverTimeout.current = setTimeout(() => {
-      setHovered({ player: p, x, y });
-    }, 120);
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHovered({ player: p, rect });
   };
 
   const handleMouseLeave = () => {
-    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-    hoverTimeout.current = setTimeout(() => {
-      setHovered(null);
-    }, 100);
+    setHovered(null);
   };
+
+  // Dismiss on scroll
+  useEffect(() => {
+    const onScroll = () => setHovered(null);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const isAll = selectedTeam.slug === "all" || selectedTeam.id === 0;
 
@@ -509,218 +507,226 @@ function GoalieTable({
   );
 }
 
+const GOALIE_ATTRS: Array<{ key: GoalieParamKey; label: string; nameSk: string; nameEn: string }> = [
+  { key: "sz", label: "SZ", nameSk: "Veľkosť", nameEn: "Size" },
+  { key: "ag", label: "AG", nameSk: "Pohyblivosť", nameEn: "Agility" },
+  { key: "rb", label: "RB", nameSk: "Vyrážanie", nameEn: "Rebounds" },
+  { key: "sc", label: "SC", nameSk: "Štýl / Pokrytie", nameEn: "Style Control" },
+  { key: "hs", label: "HS", nameSk: "Vysoké strely", nameEn: "High Shots" },
+  { key: "rt", label: "RT", nameSk: "Reflexy / Nízke", nameEn: "Reflexes" },
+  { key: "ph", label: "PH", nameSk: "Hra s hokejkou", nameEn: "Puck Handling" },
+  { key: "sk", label: "SK", nameSk: "Korčuľovanie", nameEn: "Skating" },
+  { key: "du", label: "DU", nameSk: "Odolnosť", nameEn: "Durability" },
+  { key: "en", label: "EN", nameSk: "Výdrž", nameEn: "Endurance" },
+  { key: "ex", label: "EX", nameSk: "Skúsenosti", nameEn: "Experience" },
+  { key: "ps", label: "PS", nameSk: "Nájazdy", nameEn: "Penalty Shot" },
+];
+
+function getPopoverStyle(rect: DOMRect): React.CSSProperties {
+  const width = 380;
+  const padding = 16;
+  const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const windowHeight = typeof window !== "undefined" ? window.innerHeight : 800;
+
+  let left = rect.right + 12;
+  if (left + width > windowWidth - padding) {
+    left = rect.left - width - 12;
+  }
+  if (left < padding) {
+    left = Math.max(padding, windowWidth - width - padding);
+  }
+
+  const estimatedHeight = 360;
+  let top = rect.top - 8;
+  if (top + estimatedHeight > windowHeight - padding) {
+    top = windowHeight - estimatedHeight - padding;
+  }
+  if (top < padding) {
+    top = padding;
+  }
+
+  return {
+    top: `${Math.round(top)}px`,
+    left: `${Math.round(left)}px`,
+  };
+}
+
 function GoalieHoverComparisonCard({
   hovered,
 }: {
-  hovered: { player: ProjGoalie; x: number; y: number } | null;
+  hovered: { player: ProjGoalie; rect: DOMRect } | null;
 }) {
   if (!hovered) return null;
-  const { player: p, x, y } = hovered;
+  const { player: p, rect } = hovered;
 
-  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
-  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
-
-  const cardWidth = 760;
-  const cardHeight = 310;
-
-  let top = y + 8;
-  if (top + cardHeight > vh - 16) {
-    top = Math.max(10, y - cardHeight - 44);
-  }
-
-  let left = Math.max(16, Math.min(x, vw - cardWidth - 20));
-
+  const ovAct = p.overall ?? 50;
+  const ovProj = p.overallProjected ?? ovAct;
+  const ovDiff = ovProj - ovAct;
   const s = p.stats ?? {};
 
   return (
     <div
-      style={{
-        position: "fixed",
-        top,
-        left,
-        width: Math.min(cardWidth, vw - 32),
-        zIndex: 100,
-      }}
-      className="pointer-events-none rounded-3xl border border-slate-700/90 bg-slate-950/98 p-5 shadow-2xl backdrop-blur-3xl ring-2 ring-white/10 animate-in fade-in zoom-in-95 duration-100"
+      style={getPopoverStyle(rect)}
+      className="fixed z-50 pointer-events-none transition-opacity duration-150 animate-in fade-in zoom-in-95"
     >
-      {/* Header with avatar and Overall */}
-      <div className="flex items-center justify-between gap-4 pb-3 mb-3 border-b border-slate-800">
-        <div className="flex items-center gap-3.5 min-w-0">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              {p.number != null && (
-                <span className="text-sm font-mono text-slate-500 font-bold">
-                  #{p.number}
+      <div className="w-[380px] rounded-2xl bg-slate-950/95 border border-slate-700/80 shadow-[0_25px_60px_rgba(0,0,0,0.85)] backdrop-blur-2xl p-4 text-xs text-white space-y-3 ring-1 ring-amber-500/20">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <PlayerAvatar src={p.photoUrl} alt={p.name} size={42} />
+            <div className="min-w-0">
+              <div className="font-bold text-white text-sm truncate flex items-center gap-1.5">
+                {p.number != null && <span className="text-slate-500 font-mono font-bold text-xs">#{p.number}</span>}
+                <span className="truncate">{cleanName(p.name)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold border bg-amber-500/10 border-amber-500/30 text-amber-300">
+                  G
                 </span>
-              )}
-              <span className="font-black text-white text-lg tracking-tight truncate">
-                {cleanName(p.name)}
+                {p.age != null && <span>• {p.age} r.</span>}
+                {p.gp > 0 && <span>• {p.gp} GP</span>}
+                {p.classification && (
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                    {p.classification}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Overall comparison */}
+          <div className="text-right shrink-0 pl-2">
+            <div className="text-[10px] uppercase font-bold text-slate-400">OV</div>
+            <div className="flex items-center gap-1 mt-0.5">
+              <span className="text-xs font-semibold text-slate-400">{ovAct}</span>
+              <span className="text-slate-500 text-[10px]">→</span>
+              <span className="text-sm font-black text-amber-300">{ovProj}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded text-[10px] border font-bold ${
+                  ovDiff > 0
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    : ovDiff < 0
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    : "bg-slate-800 text-slate-400 border-slate-700 font-normal"
+                }`}
+              >
+                {ovDiff > 0 ? `+${ovDiff}` : `${ovDiff}`}
               </span>
-              <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg border bg-amber-500/10 border-amber-500/30 text-amber-300">
-                G
+            </div>
+          </div>
+        </div>
+
+        {/* Goalie advanced stats pills */}
+        {(s.svPct != null || s.gaa != null || s.gsax != null) && (
+          <div className="flex items-center gap-1.5 text-[10px] overflow-x-auto pb-0.5">
+            {s.svPct != null && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                SV% <strong className="text-emerald-400">{(s.svPct * 100).toFixed(1)}%</strong>
               </span>
-              {p.classification && (
-                <span
-                  className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${
-                    p.classification === "NHL"
-                      ? "text-sky-300 bg-sky-500/10 border-sky-500/30"
-                      : "text-purple-300 bg-purple-500/10 border-purple-500/30"
+            )}
+            {s.gaa != null && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                GAA <strong className="text-slate-200">{s.gaa.toFixed(2)}</strong>
+              </span>
+            )}
+            {s.gsax != null && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
+                GSAx <strong className={s.gsax >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                  {s.gsax > 0 ? `+${s.gsax.toFixed(1)}` : s.gsax.toFixed(1)}
+                </strong>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Core Attributes comparison (SZ, AG, RB, SC, HS, RT) */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span>Kľúčové parametre</span>
+            <span className="text-[9px] font-normal text-slate-400 opacity-80">
+              Pôvodné → Nové (Posun)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            {GOALIE_ATTRS.slice(0, 6).map((attr) => {
+              const act = p.actual[attr.key] ?? 0;
+              const proj = p.projected[attr.key] ?? act;
+              const d = proj - act;
+              return (
+                <div
+                  key={attr.key}
+                  className={`flex items-center justify-between p-1.5 rounded-xl border text-[11px] ${
+                    d > 0
+                      ? "bg-emerald-950/25 border-emerald-500/35"
+                      : d < 0
+                      ? "bg-rose-950/25 border-rose-500/35"
+                      : "bg-slate-900/60 border-slate-800"
                   }`}
                 >
-                  {p.classification}
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-slate-400 mt-1 flex items-center gap-2.5 flex-wrap">
-              {p.age != null && <span><b>{p.age}</b> rokov</span>}
-              {p.gp > 0 && (
-                <>
-                  <span className="text-slate-600">·</span>
-                  <span><b>{p.gp}</b> GP</span>
-                </>
-              )}
-              {p.statusText && (
-                <>
-                  <span className="text-slate-600">·</span>
-                  <span className="text-slate-300">{p.statusText}</span>
-                </>
-              )}
-            </div>
+                  <div className="min-w-0 pr-1">
+                    <span className="font-black text-white mr-1">{attr.label}</span>
+                    <span className="text-[10px] text-slate-400 truncate hidden sm:inline">
+                      {attr.nameSk}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 font-mono">
+                    <span className="text-slate-400 text-[10px]">{act}</span>
+                    <span className="text-slate-500 text-[9px]">→</span>
+                    <span className="font-bold text-white text-[11px]">{proj}</span>
+                    <span
+                      className={`px-1 py-0.2 rounded text-[10px] font-bold ${
+                        d > 0 ? "text-emerald-400" : d < 0 ? "text-rose-400" : "text-slate-400"
+                      }`}
+                    >
+                      ({d > 0 ? `+${d}` : d})
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">
-              Overall Rating (OV)
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="text-lg font-bold text-slate-300 px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700/80 tabular-nums">
-                {p.overall ?? "—"} <span className="text-[10px] font-semibold text-slate-400">Akt</span>
-              </div>
-              <span className="text-slate-500 font-bold">→</span>
-              <div className="text-lg font-black text-amber-300 px-2.5 py-1 rounded-xl bg-amber-600/20 border border-amber-500/40 tabular-nums flex items-center gap-1">
-                <span>{p.overallProjected ?? p.overall ?? "—"}</span>
-                <span className="text-[10px] font-bold text-amber-400">Proj</span>
-                {p.overallProjected != null && p.overall != null && p.overallProjected !== p.overall && (
-                  <span
-                    className={`text-xs font-black ml-0.5 ${
-                      p.overallProjected > p.overall ? "text-emerald-400" : "text-rose-400"
-                    }`}
-                  >
-                    {p.overallProjected > p.overall
-                      ? `+${p.overallProjected - p.overall}`
-                      : p.overallProjected - p.overall}
-                  </span>
-                )}
-              </div>
-            </div>
+        {/* Secondary Attributes comparison (PH, SK, DU, EN, EX, PS) */}
+        <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Ostatné atribúty
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            {GOALIE_ATTRS.slice(6).map((attr) => {
+              const act = p.actual[attr.key] ?? 0;
+              const proj = p.projected[attr.key] ?? act;
+              const d = proj - act;
+              return (
+                <div
+                  key={attr.key}
+                  className={`p-1 rounded-lg border text-center text-[10px] ${
+                    d > 0
+                      ? "bg-emerald-950/25 border-emerald-500/35 text-emerald-300"
+                      : d < 0
+                      ? "bg-rose-950/25 border-rose-500/35 text-rose-300"
+                      : "bg-slate-900/50 border-slate-800 text-slate-400"
+                  }`}
+                >
+                  <div className="font-bold text-white">{attr.label}</div>
+                  <div className="font-mono mt-0.5 text-[9px]">
+                    {act}→<strong className="text-white">{proj}</strong>
+                  </div>
+                  <div className="font-bold text-[9px]">
+                    {d > 0 ? `+${d}` : d}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-      </div>
 
-      {/* Advanced Stats Pill Bar */}
-      <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-800/80 overflow-x-auto text-xs">
-        <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-          <span className="text-slate-500 text-[10px] uppercase block">SV%</span>
-          <span className="font-bold text-emerald-400">{s.svPct != null ? (s.svPct * 100).toFixed(1) + "%" : "—"}</span>
+        {/* Footer */}
+        <div className="pt-1 border-t border-slate-800/60 text-[10px] text-slate-400 flex items-center justify-between">
+          <span>✨ Prepočet v reálnom čase</span>
+          <span className="font-mono">{p.statusText ?? p.classification ?? "NHL"}</span>
         </div>
-        <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-          <span className="text-slate-500 text-[10px] uppercase block">GAA</span>
-          <span className="font-bold text-slate-200">{s.gaa != null ? s.gaa.toFixed(2) : "—"}</span>
-        </div>
-        <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-          <span className="text-slate-500 text-[10px] uppercase block">GSAx</span>
-          <span className={`font-bold ${s.gsax != null && s.gsax >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-            {s.gsax != null ? (s.gsax > 0 ? `+${s.gsax.toFixed(1)}` : s.gsax.toFixed(1)) : "—"}
-          </span>
-        </div>
-        <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-          <span className="text-slate-500 text-[10px] uppercase block">GSAx/60</span>
-          <span className={`font-bold ${s.gsax60 != null && s.gsax60 >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-            {s.gsax60 != null ? (s.gsax60 > 0 ? `+${s.gsax60.toFixed(2)}` : s.gsax60.toFixed(2)) : "—"}
-          </span>
-        </div>
-        <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-          <span className="text-slate-500 text-[10px] uppercase block">HD SV%</span>
-          <span className="font-bold text-sky-400">{s.hdSv != null ? (s.hdSv * 100).toFixed(1) + "%" : "—"}</span>
-        </div>
-        <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-          <span className="text-slate-500 text-[10px] uppercase block">RebCtrl</span>
-          <span className="font-bold text-indigo-300">{s.rebCtrl != null ? s.rebCtrl.toFixed(2) : "—"}</span>
-        </div>
-        <div className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800">
-          <span className="text-slate-500 text-[10px] uppercase block">Freeze %</span>
-          <span className="font-bold text-purple-300">{s.freezePct != null ? (s.freezePct * 100).toFixed(0) + "%" : "—"}</span>
-        </div>
-      </div>
-
-      {/* Comparison Matrix */}
-      <div className="overflow-x-auto pb-1 scrollbar-thin">
-        <table className="w-full text-center text-sm">
-          <thead>
-            <tr className="border-b border-slate-800 text-xs uppercase font-extrabold text-slate-400">
-              <th className="py-1.5 px-2 text-left text-slate-500 min-w-[85px]">Stav</th>
-              {ALL_GOALIE_PARAMS.map((k) => (
-                <th key={k} className="py-1.5 px-1.5 min-w-[38px] text-amber-300 font-bold" title={GOALIE_PARAM_META[k].name}>
-                  {GOALIE_PARAM_META[k].label}
-                </th>
-              ))}
-              <th className="py-1.5 px-2 min-w-[44px] text-amber-300 font-black border-l border-slate-800">
-                OV
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800/60 font-mono">
-            {/* Actual */}
-            <tr>
-              <td className="py-2 px-2 text-left font-sans text-xs font-bold text-slate-400">Tento rok</td>
-              {ALL_GOALIE_PARAMS.map((k) => (
-                <td key={k} className="py-2 px-1 text-slate-300 font-semibold">
-                  {p.actual[k] ?? "—"}
-                </td>
-              ))}
-              <td className="py-2 px-2 font-bold text-slate-200 border-l border-slate-800 bg-slate-900/50">
-                {p.overall ?? "—"}
-              </td>
-            </tr>
-
-            {/* Projected */}
-            <tr className="bg-amber-950/15">
-              <td className="py-2 px-2 text-left font-sans text-xs font-black text-amber-300">Live Odhad</td>
-              {ALL_GOALIE_PARAMS.map((k) => (
-                <td key={k} className="py-2 px-1 text-white font-black">
-                  {p.projected[k] ?? p.actual[k] ?? "—"}
-                </td>
-              ))}
-              <td className="py-2 px-2 font-black text-amber-300 border-l border-slate-800 bg-amber-900/30">
-                {p.overallProjected ?? p.overall ?? "—"}
-              </td>
-            </tr>
-
-            {/* Difference */}
-            <tr className="bg-slate-900/40 text-xs">
-              <td className="py-1.5 px-2 text-left font-sans font-bold text-slate-500">Rozdiel</td>
-              {ALL_GOALIE_PARAMS.map((k) => {
-                const diff = (p.projected[k] ?? 0) - (p.actual[k] ?? 0);
-                return (
-                  <td key={k} className={`py-1.5 px-1 font-bold ${diff > 0 ? "text-emerald-400" : diff < 0 ? "text-rose-400" : "text-slate-600"}`}>
-                    {diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : "—"}
-                  </td>
-                );
-              })}
-              <td className="py-1.5 px-2 font-black border-l border-slate-800">
-                {p.overallProjected != null && p.overall != null && p.overallProjected !== p.overall ? (
-                  <span className={p.overallProjected > p.overall ? "text-emerald-400" : "text-rose-400"}>
-                    {p.overallProjected > p.overall ? `+${p.overallProjected - p.overall}` : p.overallProjected - p.overall}
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
   );
