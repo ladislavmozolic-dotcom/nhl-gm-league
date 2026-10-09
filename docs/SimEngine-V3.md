@@ -340,3 +340,22 @@ Seeds 90,000 / 190,000 / 290,000: goals 2.98 / 3.04 / 3.06, PP% 21.2 / 21.6 / 21
 second time on that seed — a seed-specific reading, the 30-seed mean was 13.5%), OT/SO 17.8 /
 18.3 / 22.0% (seed noise; 8-seed mean ~20.1%). **Not yet shown:** that the flag widens the
 team-to-team PP% spread as designed — this needs a per-team PP% histogram over many seeds.
+
+### PP puck movement — per-team spread — 2026-10-09
+
+`frontend/scripts/pp-team-spread.ts` simulates 12 seed bases (4,000,000 + i·100,000; 32 teams,
+~2,200 PP opportunities per team) with V3 minus the flag vs V3 with it:
+
+| | without flag | with flag |
+| --- | ---: | ---: |
+| League PP% | 21.39 | 21.22 |
+| Team PP% sd | 3.55 | 3.84 |
+| Team PP% range | 15.8 – 30.1 | 15.3 – 30.7 |
+| corr(team PA skill, PP%) | 0.715 | 0.765 |
+
+The mean holds (−0.17 pt) while the spread widens ~8% and PP% tracks team passing skill more
+closely, as designed (binomial sampling noise is only ~0.9 pt, so the change is real but
+modest). Both versions already have a wide spread — V3's 3.8 pt sd is on the high side of
+real-NHL team PP% variation, so do not strengthen the slope further. A separate PK mechanic
+is not needed: the same gap term already drives the PK side (strong PK D lower PP% for the
+opposing team).
