@@ -9,7 +9,7 @@ import {
   isNextGenEngine,
   resolveSimEngine,
 } from "../lib/sim/version";
-import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
+import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
 import type { SimSkater } from "../lib/sim/types";
 
 test("V3 is a next-gen workbench version, not a league-selectable engine", () => {
@@ -97,4 +97,13 @@ test("V3 block skill is centred on a typical defenceman and bounded", () => {
   assert.ok(v3BlockSkillMult(80) > 1 && v3BlockSkillMult(60) < 1);
   assert.equal(v3BlockSkillMult(200), 1.1);
   assert.equal(v3BlockSkillMult(0), 0.9);
+});
+
+test("V3 goalie composure: rattled after a goal, locked in after a long save streak", () => {
+  assert.equal(v3GoalieComposureMult(30, 0), 1.06);
+  assert.equal(v3GoalieComposureMult(120, 0), 1.06);
+  assert.equal(v3GoalieComposureMult(121, 5), 1);
+  assert.equal(v3GoalieComposureMult(500, 12), 0.96);
+  assert.equal(v3GoalieComposureMult(60, 12), 1.06);
+  assert.equal(v3GoalieComposureMult(1e9, 0), 1);
 });

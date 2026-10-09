@@ -269,3 +269,19 @@ V2 (differences well inside 1–1.5 se). The only real shift is goals +0.047/tea
 (+1.6%), from goalie rhythm, still inside the 2.9–3.15 target; save % drops .001 as
 intended. The top-scorer average stays above the 130 ceiling in both engines (shared
 calibration item). Verdict: the 12-increment V3 is calibration-safe as a package.
+
+### Goalie composure — thirteenth increment, offline — 2026-10-09
+
+Flag `goalieComposure`: a goalie is *rattled* for 2:00 after allowing a goal (goal chance ×1.06)
+and *locked in* after 12+ consecutive saves (×0.96); a goal resets the streak, so the two
+states never overlap. State is per game (`st.goalieStreak`, `st.lastGoalAgainst`); no extra
+RNG draws; empty-net shots excluded. Pure helper `v3GoalieComposureMult` is unit-tested.
+
+Gates: identity with all 13 flags off — identical on 400 games (seed 90,000); 10/10 tests.
+Seeds 90,000 / 190,000 / 290,000: goals 2.98 / 3.04 / 3.06, shots 31.3–31.5, save %
+.911 / .910 / .909, home win 53.6–53.8%, PIM 11.0–11.8, GSAx +0.30 / +0.24 / +0.21,
+blowouts **14.2** / 13.8 / 12.4%. Net scoring effect is roughly neutral (rattled and
+locked-in roughly cancel), but blowouts now touch the 14% ceiling on seed 90,000 —
+the rattled state adds a little goal clustering. Needs the 30-seed protocol (blowouts,
+Spearman, top scorer) before any promotion discussion; if blowouts drift, shorten the
+rattled window to 90s or soften to ×1.04.
