@@ -464,3 +464,29 @@ Effect on 12 seed bases (7,000,000 + i·100,000), V3 minus the flag vs V3 plus i
 correct the +0.6 pt drift seen against V2; that drift comes from the scoring-positive
 increments and needs a flag-by-flag split. Open observation: the V3 upset rate (~27–28%) sits
 at the bottom of the 28–45% target; V2's value on the same seeds has not been measured here yet.
+
+### Flag-group split vs V2 — 19 flags, 30 fresh seed bases — 2026-10-09
+
+Seed bases 8,000,000 + i·100,000 (992 games each), mean ± se. Groups removed from the full
+V3: **goalie** = goalieRhythm, goalieComposure, shootoutDuel, reboundClearance, blockSkill;
+**special** = ppPuckMovement, speedDrawsPenalties, netFront, overtimeStars, emotionalDiscipline;
+**game** = garbageTime, coachAdaptation, fatigueDeployment, momentumTimeout, faceoffPressure.
+
+| Config | Blowouts % | Upset % | Goals | Spearman | Top scorer |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| V2 | 13.19 ± 0.20 | 28.7 ± 0.6 | 3.008 ± 0.005 | 0.800 ± 0.010 | 134.1 ± 1.5 |
+| V3 all 19 | 13.38 ± 0.22 | 28.8 ± 0.4 | 3.032 ± 0.008 | 0.796 ± 0.009 | 130.2 ± 1.7 |
+| V3 − goalie group | 13.00 ± 0.20 | 28.7 ± 0.5 | 3.004 ± 0.005 | 0.800 ± 0.008 | 129.9 ± 1.6 |
+| V3 − special group | 13.31 ± 0.24 | 29.0 ± 0.4 | 3.029 ± 0.007 | 0.792 ± 0.008 | 131.3 ± 1.3 |
+| V3 − game group | 13.42 ± 0.23 | 28.1 ± 0.5 | 3.038 ± 0.009 | 0.802 ± 0.009 | 133.5 ± 1.3 |
+
+Conclusions:
+- **Blowout "drift" and low upset rate were seed noise.** On fresh seeds V3 (13.38%) vs V2
+  (13.19%) differ by <1 se, and the upset rate is identical to V2 (28.8 vs 28.7%), inside the
+  28–45% band. The earlier 27–28% upset reading was V2-level noise around the band's edge.
+- **Spearman is identical to V2 (0.796 vs 0.800)** — the +0.018 seen on the previous seed set
+  was likewise noise. Per-seed sd is ~0.05, so only ≥30-seed means mean anything.
+- **The only systematic shift is goals: +0.024 (≈2.5 se), and it comes from the goalie group**
+  (removing it returns goals to 3.004 and blowouts to 13.0%). It is the rhythm/composure pair
+  (net goal-positive) that costs ~0.8% more goals; still inside 2.9–3.15.
+- Top scorer ~130 vs 134: the finishing curve helps as intended.
