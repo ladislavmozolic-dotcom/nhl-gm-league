@@ -9,6 +9,20 @@ export type { GameStrategy, StratWeights, LineTactic } from "./types";
 // Per-line tactic (STHS): PHY = physical/forecheck, DF = defensive commitment,
 // OF = offensive push. Small integers (0-5). Neutral baseline is PHY 1 / DF 2 / OF 2.
 export const NEUTRAL_TACTIC: LineTactic = { phy: 1, df: 2, of: 2 };
+/** The line slots a skater plays WITHOUT an off-position penalty (LW/C/RW for forwards, LD or RD for a D by shooting hand).
+ *  The sim engine uses this same function, so the editor's "off-position" warning always matches what the engine does. */
+export function naturalSlots(position: string | null | undefined, shoots: string | null | undefined): Set<string> {
+  const pos = (position || "").toUpperCase();
+  if (/D/.test(pos) && !/C|W/.test(pos)) return new Set([shoots === "R" ? "RD" : "LD"]);
+  const out = new Set<string>();
+  const universal = /(^|\/)F(\/|$)/.test(pos);
+  if (universal || /C/.test(pos)) out.add("C");
+  if (universal || pos.includes("LW") || /(^|\/)L(\/|$)/.test(pos) || /(^|\/)W(\/|$)/.test(pos)) out.add("LW");
+  if (universal || pos.includes("RW") || /(^|\/)R(\/|$)/.test(pos) || /(^|\/)W(\/|$)/.test(pos)) out.add("RW");
+  if (out.size === 0) out.add("C");
+  return out;
+}
+
 export type ForwardLine = { lw: number | null; c: number | null; rw: number | null; timePct: number; tactic?: LineTactic; puck?: PuckStyle };
 export type DefensePair = { ld: number | null; rd: number | null; timePct: number; tactic?: LineTactic; dzone?: DZone };
 /** A generic ordered special-teams / situational unit (slots + ice-time share + tactic). */

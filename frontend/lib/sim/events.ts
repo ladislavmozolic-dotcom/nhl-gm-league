@@ -35,7 +35,8 @@ export type EventType =
   | "TIMEOUT"           // a bench's one timeout
   | "COINCIDENTAL"      // coincidental minors at full strength → 4-on-4
   | "KNOCK"             // shaken up — to the room for a few minutes
-  | "RETURN";           // …and back on the bench
+  | "RETURN"            // …and back on the bench
+  | "SHOOTOUT";         // one shootout attempt — only synthesized for the LIVE feed (the engine keeps attempts in result.shootout)
 
 // Rising importance — controls what gets persisted and how loud the PBP is.
 export type Importance = "MINOR" | "NOTABLE" | "MAJOR" | "HIGHLIGHT";
@@ -90,6 +91,11 @@ export class EventSink {
    * previous NOTABLE threshold for every other kind of micro-event. */
   persistable(): SimEvent[] {
     return this.events.filter((e) => e.type === "SHOT" || e.type === "SAVE" || RANK[e.importance] >= RANK.NOTABLE);
+  }
+
+  /** Persistable events emitted since index `cursor` (a prior `count`) — the live feed. */
+  persistableSince(cursor: number): SimEvent[] {
+    return this.events.slice(cursor).filter((e) => e.type === "SHOT" || e.type === "SAVE" || RANK[e.importance] >= RANK.NOTABLE);
   }
 
   get count(): number {

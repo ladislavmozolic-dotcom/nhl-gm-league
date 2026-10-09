@@ -10,6 +10,7 @@ import type {
   SimSkater, SimGoalie, SimTeam, SkaterAttrs, GoalieAttrs, CoachInput,
 } from "./types";
 import type { TeamLinesData } from "./lines";
+import { naturalSlots } from "./lines-core";
 import { buildUnits, buildStUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
 import { roleFitOf as roleFitPure } from "./role-fit";
 import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics, type PpStyle, type PkStyle } from "./tactics";
@@ -200,15 +201,7 @@ function roleFitOf(members: SimSkater[], isDef: boolean): number {
 
 // A player's natural positions (LW/C/RW for forwards; LD or RD for a D by shoots).
 function naturalPositions(s: SimSkater): Set<string> {
-  const pos = (s.position || "").toUpperCase();
-  if (/D/.test(pos) && !/C|W/.test(pos)) return new Set([s.shoots === "R" ? "RD" : "LD"]);
-  const out = new Set<string>();
-  const universal = /(^|\/)F(\/|$)/.test(pos);
-  if (universal || /C/.test(pos)) out.add("C");
-  if (universal || pos.includes("LW") || /(^|\/)L(\/|$)/.test(pos) || /(^|\/)W(\/|$)/.test(pos)) out.add("LW");
-  if (universal || pos.includes("RW") || /(^|\/)R(\/|$)/.test(pos) || /(^|\/)W(\/|$)/.test(pos)) out.add("RW");
-  if (out.size === 0) out.add("C");
-  return out;
+  return naturalSlots(s.position, s.shoots);
 }
 // Severity of playing `slot` given natural positions → one of the STHS penalty tiers.
 function positionSeverity(nat: Set<string>, slot: string, pen: { wing: number; center: number; def: number }): number {

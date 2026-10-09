@@ -178,6 +178,9 @@ type SimState = {
   officials: { penaltyMult: number; evenUp: number } | null; // tonight's referee crew (null = neutral)
   timeoutUsed: Record<number, boolean>;
   challengeFailed: Record<number, boolean>; // a failed challenge ends a bench's challenges for the night
+  liveFeed: boolean; liveCursor: number; // live driver wants the event feed per stoppage; index of the first undelivered event
+  departedDefense: Set<number>; // defensemen a live change took out of the lineup mid-game (still D for post-game CON)
+  activePens: Penalty[] | null; // the current period's live penalty list (addPenalty pushes into it) — per game, so live games can interleave
   knocks: Map<number, { teamId: number; back: number; name: string }>; // shaken-up players: back at abs game-second `back`
   crowdMult: number;                // home team's shot-attempt lift from its crowd (1 = neutral)
 };
@@ -870,12 +873,11 @@ function addPenalty(
     });
   }
 }
-// active list is period-local; addPenalty pushes to it via a per-period ref
-let _activeRef: Penalty[] | null = null;
-function active_push(_st: SimState, p: Penalty) { _activeRef?.push(p); }
+// active list is period-local; addPenalty pushes to it via the game's per-period ref
+function active_push(st: SimState, p: Penalty) { st.activePens?.push(p); }
 
 function generatePenalties(st: SimState, team: SimTeam, period: number, active: Penalty[]) {
-  _activeRef = active;
+  st.activePens = active;
   if (!CFG.penaltiesEnabled) return;
   // physicality raises the penalty rate (proxy for a high-PHY strategy)
   const phyFactor = 0.85 + 0.3 * (avgHitting(team) / 65);
@@ -1501,7 +1503,85 @@ function lineTilt(t: LineTactic | undefined): { of: number; df: number } {
 // node = base attribute × tactics × chemistry × morale × fatigue.
 /** One 20:00 period of the possession engine. With `suddenDeath` (playoff OT) the
  *  period ends the instant someone scores; returns that team's id (else null). */
-function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDeath?: boolean } = {}): number | null {
+// The only SimTeam fields a live change may replace: lineup + tactics. Goalie, coach,
+// rivals, id/name stay with the game as it started.
+const LIVE_ADOPTED_FIELDS = [
+  "forwards", "defense", "offenseRating", "defenseRating", "avgOV", "units", "stUnits", "chemistry", "slowChem",
+  "ppChem", "pkChem", "shootoutOrder", "fwdTactics", "defTactics", "tactics", "teamTactics", "strategy",
+  "ppUnitStyleByPlayer", "ppUnitSideByPlayer", "pp4UnitStyleByPlayer", "pp4UnitSideByPlayer", "pkUnitStyleByPlayer", "pk3UnitStyleByPlayer",
+  "profile", "fwdLineFx", "defPairFx",
+] as const satisfies readonly (keyof SimTeam)[];
+
+/**
+ * Swap `live`'s lineup/tactics for `next`'s IN PLACE (the engine compares teams by
+ * identity). Consumes no RNG. Returns false (and changes nothing) for a team that
+ * isn't the same club. Players new to the night get a stat line; players who leave
+ * keep theirs, and a departed defenseman stays a defenseman for post-game conditioning.
+ */
+function adoptTeamChange(st: SimState, live: SimTeam, next: SimTeam): boolean {
+  if (next.id !== live.id) return false;
+  const nextIds = new Set([...next.forwards, ...next.defense].map((s) => s.id));
+  for (const d of live.defense) if (!nextIds.has(d.id)) st.departedDefense.add(d.id);
+  for (const k of LIVE_ADOPTED_FIELDS) (live as Record<string, unknown>)[k] = next[k];
+  for (const s of [...live.forwards, ...live.defense]) st.lines[live.id][s.id] ??= newPlayerLine(s);
+  armLineupDerived(st, live);
+  return true;
+}
+
+// Lineup-derived, RNG-free game state: leadership/experience momentum constants and the D-pair gel shield.
+function armLineupDerived(st: SimState, team: SimTeam) {
+  const ld = iceAvgAttr(team, (s) => s.attrs.ld ?? 50);
+  const ex = iceAvgAttr(team, (s) => s.attrs.ex ?? 50);
+  st.momoTau[team.id] = CFG.momentumDecaySec * (0.75 + ld / 200);          // LD 50→1.0x, 90→1.2x
+  st.momoDip[team.id] = CFG.momentumConcedeDip * (1 - (ex - 50) / 250) * team.coachLd; // EX 90→0.84x, 25→1.1x; coach LD softens further
+  // defensive shield: a gelled, role-diverse D pair suppresses goals against
+  st.defChem[team.id] = team.defense.length
+    ? team.defense.reduce((t, d) => t + chemFactor(d.chem, d.roleFit), 0) / team.defense.length : 1;
+}
+
+/** Why play stopped — the moments a live GM may change tactics/lines. */
+export type StopReason = "period-start" | "goal" | "icing" | "whistle" | "line-change" | "goalie-freeze" | "challenge" | "game-end";
+/**
+ * What a live driver may hand back at a stoppage (`gen.next(change)`): a rebuilt
+ * SimTeam (via `buildTeam` with the GM's new lines/system) per side. Only the
+ * lineup + tactics are adopted — goalie, coach, rivals and id stay as they are.
+ */
+export type TeamChange = {
+  home?: SimTeam; away?: SimTeam;
+  /** a bench calls its (one per game) timeout at this whistle — the unit on the ice gets its breath back */
+  timeout?: { home?: boolean; away?: boolean };
+};
+export type Stoppage = {
+  period: number; tick: number; absSeconds: number; why: StopReason;
+  zoneTeamId: number | null;        // team whose defensive zone hosts the draw (null = centre ice)
+  noChangeTeamIds: number[];        // teams that iced it and may not change this draw
+  // live feed (only filled when SimOptions.liveFeed is set): the score/shots now and the
+  // persistable events emitted since the previous stoppage
+  score: { home: number; away: number };
+  shots: { home: number; away: number };
+  events: SimEvent[];
+  timeoutUsedTeamIds: number[];     // benches that have already spent their timeout
+};
+// The live driver's view of the game right now (cheap no-op unless the caller asked for the feed).
+function liveFeedOf(st: SimState): Pick<Stoppage, "score" | "shots" | "events" | "timeoutUsedTeamIds"> {
+  const events = st.liveFeed ? st.sink.persistableSince(st.liveCursor) : [];
+  if (st.liveFeed) st.liveCursor = st.sink.count;
+  return {
+    score: { home: st.box[st.home.id].goals, away: st.box[st.away.id].goals },
+    shots: { home: st.box[st.home.id].shots, away: st.box[st.away.id].shots },
+    events,
+    timeoutUsedTeamIds: [st.home.id, st.away.id].filter((id) => st.timeoutUsed[id]),
+  };
+}
+
+/** Run a stoppage generator to the end, ignoring every yield — the batch (non-live) path. */
+function drainGen<T>(g: Generator<Stoppage, T, TeamChange | undefined>): T {
+  let r = g.next();
+  while (!r.done) r = g.next();
+  return r.value;
+}
+
+function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean } = {}): Generator<Stoppage, number | null, TeamChange | undefined> {
   const { home, away, rng } = st;
   let suddenWinner: number | null = null;
   const active: Penalty[] = [];
@@ -1517,6 +1597,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   const other = (t: SimTeam) => (t === home ? away : home);
 
   type St = "FACEOFF" | "PLAY";
+  let stopWhy: StopReason = "period-start";
   let state: St = "FACEOFF";
   let carrierTeam: SimTeam = home;
   let carrier: SimSkater = home.forwards[0];
@@ -1710,8 +1791,9 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     // net effect favours the chasing team (a push that sometimes gets burned)
     return marginFor < 0 ? { shots: 1.1, allow: 1.04 } : { shots: 0.94, allow: 0.97 };
   };
-  const useTimeout = (team: SimTeam, tick: number, why: string) => {
-    if (!CFG.timeoutEnabled || !coach[team.id].timeout || st.timeoutUsed[team.id]) return;
+  const useTimeout = (team: SimTeam, tick: number, why: string, called = false) => {
+    // `called`: the GM asked for it — the coach's own "use it automatically" preference doesn't apply
+    if (!CFG.timeoutEnabled || (!called && !coach[team.id].timeout) || st.timeoutUsed[team.id]) return;
     st.timeoutUsed[team.id] = true;
     st.box[team.id].timeouts++;
     shifts[team.id].fElapsed = 0; shifts[team.id].dElapsed = 0; // the unit on the ice gets its breath back
@@ -1793,14 +1875,14 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     // for one when they can), so most of these still go to a draw — but a clean
     // minority are genuinely on-the-fly, mid-possession, no stoppage at all.
     if (penStarts || hurtHome.some((s) => s.id === carrier.id) || hurtAway.some((s) => s.id === carrier.id)) {
-      state = "FACEOFF"; setup = "carry"; press = 0;
+      stopWhy = "whistle"; state = "FACEOFF"; setup = "carry"; press = 0;
       // after a penalty the draw is in the offending team's end (NHL Rule 76)
       const called = penStarts ? active.find((p) => p.start === tick && !p.expired && !p.offsetting && !p.fourOnFour) : undefined;
       foZone = CFG.zoneFaceoffsEnabled && called ? called.team : null;
     } else if (!carrierOnIce) {
       // (icings now add their own real whistles, so fewer changes wait for one)
       if (onIcePool.length && !rng.chance(CFG.icingEnabled ? 0.62 : 0.75)) carrier = pickByAttr(rng, onIcePool, (s) => s.attrs.sk ?? 50) ?? carrier;
-      else { state = "FACEOFF"; setup = "carry"; press = 0; foZone = null; }
+      else { stopWhy = "line-change"; state = "FACEOFF"; setup = "carry"; press = 0; foZone = null; }
     }
     announceChange(home, tick); announceChange(away, tick);
     // Empty net: a team trailing late in regulation, at even strength OR on a power play
@@ -1858,6 +1940,26 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     }
 
     if (state === "FACEOFF") {
+      // LIVE HOOK: every stoppage is a safe change point. The driver may swap tactics/lines here
+      // (it consumes no RNG, so draining the generator untouched reproduces the batch sim exactly).
+      const change = yield { period, tick, absSeconds: base + tick, why: stopWhy, zoneTeamId: foZone, noChangeTeamIds: [home.id, away.id].filter((t) => noChange[t]), ...liveFeedOf(st) };
+      stopWhy = "whistle";
+      if (change) {
+        // a called timeout is always allowed — even right after an icing (that's when a tired unit needs it most)
+        if (change.timeout?.home) useTimeout(home, tick, "to give the unit on the ice a breather", true);
+        if (change.timeout?.away) useTimeout(away, tick, "to give the unit on the ice a breather", true);
+        for (const [team, next] of [[home, change.home], [away, change.away]] as const) {
+          if (!next || noChange[team.id] || !adoptTeamChange(st, team, next)) continue; // the icing team stays out for this draw
+          // keep each unit's running clock / rotation slot, swap in the new personnel
+          const old = shifts[team.id], fresh = buildShifts(team);
+          fresh.fIdx = old.fIdx % Math.max(1, fresh.fLines.length); fresh.dIdx = old.dIdx % Math.max(1, fresh.dPairs.length);
+          fresh.fElapsed = old.fElapsed; fresh.dElapsed = old.dElapsed;
+          shifts[team.id] = fresh;
+          stUnit[team.id] = resolveStUnits(team);
+          lastMinOffUnit[team.id] = resolveLastMinOff(team);
+          coach[team.id] = coachingOf(team);
+        }
+      }
       // V3: use a timeout at a real stoppage to break a late opposing surge in
       // a one-goal game. This never overrides the existing icing/pull timeout;
       // it simply makes a coaching preference useful in another clear scenario.
@@ -2031,7 +2133,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       if (rng.chance(ICING_RATE * (CFG.icingRatePct / 100) * tiredMult * (defFx.takeaway ?? 1))) {
         st.box[carrierTeam.id].icings++;
         st.sink.emit({ period, seconds: tick, type: "ICING", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "NOTABLE" });
-        state = "FACEOFF"; setup = "carry"; press = 0;
+        stopWhy = "icing"; state = "FACEOFF"; setup = "carry"; press = 0;
         foZone = CFG.zoneFaceoffsEnabled ? carrierTeam.id : null;
         noChange[carrierTeam.id] = true; // no change for the icing team
         // late and protecting a lead / a tie: burn the timeout to rest the stuck unit
@@ -2301,7 +2403,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
                 st.box[def.id].challengesWon++;
                 st.sink.emit({ period, seconds: tick, type: "CHALLENGE", teamId: def.id, teamCode: def.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "MAJOR", meta: { kind, won: true } });
                 gLine.saves++; // no goal — the shot stands as a save
-                state = "FACEOFF"; setup = "carry"; press = 0; foZone = null;
+                stopWhy = "challenge"; state = "FACEOFF"; setup = "carry"; press = 0; foZone = null;
                 continue;
               }
               st.challengeFailed[def.id] = true;
@@ -2332,7 +2434,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
         momoOnGoal(st, carrierTeam.id, def.id, absT);
         if (!defEmptyNet) maybePullGoalie(st, def); // yank the starter if he's been shelled
         if (strength === "PP") expireOnePenalty(def.id, tick, active);
-        state = "FACEOFF"; setup = "carry"; continue;
+        stopWhy = "goal"; state = "FACEOFF"; setup = "carry"; continue;
       }
       // Missed/wide of the empty net — nobody made a save, so no goalie stat or
       // "save by X" narration; the puck just stays loose for the next battle.
@@ -2369,7 +2471,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
           playerId: carrier.id, playerName: carrier.name, zone: "OFF", importance: "NOTABLE",
         });
       }
-      else if (rng.chance(CFG.zoneFaceoffsEnabled ? 0.095 : 0.12)) { state = "FACEOFF"; setup = "carry"; press = 0; foZone = CFG.zoneFaceoffsEnabled ? def.id : null; } // goalie freezes it → whistle, draw in his end
+      else if (rng.chance(CFG.zoneFaceoffsEnabled ? 0.095 : 0.12)) { stopWhy = "goalie-freeze"; state = "FACEOFF"; setup = "carry"; press = 0; foZone = CFG.zoneFaceoffsEnabled ? def.id : null; } // goalie freezes it → whistle, draw in his end
       else { carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // covered & cleared, play on
       continue;
     }
@@ -2819,10 +2921,38 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
+  liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
   experimentalV3?: { shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
+/**
+ * Batch entry point — the whole game in one call. Identical to draining the live
+ * generator below without ever touching a stoppage.
+ */
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
+  return drainGen(simulateGameLive(home, away, opts));
+}
+
+/**
+ * Live entry point — the same game as a generator that pauses at every stoppage
+ * (see `Stoppage`). A driver may mutate `home`/`away` tactics between steps; with
+ * no changes the result is bit-identical to `simulateGame`. Several live games can
+ * be interleaved: the module-level settings are re-armed on every resume.
+ */
+export function* simulateGameLive(home: SimTeam, away: SimTeam, opts: SimOptions = {}): Generator<Stoppage, GameResult, TeamChange | undefined> {
+  const cfg = opts.settings ?? DEFAULT_SETTINGS;
+  const ahl = opts.league === "AHL";
+  const inner = gameGen(home, away, opts);
+  let change: TeamChange | undefined;
+  for (;;) {
+    CFG = cfg; AHL_GAME = ahl;
+    const r = inner.next(change);
+    if (r.done) return r.value;
+    change = yield r.value;
+  }
+}
+
+function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Stoppage, GameResult, TeamChange | undefined> {
   CFG = opts.settings ?? DEFAULT_SETTINGS;
   AHL_GAME = opts.league === "AHL";
   const seed = opts.seed ?? fixtureSeed(home.id, away.id);
@@ -2872,6 +3002,9 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
     timeoutUsed: {},
     challengeFailed: {},
+    activePens: null,
+    departedDefense: new Set(),
+    liveFeed: !!opts.liveFeed, liveCursor: 0,
     knocks: new Map(),
     crowdMult: CFG.crowdEnabled && opts.crowd && !opts.crowd.neutral
       ? Math.max(0.94, Math.min(1.045, 1 + (Math.max(0, Math.min(1, opts.crowd.fill)) - 0.85) * 0.15 + (opts.noShootout ? 0.02 : 0)))
@@ -2881,17 +3014,9 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     for (const s of [...team.forwards, ...team.defense]) {
       st.lines[team.id][s.id] = newPlayerLine(s);
     }
-    // leadership stretches a hot streak; experience steadies a team that concedes
-    const ld = iceAvgAttr(team, (s) => s.attrs.ld ?? 50);
-    const ex = iceAvgAttr(team, (s) => s.attrs.ex ?? 50);
     st.momentum[team.id] = 0;
     st.momoTime[team.id] = 0;
-    st.momoTau[team.id] = CFG.momentumDecaySec * (0.75 + ld / 200);          // LD 50→1.0x, 90→1.2x
-    st.momoDip[team.id] = CFG.momentumConcedeDip * (1 - (ex - 50) / 250) * team.coachLd; // EX 90→0.84x, 25→1.1x; coach LD softens further
-    // defensive shield: a gelled, role-diverse D pair suppresses goals against
-    const dc = team.defense.length
-      ? team.defense.reduce((t, d) => t + chemFactor(d.chem, d.roleFit), 0) / team.defense.length : 1;
-    st.defChem[team.id] = dc;
+    armLineupDerived(st, team); // leadership/experience momentum constants + D-pair gel shield
     // "any given night": one form draw per team per game. Correlated across every
     // shot in the game (unlike per-tick noise, which averages out), so a hot goalie
     // or a cold offence swings the whole result — that's where upsets come from.
@@ -2920,7 +3045,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     // the main fight/line-brawl path lives INSIDE simulatePeriodPossession's tick loop
     // (maybeStartFight, hooked to real stoppages) — genuinely live, so a fight-injury
     // benches the player for the REST of the same period too, not just the ones still to come.
-    simulatePeriodPossession(st, period);
+    yield* periodGen(st, period);
     // scrums/donnybrooks/abuse-of-official stay a per-period post-hoc roll (rare
     // enough that the same-period residual this leaves is a non-issue); donnybrook
     // Fighting majors resolve their own injury inline.
@@ -2940,7 +3065,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
       // playoff sudden death, NHL rules: full 20:00 periods of 5-on-5 (the regular
       // possession engine — lines, PP/PK, penalties, fatigue all live) until someone scores.
       let w: number | null = null, guard = 0;
-      while (w == null && guard++ < 12) { otPeriods++; w = simulatePeriodPossession(st, 3 + otPeriods, { suddenDeath: true }); }
+      while (w == null && guard++ < 12) { otPeriods++; w = yield* periodGen(st, 3 + otPeriods, { suddenDeath: true }); }
       winnerId = w ?? home.id; endedIn = "OT"; periods = 3 + Math.max(1, otPeriods);
     } else {
       const ot = simulateOvertime(st);
@@ -2951,6 +3076,12 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     winnerId = hG > aG ? home.id : away.id;
   }
   const loserId = winnerId === home.id ? away.id : home.id;
+
+  // last call for the live feed: whatever OT / shootout / the horn emitted after the final stoppage
+  if (st.liveFeed) {
+    const last = st.sink.all()[st.sink.count - 1];
+    yield { period: last?.period ?? periods, tick: last?.seconds ?? 0, absSeconds: last ? (last.period - 1) * PERIOD_SECONDS + last.seconds : 0, why: "game-end", zoneTeamId: null, noChangeTeamIds: [home.id, away.id], ...liveFeedOf(st) };
+  }
 
   distributeCounting(st);
   finalizeBoxes(st, winnerId, endedIn, otPeriods);
@@ -2987,7 +3118,7 @@ function finalizeBoxes(st: SimState, winnerId: number, endedIn: GameResult["ende
       .sort((a, b) => b.points - a.points || b.goals - a.goals);
     // post-game skater conditioning: heavy TOI (or a playoff OT marathon) drops CON,
     // plus an extra hit for penalty-kill duty (more for a player on both PK units).
-    const defIds = new Set(team.defense.map((d) => d.id));
+    const defIds = new Set([...team.defense.map((d) => d.id), ...st.departedDefense]);
     const pkCount = new Map<number, number>();
     const stU = resolveStUnits(team);
     for (const u of [...stU.pk, ...stU.pk3]) for (const s of [...(u.f ?? []), ...(u.d ?? [])]) pkCount.set(s.id, (pkCount.get(s.id) ?? 0) + 1);
