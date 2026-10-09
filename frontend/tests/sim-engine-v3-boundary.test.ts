@@ -9,7 +9,7 @@ import {
   isNextGenEngine,
   resolveSimEngine,
 } from "../lib/sim/version";
-import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, V3_OT_STAR_EXPONENT, V3_PP_CENTER, v3PpPuckMovementMult, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
+import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, V3_OT_STAR_EXPONENT, v3SpeedDrawsPenaltiesMult, V3_PP_CENTER, v3PpPuckMovementMult, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
 import type { SimSkater } from "../lib/sim/types";
 
 test("V3 is a next-gen workbench version, not a league-selectable engine", () => {
@@ -120,4 +120,12 @@ test("V3 PP puck movement is centred, directional and capped", () => {
   assert.equal(v3PpPuckMovementMult([mk(100, 0)], [mk(0, 40)]), 1.12);
   assert.equal(v3PpPuckMovementMult([mk(0, 0)], [mk(0, 100)]), 0.88);
   assert.equal(v3PpPuckMovementMult([], [mk(0, 60)]), 1);
+});
+
+test("V3 speed-draws-penalties is antisymmetric and capped", () => {
+  assert.equal(v3SpeedDrawsPenaltiesMult(60, 60), 1);
+  assert.ok(v3SpeedDrawsPenaltiesMult(70, 60) > 1 && v3SpeedDrawsPenaltiesMult(60, 70) < 1);
+  assert.ok(Math.abs(v3SpeedDrawsPenaltiesMult(70, 60) * v3SpeedDrawsPenaltiesMult(60, 70) - 1) < 0.001);
+  assert.equal(v3SpeedDrawsPenaltiesMult(100, 0), 1.1);
+  assert.equal(v3SpeedDrawsPenaltiesMult(0, 100), 0.9);
 });

@@ -359,3 +359,19 @@ modest). Both versions already have a wide spread — V3's 3.8 pt sd is on the h
 real-NHL team PP% variation, so do not strengthen the slope further. A separate PK mechanic
 is not needed: the same gap term already drives the PK side (strong PK D lower PP% for the
 opposing team).
+
+### Speed draws penalties — sixteenth increment, offline — 2026-10-09
+
+Flag `speedDrawsPenalties`: the infraction rate a team takes is scaled by
+`v3SpeedDrawsPenaltiesMult(oppSkating, ownSkating)` — ±0.3% per point of ice-time-weighted SK
+gap to the opponent, capped ±10%. The factor is antisymmetric between the two teams (what one
+gains the other loses, product ≈ 1), so league penalty volume needs no centring. No extra RNG
+draws.
+
+Gates: identity with all 16 flags off — identical on 400 games (seed 290,000); 13/13 tests.
+Seeds 90,000 / 190,000 / 290,000: goals 2.98 / 3.05 / 3.06, PIM 11.7 / 11.0 / 11.3, PP opps
+2.95 / 2.95 / 2.95 (unchanged), PP% 21.3 / 21.8 / 21.6, blowouts 14.5 / 13.6 / 11.8%
+(seed 90,000 again slightly over 14%: seed-specific, 30-seed mean was 13.5%), OT/SO 17.7 /
+18.3 / 22.4% (seed noise). Spearman 0.881 / 0.851 / 0.781 is within the known ±0.045 per-seed
+noise. **Not yet shown:** that fast teams actually end up with more PP opportunities than
+slow ones — a per-team PP-opportunity vs team-SK correlation over many seeds is still to do.

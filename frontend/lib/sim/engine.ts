@@ -165,6 +165,7 @@ type SimState = {
   v3GoalieComposure: boolean;        // V3 diagnostic feature flag
   v3OvertimeStars: boolean;          // V3 diagnostic feature flag
   v3PpPuckMovement: boolean;         // V3 diagnostic feature flag
+  v3SpeedDrawsPenalties: boolean;    // V3 diagnostic feature flag
   goalieStreak: Record<number, number>;      // V3: consecutive saves since the goalie last allowed a goal
   lastGoalAgainst: Record<number, number>;   // V3: absolute game second of the last goal each goalie allowed
   lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
@@ -766,6 +767,19 @@ function avgDiscipline(team: SimTeam): number {
   return wt ? sum / wt : 50;
 }
 
+function avgSkating(team: SimTeam): number {
+  const all = [...team.forwards, ...team.defense];
+  let sum = 0, wt = 0;
+  for (const s of all) { sum += (s.attrs.sk ?? 50) * s.iceTime; wt += s.iceTime; }
+  return wt ? sum / wt : 50;
+}
+// V3: a faster team draws penalties — the rate of infractions a team takes is scaled by the
+// skating gap to its opponent (+/-0.3% per SK point, capped +/-10%). Antisymmetric between the
+// two teams, so the league-wide penalty volume is unchanged.
+export function v3SpeedDrawsPenaltiesMult(oppSkating: number, ownSkating: number): number {
+  return Math.max(0.9, Math.min(1.1, 1 + 0.003 * (oppSkating - ownSkating)));
+}
+
 function avgHitting(team: SimTeam): number {
   const all = [...team.forwards, ...team.defense];
   let sum = 0, wt = 0;
@@ -868,7 +882,7 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
   const rival = st.rivalry ? CFG.rivalryPenaltyMult : 1;
   // coach discipline: a disciplined bench (high PD) takes fewer penalties; a
   // physical-style coach's team takes more.
-  const lambda = (LEAGUE.penaltiesPerTeam / 3) * (LEAGUE.avgDefense / Math.max(30, avgDiscipline(team))) * phyFactor * frustration * moraleFrust * team.coachDisc * rival * team.tactics.penaltyMult * (CFG.penaltiesPct / 100);
+  const lambda = (LEAGUE.penaltiesPerTeam / 3) * (LEAGUE.avgDefense / Math.max(30, avgDiscipline(team))) * phyFactor * frustration * moraleFrust * team.coachDisc * rival * team.tactics.penaltyMult * (CFG.penaltiesPct / 100) * (st.v3SpeedDrawsPenalties ? v3SpeedDrawsPenaltiesMult(avgSkating(opp), avgSkating(team)) : 1);
   // the referee crew: a strict crew calls more, and a crew that "manages the game"
   // leans on whichever bench has been called less so far tonight (evening up)
   let crew = 1;
@@ -2760,7 +2774,7 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
-  experimentalV3?: { ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2802,6 +2816,7 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     v3GoalieComposure: isV3 && (opts.experimentalV3?.goalieComposure ?? true),
     v3OvertimeStars: isV3 && (opts.experimentalV3?.overtimeStars ?? true),
     v3PpPuckMovement: isV3 && (opts.experimentalV3?.ppPuckMovement ?? true),
+    v3SpeedDrawsPenalties: isV3 && (opts.experimentalV3?.speedDrawsPenalties ?? true),
     goalieStreak: {}, lastGoalAgainst: {},
     lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
