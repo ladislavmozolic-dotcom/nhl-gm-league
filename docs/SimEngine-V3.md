@@ -224,3 +224,19 @@ looked worst) was a ~2σ fluke and an engine tweak to coach adaptation tried on 
 basis was reverted. **Rule going forward: judge Spearman / top-scorer / gap only on
 ≥ 30 seed bases; use 3 seeds for the coarse rate checks (goals, shots, PIM, home win %).**
 Note V2 itself averages 0.79, below the 0.85 target — a shared calibration item, not V3.
+
+### Goalie rhythm — eleventh increment, offline — 2026-10-09
+
+A goalie idle for more than 4:00 of game time is colder on the next shot: goal
+probability ×1.00→1.06, ramping from 4:00 to 8:00 idle and capped, for that one shot
+only (`v3GoalieRhythmMult`, flag `goalieRhythm`, tracked per goalie in
+`st.lastShotAgainst`). No extra RNG draws; empty-net shots are excluded.
+
+Gates: `v3-identity.ts` with all eleven flags off — identical on 400 games (seed 90,000).
+Seeds 90,000 / 190,000 / 290,000: goals 2.97 / 2.98 / 2.98, shots 31.4 / 31.3 / 31.5,
+home win 55.6 / 56.0 / 55.4%, PIM 11.8 / 11.1 / 11.3, blowouts 12.9 / 11.9 / 11.5% —
+all in range, and indistinguishable from the pre-increment run. Save % stays .911
+(shared warning). **The effect is below measurement noise** (long idle stretches are
+rare at ~31 shots/team), so it is safe but nearly inert; strengthen it (lower the
+idle threshold or raise the 6% cap) only if a visible effect is wanted. Spearman/top
+scorer need the 30-seed protocol before any claim either way.

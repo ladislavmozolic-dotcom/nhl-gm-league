@@ -160,6 +160,8 @@ type SimState = {
   v3AssistSpread: boolean;           // V3 diagnostic feature flag
   v3EmotionalDiscipline: boolean;    // V3 diagnostic feature flag
   v3FinishingCurve: boolean;         // V3 diagnostic feature flag
+  v3GoalieRhythm: boolean;           // V3 diagnostic feature flag
+  lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
   officials: { penaltyMult: number; evenUp: number } | null; // tonight's referee crew (null = neutral)
   timeoutUsed: Record<number, boolean>;
   challengeFailed: Record<number, boolean>; // a failed challenge ends a bench's challenges for the night
@@ -1366,6 +1368,12 @@ export function v3CoachAdaptation(
   const shell = (0.035 + 0.065 * urgency) * (1.25 - attackLean * 0.5);
   return { shots: 1 - shell * 0.35, allow: 1 - shell };
 }
+// V3: goalie rhythm — after 4+ idle minutes the next shot is ~6% likelier to beat him,
+// ramping in from 4:00 and capped at 8:00 of idleness. Affects only that one shot.
+export function v3GoalieRhythmMult(idleSeconds: number): number {
+  if (idleSeconds <= 240) return 1;
+  return 1 + 0.06 * Math.min(1, (idleSeconds - 240) / 240);
+}
 // V3: a real checking trio affects the opposing top line's chance quality when
 // home-ice last change has actually produced that matchup. Existing player
 // profile types supply the tactical identity; DF/CK determine its strength.
@@ -2160,6 +2168,11 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
         * teamEdge * catchUp * ppMod
         * (st.nightOff[carrierTeam.id] ?? 1) * (st.nightDef[def.id] ?? 1); // any-given-night form
+      // V3: a goalie who has been idle for a long stretch is colder on the next shot.
+      if (st.v3GoalieRhythm && !defEmptyNet) {
+        p *= v3GoalieRhythmMult(absT - (st.lastShotAgainst[def.id] ?? 0));
+        st.lastShotAgainst[def.id] = absT;
+      }
       // Empty net (both engines — a real missing mechanic, not a v2 presentation
       // choice; see st.emptyNet below). carrierTeam pulled: 6-on-5 pressure. def
       // pulled: an open net — a shot on target goes in almost every time.
@@ -2709,7 +2722,7 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
-  experimentalV3?: { fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2746,6 +2759,8 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     v3AssistSpread: isV3 && (opts.experimentalV3?.assistSpread ?? true),
     v3EmotionalDiscipline: isV3 && (opts.experimentalV3?.emotionalDiscipline ?? true),
     v3FinishingCurve: isV3 && (opts.experimentalV3?.finishingCurve ?? true),
+    v3GoalieRhythm: isV3 && (opts.experimentalV3?.goalieRhythm ?? true),
+    lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
     timeoutUsed: {},
     challengeFailed: {},
