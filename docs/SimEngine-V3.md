@@ -250,3 +250,22 @@ one seed and borderline on two), GSAx +0.27 / +0.26 / +0.24, shots unchanged
 (31.4–31.5), home win 55.4–55.9%, blowouts 11.7–12.4%, PIM 11.1–11.8. All in range;
 goals sit in the upper half of 2.9–3.15 so watch them when stacking further scoring-
 positive mechanics. Identity gate (all flags off) re-run: identical.
+
+### Full V3 (12 flags) vs V2 — 30 seed bases — 2026-10-09
+
+30 independent seed bases (2,000,000 + i·100,000), 992 games each, mean ± se:
+
+| Metric | V2 | V3 (all 12) |
+| --- | ---: | ---: |
+| Quality → points (Spearman) | 0.793 ± 0.008 | 0.795 ± 0.008 |
+| Top scorer (pts/82) | 133.6 ± 1.6 | 131.9 ± 1.6 |
+| Top-8 vs bottom-8 gap | 37.4 ± 0.7 | 37.0 ± 0.7 |
+| Goals / team / game | 2.985 ± 0.008 | 3.032 ± 0.009 |
+| Save % | .911 | .910 |
+| Blowouts % | 13.1 ± 0.2 | 13.2 ± 0.2 |
+
+Competitive balance, scoring concentration and blowouts are statistically identical to
+V2 (differences well inside 1–1.5 se). The only real shift is goals +0.047/team/game
+(+1.6%), from goalie rhythm, still inside the 2.9–3.15 target; save % drops .001 as
+intended. The top-scorer average stays above the 130 ceiling in both engines (shared
+calibration item). Verdict: the 12-increment V3 is calibration-safe as a package.
