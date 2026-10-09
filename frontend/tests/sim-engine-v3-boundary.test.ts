@@ -87,9 +87,9 @@ test("V3 softly compresses only the finishing curve's elite end", () => {
 test("V3 goalie rhythm only chills a goalie after a long idle stretch and is capped", () => {
   assert.equal(v3GoalieRhythmMult(0), 1);
   assert.equal(v3GoalieRhythmMult(120), 1);
-  assert.ok(v3GoalieRhythmMult(200) > 1 && v3GoalieRhythmMult(200) < 1.12);
-  assert.ok(Math.abs(v3GoalieRhythmMult(300) - 1.12) < 1e-9);
-  assert.ok(Math.abs(v3GoalieRhythmMult(3000) - 1.12) < 1e-9);
+  assert.ok(v3GoalieRhythmMult(200) > 1 && v3GoalieRhythmMult(200) < 1.08);
+  assert.ok(Math.abs(v3GoalieRhythmMult(300) - 1.08) < 1e-9);
+  assert.ok(Math.abs(v3GoalieRhythmMult(3000) - 1.08) < 1e-9);
 });
 
 test("V3 block skill is centred on a typical defenceman and bounded", () => {
@@ -149,10 +149,10 @@ test("V3 shootout duel is centred, directional and capped", () => {
 test("V3 garbage time only eases a 3+ goal lead and nudges the trailing side", () => {
   assert.equal(v3GarbageTimeShotMult(1, 4), 1);
   assert.equal(v3GarbageTimeShotMult(2, 2), 1);
-  assert.equal(v3GarbageTimeShotMult(2, 3), 0.94);
-  assert.equal(v3GarbageTimeShotMult(3, 4), 0.9);
+  assert.equal(v3GarbageTimeShotMult(2, 3), 0.86);
+  assert.equal(v3GarbageTimeShotMult(3, 4), 0.76);
   assert.equal(v3GarbageTimeShotMult(2, -3), 1);
-  assert.equal(v3GarbageTimeShotMult(3, -3), 1.05);
+  assert.equal(v3GarbageTimeShotMult(3, -3), 1.1);
 });
 
 test("V3 shooter form: confident after a goal, tight after a drought", () => {

@@ -1435,11 +1435,11 @@ export function v3GoalieComposureMult(secondsSinceGoalAgainst: number, saveStrea
 export function v3BlockSkillMult(blocking: number): number {
   return Math.max(0.8, Math.min(1.2, 1 + 0.03 * (blocking - 71)));
 }
-// V3: goalie rhythm — after 2+ idle minutes the next shot is up to ~12% likelier to beat him,
+// V3: goalie rhythm — after 2+ idle minutes the next shot is up to ~8% likelier to beat him,
 // ramping in from 2:00 and capped at 5:00 of idleness. Affects only that one shot.
 export function v3GoalieRhythmMult(idleSeconds: number): number {
   if (idleSeconds <= 120) return 1;
-  return 1 + 0.12 * Math.min(1, (idleSeconds - 120) / 180);
+  return 1 + 0.08 * Math.min(1, (idleSeconds - 120) / 180);
 }
 // V3: a real checking trio affects the opposing top line's chance quality when
 // home-ice last change has actually produced that matchup. Existing player
@@ -1482,8 +1482,8 @@ export function v3ShooterFormMult(secondsSinceOwnGoal: number, shotsSinceGoal: n
 // blowout keeps its full tempo. From the 2nd period a team up 3+ eases off (x0.94, x0.90 in the
 // 3rd); a team down 3+ pushes a little in the 3rd (x1.05). Bounded, deterministic, no RNG.
 export function v3GarbageTimeShotMult(period: number, marginForTeam: number): number {
-  if (marginForTeam >= 3 && period >= 2) return period >= 3 ? 0.9 : 0.94;
-  if (marginForTeam <= -3 && period >= 3) return 1.05;
+  if (marginForTeam >= 3 && period >= 2) return period >= 3 ? 0.76 : 0.86;
+  if (marginForTeam <= -3 && period >= 3) return 1.1;
   return 1;
 }
 // Per-line deployment tactic → {of, df} multipliers around 1.0. Neutral CK1/DF2/OF2

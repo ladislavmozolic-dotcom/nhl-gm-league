@@ -538,3 +538,29 @@ Sanity: identity gate (all flags off) identical on 400 games, 17/17 tests, and 3
 unchanged (goals 2.99 / 2.98 / 3.06, shots 31.1–31.4, PP% 21.2–21.3, PIM 10.8–11.7, blowouts
 14.1 / 11.6 / 13.6%; top scorer 120 / 123 / 138 is seed noise). Not yet re-run: the 30-seed package
 check with the retuned strengths. Still open: goalie group's +0.8% goals (see group split).
+
+### 60-seed goals/blowouts tuning — 2026-10-09
+
+60 fresh seed bases (10,000,000 + i·100,000; 992 games each), mean ± se. With the retuned (stronger)
+flags the package had drifted: goals 3.028 vs V2 3.009 and **blowouts 14.07 vs V2 12.99 (~5 se)**.
+
+Group removals (goals / blowouts): no goalieRhythm 2.973 / 13.76; no goalieComposure 3.035 / 13.65.
+So **goalieRhythm adds ~+0.055 goals** (V3 without it is 0.036 *below* V2), composure ≈ −0.008.
+Later split at rhythm cap 8%: no shooterForm 3.011 / 13.81; no netFront+blockSkill 3.036 / 13.59;
+no ppPuckMovement+speedDrawsPenalties+overtimeStars 3.022 / 13.76; all-on 3.018 / 13.97 —
+each removal moves blowouts only 0.2–0.4 (1–2 se), so the drift is **spread across many flags,
+not one**, and the blunt targeted lever is `garbageTime`.
+
+Changes: goalieRhythm cap **12% → 8%** (goals back to ~V2); garbageTime strengthened.
+Variants of garbageTime, all-on, 60 seeds (goals / blowouts / save % / home win % / top scorer):
+
+| Variant (up-3+ P2 / P3, down-3+ P3) | Goals | Blowouts | Save % | Home win % | Top scorer |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ×0.94 / ×0.90, ×1.05 (old) | 3.018 | 13.97 | .9097 | 53.7 | 131.6 |
+| ×0.90 / ×0.82, ×1.08 (A) | 3.019 | 13.49 | .9096 | 53.6 | 131.5 |
+| **×0.86 / ×0.76, ×1.10 (B, adopted)** | **3.015** | **13.23** | .9096 | 53.7 | 130.6 |
+| V2 | 3.009 | 12.99 | .9111 | 53.5 | 134.1 |
+
+B leaves goals within 0.006 of V2 and blowouts within 0.24 (≈1.2 se) of V2, with a smaller top
+scorer tail. It only acts at 3+ goal margins, so it cannot change close games. Gates after the
+change: identity (all flags off) identical on 400 games; 17/17 tests.
