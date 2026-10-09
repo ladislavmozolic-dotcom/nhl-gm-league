@@ -285,3 +285,24 @@ locked-in roughly cancel), but blowouts now touch the 14% ceiling on seed 90,000
 the rattled state adds a little goal clustering. Needs the 30-seed protocol (blowouts,
 Spearman, top scorer) before any promotion discussion; if blowouts drift, shorten the
 rattled window to 90s or soften to ×1.04.
+
+### Full V3 (13 flags) vs V2 — 30 seed bases — 2026-10-09
+
+Same protocol (seed bases 2,000,000 + i·100,000, 992 games each), mean ± se:
+
+| Metric | V2 | V3 (all 13) |
+| --- | ---: | ---: |
+| Quality → points (Spearman) | 0.793 ± 0.008 | 0.794 ± 0.009 |
+| Top scorer (pts/82) | 133.6 ± 1.6 | 131.3 ± 1.5 |
+| Top-8 vs bottom-8 gap | 37.4 ± 0.7 | 36.4 ± 0.8 |
+| Goals / team / game | 2.985 ± 0.008 | 3.024 ± 0.008 |
+| Save % | .911 | .910 |
+| Blowouts % | 13.08 ± 0.19 | 13.49 ± 0.22 |
+| Home win % | 53.2 ± 0.3 | 53.7 ± 0.2 |
+| PIM / team / game | 19.8 ± 0.07 | 11.4 ± 0.06 |
+
+Competitive balance and scoring concentration are unchanged. Blowouts +0.4 pts is ~1.4 se
+(not significant; stays under the 14% ceiling), so the seed-90,000 reading of 14.2% was
+noise and the rattled-goalie window needs no softening. Goals +0.04 (+1.3%) and PIM
+19.8→11.4 (V3 emotional-discipline, in the 7–12 target; V2's 19.8 is the known shared
+failure) are the only real shifts, both intended. Package remains calibration-safe.
