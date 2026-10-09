@@ -9,6 +9,7 @@ export type MenuItem = { key: string; label: string; href: string; mega?: boolea
 export const DEFAULT_MENU: MenuItem[] = [
   { key: "home", label: "Home", href: "/" },
   { key: "scores", label: "Scores", href: "/scores" },
+  { key: "live", label: "🔴 Live", href: "/live" },
   { key: "standings", label: "Standings", href: "/standings" },
   { key: "schedule", label: "Schedule", href: "/schedule" },
   { key: "trades", label: "Trades", href: "/trades", children: [
