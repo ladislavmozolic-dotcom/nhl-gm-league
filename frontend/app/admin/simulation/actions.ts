@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { saveSettings, mergeSettings, DEFAULT_SETTINGS, type EngineSettings } from "@/lib/sim/settings";
 import { isAdmin } from "@/lib/auth";
+import { isSandbox } from "@/lib/sandbox";
 import { promoteParamSet, type ParamSet } from "@/lib/edge-params-server";
 
 /** Switch the LEAGUE'S LIVE parameter set — this actually overwrites every player's
@@ -33,4 +34,14 @@ export async function resetSimSettings() {
   await saveSettings(DEFAULT_SETTINGS);
   revalidatePath("/admin/simulation");
   return DEFAULT_SETTINGS;
+}
+
+/** Sandbox/test instance only: switch the whole test league between V2 and the experimental V3 engine.
+ *  Refuses on the live league, where V3 must stay unreachable. */
+export async function setSandboxEngineAction(formData: FormData) {
+  if (!(await isAdmin())) throw new Error("Admin only.");
+  if (!isSandbox()) throw new Error("The V3 switch exists only on the test instance.");
+  const simEngine = formData.get("engine") === "v3" ? "v3" : "nextgen";
+  await prisma.leagueConfig.upsert({ where: { id: 1 }, update: { simEngine }, create: { id: 1, simEngine } });
+  revalidatePath("/admin/simulation");
 }

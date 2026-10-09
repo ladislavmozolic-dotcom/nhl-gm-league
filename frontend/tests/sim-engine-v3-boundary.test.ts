@@ -7,8 +7,9 @@ import {
   engineVersionFor,
   isExperimentalEngine,
   isNextGenEngine,
+  resolveSimEngine,
 } from "../lib/sim/version";
-import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3ShiftLimit } from "../lib/sim/engine";
+import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3ShiftLimit } from "../lib/sim/engine";
 import type { SimSkater } from "../lib/sim/types";
 
 test("V3 is a next-gen workbench version, not a league-selectable engine", () => {
@@ -20,6 +21,15 @@ test("V3 is a next-gen workbench version, not a league-selectable engine", () =>
   assert.equal(isExperimentalEngine(ENGINE_V3), true);
   assert.equal(engineVersionFor("current"), ENGINE_V1);
   assert.equal(engineVersionFor("nextgen"), ENGINE_V2);
+});
+
+test("V3 is reachable only on the sandbox instance — a stored v3 value never activates it on live", () => {
+  assert.equal(resolveSimEngine("v3", false), "nextgen");
+  assert.equal(resolveSimEngine("v3", true), "v3");
+  assert.equal(resolveSimEngine("nextgen", true), "nextgen");
+  assert.equal(resolveSimEngine("current", true), "nextgen");
+  assert.equal(resolveSimEngine(null, true), "nextgen");
+  assert.equal(engineVersionFor("v3"), ENGINE_V3);
 });
 
 function skater(en: number, con: number): SimSkater {
@@ -59,4 +69,17 @@ test("V3 checking matchup uses the existing player types and remains a small eff
   const mult = v3CheckingMatchupDangerMult(checkers, attackers);
   assert.ok(mult < 1 && mult >= 0.97);
   assert.equal(v3CheckingMatchupDangerMult([], attackers), 1);
+});
+
+test("V3 concentrates a defence pair's assist weight without changing its average", () => {
+  const elite = { ...skater(60, 100), isDefense: true, offense: 80, playmaking: 80 };
+  const depth = { ...skater(60, 100), id: 2, isDefense: true, offense: 45, playmaking: 45 };
+  const weights = [v3DefenseAssistWeight(elite, [elite, depth]), v3DefenseAssistWeight(depth, [elite, depth])];
+  assert.ok(weights[0] > 1 && weights[1] < 1);
+  assert.ok(Math.abs((weights[0] + weights[1]) / 2 - 1) < 0.000001);
+});
+
+test("V3 softly compresses only the finishing curve's elite end", () => {
+  assert.equal(v3FinishingExponent(1.7), 1.55);
+  assert.equal(v3FinishingExponent(1.55), 1.5);
 });

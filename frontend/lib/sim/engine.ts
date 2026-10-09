@@ -153,6 +153,13 @@ type SimState = {
   v3FatigueDeployment: boolean;      // V3 diagnostic feature flag
   v3CoachAdaptation: boolean;        // V3 diagnostic feature flag
   v3CheckingMatchup: boolean;        // V3 diagnostic feature flag
+  v3QualityDAssists: boolean;        // V3 diagnostic feature flag
+  v3FaceoffPressure: boolean;        // V3 diagnostic feature flag
+  v3ReboundClearance: boolean;       // V3 diagnostic feature flag
+  v3MomentumTimeout: boolean;        // V3 diagnostic feature flag
+  v3AssistSpread: boolean;           // V3 diagnostic feature flag
+  v3EmotionalDiscipline: boolean;    // V3 diagnostic feature flag
+  v3FinishingCurve: boolean;         // V3 diagnostic feature flag
   officials: { penaltyMult: number; evenUp: number } | null; // tonight's referee crew (null = neutral)
   timeoutUsed: Record<number, boolean>;
   challengeFailed: Record<number, boolean>; // a failed challenge ends a bench's challenges for the night
@@ -286,11 +293,11 @@ function initTeamBox(team: SimTeam): TeamBox {
 
 function conversion(
   shooterFinishing: number, goalieQuality: number, isHome: boolean,
-  strength: "EV" | "PP" | "SH",
+  strength: "EV" | "PP" | "SH", finishExponent = CFG.finishExponent ?? 1.7,
 ): number {
   // finishing amplified around the league mean so an elite finisher clearly out-scores
   // a similar-looking one — the compressed ratings still separate the snipers.
-  const shooterMod = Math.pow(shooterFinishing / 60, CFG.finishExponent ?? 1.7);
+  const shooterMod = Math.pow(shooterFinishing / 60, finishExponent);
   // goalie spread (^1.7): tightens the top so an elite keeper tops out ~92.5% SV over a
   // season (real ceiling) instead of running to ~94%, and slightly narrows the band.
   // (2.2 → elite too good; 1.9 still let mid-season elites reach 94%; now 1.7.)
@@ -300,6 +307,11 @@ function conversion(
   if (strength === "PP") p *= 1 + (LEAGUE.ppConvBoost - 1) * (CFG.powerPlayPct / 100);
   else if (strength === "SH") p *= LEAGUE.shConvPenalty;
   return Math.max(0.01, Math.min(0.6, p));
+}
+
+/** V3 softens only the elite end of finishing; average finishing remains anchored at 60. */
+export function v3FinishingExponent(baseExponent: number): number {
+  return Math.max(1.5, baseExponent - 0.15);
 }
 
 // ---- selection weights ------------------------------------------------------
@@ -394,7 +406,17 @@ function pickShooter(rng: RNG, team: SimTeam): SimSkater {
   return pickShooterFromPool(rng, [...team.forwards, ...team.defense]);
 }
 
-function pickAssists(rng: RNG, onIce: SimSkater[], scorerId: number, creator?: SimSkater | null): number[] {
+/** V3 keeps a D pair's average assist weight while rewarding its best distributor. */
+export function v3DefenseAssistWeight(skater: SimSkater, onIceDefense: SimSkater[]): number {
+  if (!skater.isDefense || !onIceDefense.length) return 1;
+  const quality = (s: SimSkater) => 0.62 * s.playmaking + 0.38 * s.offense;
+  const raw = (s: SimSkater) => Math.max(0.7, Math.min(1.45, 1 + (quality(s) - 55) * 0.022));
+  const mean = onIceDefense.reduce((n, d) => n + raw(d), 0) / onIceDefense.length;
+  return raw(skater) / Math.max(0.01, mean);
+}
+
+function pickAssists(st: SimState, onIce: SimSkater[], scorerId: number, creator?: SimSkater | null): number[] {
+  const rng = st.rng;
   const roll = rng.next();
   // ~1.6 assists per goal (NHL-realistic): mostly 2, occasionally unassisted
   const n = roll < 0.08 ? 0 : roll < 0.30 ? 1 : 2;
@@ -411,9 +433,15 @@ function pickAssists(rng: RNG, onIce: SimSkater[], scorerId: number, creator?: S
     // assist share follows PLAYMAKING on its own (steeper) curve — an elite passer
     // (McDavid/Kucherov PA 78) collects far more of his line's assists than a 65 PA
     // linemate; 0/unset = same curve as shooting (starExponent, the old behaviour)
-    const aExp = CFG.assistExponent || CFG.starExponent;
+    const baseAssistExp = CFG.assistExponent || CFG.starExponent;
+    // V3 widens the assist distribution slightly without touching total team
+    // assists or shooting. It prevents the same elite passer from absorbing an
+    // unrealistically large share of every on-ice secondary assist.
+    const aExp = st.v3AssistSpread ? Math.max(1.6, baseAssistExp - 0.18) : baseAssistExp;
+    const onIceDefense = pool.filter((s) => s.isDefense);
     const weights = pool.map((s) =>
-      Math.pow((s.playmaking * conFactor(s.con)) / 60, aExp) * s.iceTime * (s.isDefense ? D_ASSIST * ((CFG.dAssistPct ?? 100) / 100) : 1));
+      Math.pow((s.playmaking * conFactor(s.con)) / 60, aExp) * s.iceTime * (s.isDefense
+        ? D_ASSIST * ((CFG.dAssistPct ?? 100) / 100) * (st.v3QualityDAssists ? v3DefenseAssistWeight(s, onIceDefense) : 1) : 1));
     const idx = rng.weighted(weights);
     picked.push(pool[idx].id);
     pool.splice(idx, 1);
@@ -586,7 +614,7 @@ function recordGoal(
   // conceding side: the real unit that was on the ice against (PK unit on a PP goal, etc.).
   const defIce = st.currentOnIce[def.id];
   const onAgainst: SimSkater[] = defIce && (defIce.f.length || defIce.d.length) ? [...defIce.f, ...defIce.d] : pickOnIce(st.rng, def);
-  const assists = strength === "SO" ? [] : pickAssists(st.rng, onFor, scorer.id, creator);
+  const assists = strength === "SO" ? [] : pickAssists(st, onFor, scorer.id, creator);
   const situation = explicitSituation ?? situationFor(st, off, def, period, strength, onFor.length, onAgainst.length);
   const offLines = st.lines[off.id];
   const sl = offLines[scorer.id];
@@ -743,6 +771,10 @@ function avgMorale(team: SimTeam): number {
   for (const s of all) { sum += (s.morale ?? CFG.moraleNeutral) * s.iceTime; wt += s.iceTime; }
   return wt ? sum / wt : CFG.moraleNeutral;
 }
+
+// V3 trims only the rare emotional-PIM branches; ordinary infractions and the
+// resulting power-play environment retain their current calibrated rate.
+function v3EmotionalPimMult(st: SimState): number { return st.v3EmotionalDiscipline ? 0.35 : 1; }
 
 // A delayed-penalty call can pull a penalty's start up to ~12s EARLIER than rolled (see the
 // delayed-penalty block in the tick loop), so same-player penalties are kept this much apart.
@@ -969,7 +1001,7 @@ function maybeStartFight(st: SimState, home: SimTeam, away: SimTeam, period: num
   };
   // base fight chance scales with the lower of the two teams' willingness; a
   // rivalry game runs hot (far more likely to drop the gloves).
-  let pGame = (0.06 + 0.5 * Math.max(0, Math.min(topFG(home), topFG(away)) - 55) / 45) * (CFG.fightsPct / 100);
+  let pGame = (0.06 + 0.5 * Math.max(0, Math.min(topFG(home), topFG(away)) - 55) / 45) * (CFG.fightsPct / 100) * v3EmotionalPimMult(st);
   if (st.rivalry) pGame *= CFG.rivalryFightMult;
   pGame = Math.min(0.85, pGame);
   const perStoppage = 1 - Math.pow(1 - pGame, 1 / STOPPAGES_PER_GAME);
@@ -1017,7 +1049,7 @@ function generateHeatEvents(st: SimState, period: number) {
   const scrummer = (t: SimTeam) => { const pool = active(t); return pool[st.rng.weighted(pool.map((s) => (s.attrs.fg ?? 30) + (105 - s.discipline)))]; };
 
   // /3 — rolled independently each period now instead of once for the whole game.
-  if (st.rivalry && st.rng.chance(CFG.scrumChance / 3)) {
+  if (st.rivalry && st.rng.chance(CFG.scrumChance / 3 * v3EmotionalPimMult(st))) {
     const at = 60 + st.rng.int(PERIOD_SECONDS - 120);
     const nPer = 1 + st.rng.int(2); // 1–2 roughing minors per side
     for (let k = 0; k < nPer; k++) {
@@ -1029,7 +1061,7 @@ function generateHeatEvents(st: SimState, period: number) {
 
   // donnybrook: a full line brawl erupts — several simultaneous fights, roughing
   // minors and game misconducts. These are the rare 100+ PIM nights.
-  if (st.rivalry && st.rng.chance(CFG.brawlChance / 3)) {
+  if (st.rivalry && st.rng.chance(CFG.brawlChance / 3 * v3EmotionalPimMult(st))) {
     const at = 120 + st.rng.int(PERIOD_SECONDS - 240);
     const bouts = 3 + st.rng.int(2); // 3–4 fighting majors per side
     for (let k = 0; k < bouts; k++) {
@@ -1054,7 +1086,7 @@ function generateHeatEvents(st: SimState, period: number) {
     const opp = team === st.home ? st.away : st.home;
     const trailBy = st.box[opp.id].goals - st.box[team.id].goals;
     const frustration = trailBy >= 3 ? 2.5 : trailBy >= 2 ? 1.5 : 1;
-    if (st.rng.chance(CFG.abuseOfficialChance * frustration)) {
+    if (st.rng.chance(CFG.abuseOfficialChance * frustration * v3EmotionalPimMult(st))) {
       const pool = active(team);
       const off = pool[st.rng.weighted(pool.map((s) => 105 - s.discipline))];
       const at = PERIOD_SECONDS - 60 - st.rng.int(600);
@@ -1402,6 +1434,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
   let setup: "carry" | "pass" | "rebound" = "carry"; // how the current look arose → shot danger
   let creator: SimSkater | null = null; // who set the current look up (the passer / the rebound's shooter) → primary assist
   let press = 0; // consecutive shots in one sustained possession → screening/rebound pressure
+  let faceoffPressure: { teamId: number; until: number } | null = null;
 
   // special-teams personnel + the live man-advantage state per team. During a PP a
   // club ices its PP unit; shorthanded, its PK unit — so shots, goals, +/- and TOI
@@ -1735,11 +1768,21 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     }
 
     if (state === "FACEOFF") {
+      // V3: use a timeout at a real stoppage to break a late opposing surge in
+      // a one-goal game. This never overrides the existing icing/pull timeout;
+      // it simply makes a coaching preference useful in another clear scenario.
+      if (st.v3MomentumTimeout && regulation && period === 3 && PERIOD_SECONDS - tick <= 180) {
+        for (const team of [home, away]) {
+          const opp = team === home ? away : home;
+          const marginFor = st.box[team.id].goals - st.box[opp.id].goals;
+          if (marginFor >= -1 && marginFor <= 1 && momoNow(st, opp.id, base + tick) - momoNow(st, team.id, base + tick) >= 1.25) useTimeout(team, tick, "to halt opponent momentum");
+        }
+      }
       // a scrum at the whistle, before the draw — the natural real-hockey moment
       // for a fight to break out (see maybeStartFight's header comment)
       maybeStartFight(st, home, away, period, tick);
       // after-the-whistle scrum: one roughing minor each — at full strength that's 4-on-4
-      if (CFG.penaltiesEnabled && CFG.scrumMinorsPerGame > 0 && rng.chance((CFG.scrumMinorsPerGame / 60) * (st.officials?.penaltyMult ?? 1))) {
+      if (CFG.penaltiesEnabled && CFG.scrumMinorsPerGame > 0 && rng.chance((CFG.scrumMinorsPerGame / 60) * (st.officials?.penaltyMult ?? 1) * v3EmotionalPimMult(st))) {
         const benchedNow = (t: SimTeam) => benchedIds(t);
         const pickScrum = (t: SimTeam) => { const pool = [...onIceF(t), ...onIceD(t)].filter((x) => !benchedNow(t).has(x.id)); return pool.length ? pool[rng.weighted(pool.map((x) => (x.attrs.fg ?? 30) + (105 - x.discipline)))] : null; };
         const hs = pickScrum(home), as = pickScrum(away);
@@ -1812,7 +1855,10 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
         zone: "NEU", importance: "MINOR",
       });
       // a draw in one team's end: winning it there = possession in that zone
-      zone = foZone == null ? "NEU" : carrierTeam.id === foZone ? "DEF" : "OFF";
+      const drawZone = foZone;
+      zone = drawZone == null ? "NEU" : carrierTeam.id === drawZone ? "DEF" : "OFF";
+      faceoffPressure = st.v3FaceoffPressure && drawZone != null && carrierTeam.id !== drawZone
+        ? { teamId: carrierTeam.id, until: tick + 10 } : null;
       if (foZone != null) { const fe = st.sink.all(); const last = fe[fe.length - 1]; if (last?.type === "FACEOFF") last.zone = zone; }
       foZone = null; noChange[home.id] = false; noChange[away.id] = false;
       state = "PLAY"; setup = "carry"; press = 0;
@@ -1931,11 +1977,12 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
     // of always reaching the net, so the upstream rate is boosted to keep the actual
     // on-goal (SOG) rate the calibration is tuned against unchanged.
     const lateShell = lateShellShotMult(period, tick, margin);
+    const faceoffSetPlay = faceoffPressure?.teamId === carrierTeam.id && tick < faceoffPressure.until ? 1.06 : 1;
     const adaptAtk = adapt(carrierTeam, margin).shots, adaptDef = adapt(def, -margin).allow;
     const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
     const armUp = delayedFor === carrierTeam.id ? 1.2 : 1;
     const crowd = carrierTeam === home ? st.crowdMult : 1;
-    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell * adaptAtk * adaptDef * openIce * armUp * crowd)) continue;
+    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd)) continue;
     // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
     // the puck back to the point for a D one-timer instead — this is how D rack up
     // their goals. But a forward who would PASS keeps the puck (→ his linemate's
@@ -2096,12 +2143,13 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       // team defence/coaching/chem edge toward 1. Ranks are kept — only the spread
       // narrows — so the scoring race and elite goalies still stand out.
       const pk = 1 - PARITY_CONV * parityAmt();
-      const pTalent = conversion(shOff, effGoalieQuality(gSim), isHome, strength);
+      const finishExponent = st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7;
+      const pTalent = conversion(shOff, effGoalieQuality(gSim), isHome, strength, finishExponent);
       // PARITY compresses only the GOALIE mismatch toward a league-average keeper —
       // a team-level edge — while the SHOOTER's finishing is left FULL, so elite
       // snipers still pile up goals (top scorers reach ~110-120) even as weak teams
       // stay competitive. (Anchor keeps `shOff`, swaps only the goalie.)
-      const pAnchor = conversion(shOff, LEAGUE.avgGoalie, isHome, strength);
+      const pAnchor = conversion(shOff, LEAGUE.avgGoalie, isHome, strength, finishExponent);
       const pConv = compressToward(pTalent, pAnchor, pk);
       const teamEdge = compressToward(offMult * defShield * defTalent, 1, pk);
       // a booming point shot rewards the D's SHOT rating (SC): an elite offensive D
@@ -2197,6 +2245,16 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
       }
       const rb = gSim.attrs.rb ?? 50;
       if (rng.chance(Math.max(0.05, 0.32 - rb / 300))) {
+        // V3: a rebound is loose, not automatically an attacking recovery. A
+        // strong defending pair can clear a small share of loose pucks; goalie
+        // RB still controls how often the rebound exists in the first place.
+        const reboundClear = st.v3ReboundClearance
+          ? Math.max(0.04, Math.min(0.16, 0.08 + ((onIceD(def).reduce((n, s) => n + 0.65 * (s.attrs.df ?? 50) + 0.35 * (s.attrs.ck ?? 50), 0) / Math.max(1, onIceD(def).length)) - 65) * 0.002))
+          : 0;
+        if (reboundClear > 0 && rng.chance(reboundClear)) {
+          carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50)) ?? dman;
+          zone = "DEF"; setup = "carry"; press = 0; continue;
+        }
         creator = carrier; carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(s.attrs.sc ?? 50) * 60) ?? carrier; setup = "rebound"; // rebound in the slot (press stays → escalating danger)
         st.sink.emit({
           period, seconds: tick, type: "REBOUND", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
@@ -2492,7 +2550,8 @@ function simulateOvertime(st: SimState, cfg: { period?: number; seconds?: number
       const xg = expectedGoal(rng, sector, shotType, "EV");
       const tracked = trackSpecialShot(st, att, def, shooter, per, t, sector, shotType, xg, true, "3V3");
       hasOtShot = true;
-      const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV") * 2.2 * (cfg.finishMult ?? 1);
+      const finishExponent = st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7;
+      const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV", finishExponent) * 2.2 * (cfg.finishMult ?? 1);
       if (rng.chance(p)) {
         tracked.goalie!.goalsAgainst++;
         // st.currentOnIce already holds the real deployed trio for both teams
@@ -2650,7 +2709,7 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
-  experimentalV3?: { fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean };
+  experimentalV3?: { fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2680,6 +2739,13 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     v3FatigueDeployment: isV3 && (opts.experimentalV3?.fatigueDeployment ?? true),
     v3CoachAdaptation: isV3 && (opts.experimentalV3?.coachAdaptation ?? true),
     v3CheckingMatchup: isV3 && (opts.experimentalV3?.checkingMatchup ?? true),
+    v3QualityDAssists: isV3 && (opts.experimentalV3?.qualityDAssists ?? true),
+    v3FaceoffPressure: isV3 && (opts.experimentalV3?.faceoffPressure ?? true),
+    v3ReboundClearance: isV3 && (opts.experimentalV3?.reboundClearance ?? true),
+    v3MomentumTimeout: isV3 && (opts.experimentalV3?.momentumTimeout ?? true),
+    v3AssistSpread: isV3 && (opts.experimentalV3?.assistSpread ?? true),
+    v3EmotionalDiscipline: isV3 && (opts.experimentalV3?.emotionalDiscipline ?? true),
+    v3FinishingCurve: isV3 && (opts.experimentalV3?.finishingCurve ?? true),
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
     timeoutUsed: {},
     challengeFailed: {},

@@ -47,10 +47,12 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
   let games = 0, homeWins = 0, extra = 0, goals = 0, shots = 0, saves = 0, shotsAg = 0;
   let xgF = 0, hd = 0, gsaxSum = 0, gsaxN = 0, oz = 0, znTot = 0, hits = 0;
   let inj = 0; const injMech: Record<string, number> = {};
+  let assists = 0, dAssists = 0;
+  const pimByType: Record<string, number> = {};
   let pim = 0, blowouts = 0, upsetGames = 0, upsets = 0;
   const points: Record<number, number> = {};
   const strength: Record<number, number> = {};
-  const scorer: Record<number, number> = {};
+  const scorer: Record<number, { points: number; goals: number; assists: number; toi: number; games: number }> = {};
   for (const t of teams) { points[t.id] = 0; strength[t.id] = t.avgOV; }
 
   // double round-robin (home + away)
@@ -70,9 +72,16 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
       const g = b.goalie; if (g.shotsAgainst > 0) { gsaxSum += g.xga - g.goalsAgainst; gsaxN++; }
       const zt = b.ozTime + b.nzTime + b.dzTime; oz += b.ozTime; znTot += zt;
       hits += b.hits; pim += b.pim;
-      for (const s of b.skaters) scorer[s.id] = (scorer[s.id] ?? 0) + s.points;
+      for (const s of b.skaters) {
+        const total = scorer[s.id] ?? { points: 0, goals: 0, assists: 0, toi: 0, games: 0 };
+        total.points += s.points; total.goals += s.goals; total.assists += s.assists; total.toi += s.toi; total.games++;
+        scorer[s.id] = total;
+        assists += s.assists;
+        if (/D/.test(s.position)) dAssists += s.assists;
+      }
     }
     for (const x of r.injuries) { inj++; injMech[x.mechanism] = (injMech[x.mechanism] ?? 0) + 1; }
+    for (const p of r.penalties) pimByType[p.type] = (pimByType[p.type] ?? 0) + p.minutes;
     if (Math.abs(hg - ag) >= 4) blowouts++;
     // points (2/1/0)
     const win = r.winner, lose = r.loser;
@@ -93,7 +102,14 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
   const ptsScaled = (id: number) => points[id] * scale82;
   const top8 = byStrength.slice(0, 8).reduce((s, id) => s + ptsScaled(id), 0) / 8;
   const bot8 = byStrength.slice(-8).reduce((s, id) => s + ptsScaled(id), 0) / 8;
-  const topScorer = Math.max(...Object.values(scorer)) * scale82;
+  const scoringLeaders = Object.values(scorer).sort((a, b) => b.points - a.points);
+  const leader = scoringLeaders[0] ?? { points: 0, goals: 0, assists: 0, toi: 0, games: 1 };
+  const topScorer = leader.points * scale82;
+  const leaderGoals = leader.goals * scale82;
+  const leaderAssists = leader.assists * scale82;
+  const leaderToi = leader.toi / Math.max(1, leader.games);
+  const allPlayerPoints = scoringLeaders.reduce((n, s) => n + s.points, 0);
+  const topFiveShare = allPlayerPoints ? scoringLeaders.slice(0, 5).reduce((n, s) => n + s.points, 0) / allPlayerPoints * 100 : 0;
 
   const gpg = perTeamGame(goals);
   const svp = shotsAg ? saves / shotsAg : 0;
@@ -104,6 +120,8 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
   const ozPct = znTot ? (oz / znTot) * 100 : 0;
   const injPerGame = perTeamGame(inj);
   const topMech = Object.entries(injMech).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
+  const topPim = Object.entries(pimByType).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([type, mins]) => `${type} ${(mins / games / 2).toFixed(1)}`).join(" · ") || "—";
 
   const m: CalMetric[] = [
     // core
@@ -113,12 +131,16 @@ export async function runCalibration(opts?: { settings?: EngineSettings; season?
     { group: "Core rates", label: "Home win %", value: (homeWins / games * 100).toFixed(1) + "%", target: "52 – 56%", status: grade(homeWins / games * 100, [51, 57], [48, 60]) },
     { group: "Core rates", label: "OT / SO games", value: (extra / games * 100).toFixed(1) + "%", target: "20 – 26%", status: grade(extra / games * 100, [19, 27], [15, 32]) },
     { group: "Core rates", label: "PIM / team / game", value: perTeamGame(pim).toFixed(1), target: "7 – 12", status: grade(perTeamGame(pim), [7, 12], [5, 15]) },
+    { group: "Core rates", label: "Top PIM sources / team / game", value: topPim, target: "diagnostic", status: "ok", hint: "minutes by penalty type" },
     // balance
     { group: "Competitive balance", label: "Quality → points (Spearman)", value: rho.toFixed(3), target: "> 0.85", status: grade(rho, [0.85, 1], [0.75, 1]), hint: "does the higher-rated team win over a season?" },
     { group: "Competitive balance", label: "Top-8 vs bottom-8 gap (pts/82)", value: (top8 - bot8).toFixed(0), target: "> 30", status: grade(top8 - bot8, [30, 200], [20, 200]) },
     { group: "Competitive balance", label: "Upset rate (≥3 OV gap)", value: (upsetGames ? upsets / upsetGames * 100 : 0).toFixed(0) + "%", target: "28 – 45%", status: grade(upsetGames ? upsets / upsetGames * 100 : 0, [26, 46], [18, 55]), hint: "healthy randomness — not a coin flip, not chalk" },
     { group: "Competitive balance", label: "Blowouts (≥4 goals)", value: (blowouts / games * 100).toFixed(1) + "%", target: "8 – 14%", status: grade(blowouts / games * 100, [7, 15], [4, 20]) },
     { group: "Competitive balance", label: "Top scorer (pts/82)", value: topScorer.toFixed(0), target: "105 – 130", status: grade(topScorer, [102, 135], [90, 150]) },
+    { group: "Player distribution", label: "Top scorer breakdown", value: `${leaderGoals.toFixed(0)}G · ${leaderAssists.toFixed(0)}A · ${(leaderToi / 60).toFixed(1)} TOI`, target: "diagnostic", status: "ok", hint: "per 82 G/A; average minutes per game" },
+    { group: "Player distribution", label: "Top-5 scoring share", value: `${topFiveShare.toFixed(1)}%`, target: "diagnostic", status: "ok", hint: "share of all skater points" },
+    { group: "Player distribution", label: "Defencemen assist share", value: `${(assists ? dAssists / assists * 100 : 0).toFixed(1)}%`, target: "26 – 30%", status: grade(assists ? dAssists / assists * 100 : 0, [26, 30], [23, 33]), hint: "tracks the V3 quality-sensitive D-assist curve" },
     // shot quality
     { group: "Shot quality (xG)", label: "xGF vs GF / team", value: `${xgf.toFixed(2)} vs ${gf.toFixed(2)}`, target: "within ~8%", status: grade(gf ? xgf / gf : 1, [0.9, 1.1], [0.82, 1.2]), hint: "expected goals should track real goals" },
     { group: "Shot quality (xG)", label: "High-danger shot %", value: hdPct.toFixed(0) + "%", target: "28 – 38%", status: grade(hdPct, [28, 38], [22, 44]) },
