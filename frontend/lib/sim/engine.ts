@@ -169,6 +169,9 @@ type SimState = {
   v3NetFront: boolean;               // V3 diagnostic feature flag
   v3ShootoutDuel: boolean;           // V3 diagnostic feature flag
   v3GarbageTime: boolean;            // V3 diagnostic feature flag
+  v3ShooterForm: boolean;            // V3 diagnostic feature flag
+  shooterGoalAt: Record<number, number>;     // V3: absolute game second of each skater's last goal
+  shooterColdShots: Record<number, number>;  // V3: shots on goal since each skater's last goal this game
   goalieStreak: Record<number, number>;      // V3: consecutive saves since the goalie last allowed a goal
   lastGoalAgainst: Record<number, number>;   // V3: absolute game second of the last goal each goalie allowed
   lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
@@ -1468,6 +1471,13 @@ function lateShellShotMult(period: number, secondsIntoPeriod: number, marginForT
   const intensity = 1 - Math.max(0, secLeft) / LATE_SHELL_WINDOW;
   return 1 - 0.12 * intensity; // up to 12% fewer shot attempts right at the horn
 }
+// V3: shooter form — for 10:00 after his own goal a skater's shots are x1.04 likelier to score;
+// once he has put 5+ shots on net since his last goal (or all game) they are x0.97. The two states
+// are exclusive (a goal resets the drought counter), bounded and RNG-free.
+export function v3ShooterFormMult(secondsSinceOwnGoal: number, shotsSinceGoal: number): number {
+  if (secondsSinceOwnGoal >= 0 && secondsSinceOwnGoal <= 600) return 1.04;
+  return shotsSinceGoal >= 5 ? 0.97 : 1;
+}
 // V3: garbage time — V2's shell stops at a 2-goal lead ("3+ is already comfortable"), so a
 // blowout keeps its full tempo. From the 2nd period a team up 3+ eases off (x0.94, x0.90 in the
 // 3rd); a team down 3+ pushes a little in the 3rd (x1.05). Bounded, deterministic, no RNG.
@@ -2247,6 +2257,11 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
         p *= v3GoalieRhythmMult(absT - (st.lastShotAgainst[def.id] ?? 0));
         st.lastShotAgainst[def.id] = absT;
       }
+      // V3: shooter form — confident right after scoring, gripping the stick after a long drought.
+      if (st.v3ShooterForm && !defEmptyNet) {
+        p *= v3ShooterFormMult(absT - (st.shooterGoalAt[carrier.id] ?? -1e9), st.shooterColdShots[carrier.id] ?? 0);
+        st.shooterColdShots[carrier.id] = (st.shooterColdShots[carrier.id] ?? 0) + 1;
+      }
       // V3: in-game composure — rattled right after a goal against, locked in on a long save streak.
       if (st.v3GoalieComposure && !defEmptyNet) {
         p *= v3GoalieComposureMult(absT - (st.lastGoalAgainst[def.id] ?? -1e9), st.goalieStreak[def.id] ?? 0);
@@ -2313,7 +2328,7 @@ function simulatePeriodPossession(st: SimState, period: number, opts: { suddenDe
           }
         }
         if (opts.suddenDeath) { suddenWinner = carrierTeam.id; break; } // overtime winner — game over
-        if (!defEmptyNet) { st.goalieStreak[def.id] = 0; st.lastGoalAgainst[def.id] = absT; }
+        if (!defEmptyNet) { st.goalieStreak[def.id] = 0; st.lastGoalAgainst[def.id] = absT; st.shooterGoalAt[carrier.id] = absT; st.shooterColdShots[carrier.id] = 0; }
         momoOnGoal(st, carrierTeam.id, def.id, absT);
         if (!defEmptyNet) maybePullGoalie(st, def); // yank the starter if he's been shelled
         if (strength === "PP") expireOnePenalty(def.id, tick, active);
@@ -2803,7 +2818,7 @@ export type SimOptions = {
   // tonight's crowd as a share of capacity (0..1). A packed building lifts the home side.
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
-  experimentalV3?: { garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}): GameResult {
@@ -2849,6 +2864,8 @@ export function simulateGame(home: SimTeam, away: SimTeam, opts: SimOptions = {}
     v3NetFront: isV3 && (opts.experimentalV3?.netFront ?? true),
     v3ShootoutDuel: isV3 && (opts.experimentalV3?.shootoutDuel ?? true),
     v3GarbageTime: isV3 && (opts.experimentalV3?.garbageTime ?? true),
+    v3ShooterForm: isV3 && (opts.experimentalV3?.shooterForm ?? true),
+    shooterGoalAt: {}, shooterColdShots: {},
     goalieStreak: {}, lastGoalAgainst: {},
     lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,

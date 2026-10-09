@@ -490,3 +490,17 @@ Conclusions:
   (removing it returns goals to 3.004 and blowouts to 13.0%). It is the rhythm/composure pair
   (net goal-positive) that costs ~0.8% more goals; still inside 2.9–3.15.
 - Top scorer ~130 vs 134: the finishing curve helps as intended.
+
+### Shooter form — twentieth increment, offline — 2026-10-09
+
+Flag `shooterForm` (`v3ShooterFormMult`, state `st.shooterGoalAt` / `st.shooterColdShots`): for 10:00
+after his own goal a skater's shots are ×1.04 likelier to score; after 5+ shots on goal since
+his last goal (or since the start of the game) they are ×0.97. A goal resets the drought counter,
+so the two states never overlap; empty-net shots excluded; no RNG draws.
+
+Gates: identity with all 20 flags off — identical on 400 games (seed 90,000); 17/17 tests.
+Seeds 90,000 / 190,000 / 290,000: goals 2.98 / 3.05 / 3.04 (unchanged vs the previous
+increment — the +4% and −3% roughly cancel), shots 31.2–31.5, save % .911 / .909 / .909, top
+scorer 130 / 124 / 126, top-5 share 2.9–3.1%, blowouts 14.2 / 14.0 / 12.3%. Not measured: the
+per-player streakiness distribution (a skater's multi-goal-game rate); that needs a dedicated
+multi-seed check before any claim beyond "league-neutral".

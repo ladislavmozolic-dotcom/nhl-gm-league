@@ -9,7 +9,7 @@ import {
   isNextGenEngine,
   resolveSimEngine,
 } from "../lib/sim/version";
-import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, V3_OT_STAR_EXPONENT, v3GarbageTimeShotMult, V3_SHOOTOUT_CENTER, v3ShootoutDuelMult, V3_NETFRONT_CENTER, v3NetFrontMult, v3SpeedDrawsPenaltiesMult, V3_PP_CENTER, v3PpPuckMovementMult, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
+import { v3CheckingMatchupDangerMult, v3CoachAdaptation, v3DefenseAssistWeight, v3FinishingExponent, v3BlockSkillMult, V3_OT_STAR_EXPONENT, v3ShooterFormMult, v3GarbageTimeShotMult, V3_SHOOTOUT_CENTER, v3ShootoutDuelMult, V3_NETFRONT_CENTER, v3NetFrontMult, v3SpeedDrawsPenaltiesMult, V3_PP_CENTER, v3PpPuckMovementMult, v3GoalieComposureMult, v3GoalieRhythmMult, v3ShiftLimit } from "../lib/sim/engine";
 import type { SimSkater } from "../lib/sim/types";
 
 test("V3 is a next-gen workbench version, not a league-selectable engine", () => {
@@ -153,4 +153,12 @@ test("V3 garbage time only eases a 3+ goal lead and nudges the trailing side", (
   assert.equal(v3GarbageTimeShotMult(3, 4), 0.9);
   assert.equal(v3GarbageTimeShotMult(2, -3), 1);
   assert.equal(v3GarbageTimeShotMult(3, -3), 1.05);
+});
+
+test("V3 shooter form: confident after a goal, tight after a drought", () => {
+  assert.equal(v3ShooterFormMult(30, 0), 1.04);
+  assert.equal(v3ShooterFormMult(600, 9), 1.04);
+  assert.equal(v3ShooterFormMult(601, 4), 1);
+  assert.equal(v3ShooterFormMult(1e9, 5), 0.97);
+  assert.equal(v3ShooterFormMult(1e9, 0), 1);
 });

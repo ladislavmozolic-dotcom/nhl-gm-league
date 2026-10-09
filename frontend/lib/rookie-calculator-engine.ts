@@ -102,6 +102,22 @@ export function calculateRookieRatings(
   const nhlLastGp = Number(p.lastSeasonGP ?? 0);
   const nhlGp = nhlCurGp + nhlLastGp;
 
+  // Current season counts 80%, last season 20% (same rule as the Player Calculator).
+  // Rates are blended per game; if only one season has games, that one is used as-is.
+  const CUR_W = 0.8;
+  const LAST_W = 0.2;
+  const blendRate = (cur: unknown, last: unknown): number => {
+    const cr = nhlCurGp > 0 ? Number(cur ?? 0) / nhlCurGp : null;
+    const lr = nhlLastGp > 0 ? Number(last ?? 0) / nhlLastGp : null;
+    if (cr != null && lr != null) return CUR_W * cr + LAST_W * lr;
+    return cr ?? lr ?? 0;
+  };
+  const perGame = blendRate;
+  const pooledToiSec = blendRate(
+    Number(p.curSeasonToi ?? 0) * nhlCurGp,
+    Number(p.lastSeasonToi ?? 0) * nhlLastGp
+  );
+
   const ahl = (p.ahlStats as any) ?? {};
   const ahlCur = ahl.cur ?? {};
   const ahlLast = ahl.last ?? {};
@@ -157,8 +173,8 @@ export function calculateRookieRatings(
   // 1. PA (Passing) — from A/GP, A/60 all, A/60 5v5 + custom
   let livePaPct = isD ? 0.20 : 0.22;
   if (nhlGp > 0) {
-    const apg = nhlCurGp > 0 ? Number(p.curSeasonA ?? 0) / nhlCurGp : (nhlLastGp > 0 ? Number(p.lastSeasonA ?? 0) / nhlLastGp : 0);
-    const toiSec = Number(p.curSeasonToi ?? p.lastSeasonToi ?? 0);
+    const apg = perGame(p.curSeasonA, p.lastSeasonA);
+    const toiSec = pooledToiSec;
     const a60 = toiSec > 0 ? (apg / toiSec) * 3600 : apg * 3.5;
     const a60_5v5 = mpCur.toi5v5 ? ((mpCur.a1_5v5 ?? 0) + (mpCur.a2_5v5 ?? 0)) / mpCur.toi5v5 * 3600 : a60;
 
@@ -180,8 +196,8 @@ export function calculateRookieRatings(
   // 2. SC (Scoring) — from G/GP, G/60, xG/60, (G-xG)/60 + custom
   let liveScPct = isD ? 0.20 : 0.22;
   if (nhlGp > 0) {
-    const gpg = nhlCurGp > 0 ? Number(p.curSeasonG ?? 0) / nhlCurGp : (nhlLastGp > 0 ? Number(p.lastSeasonG ?? 0) / nhlLastGp : 0);
-    const toiSec = Number(p.curSeasonToi ?? p.lastSeasonToi ?? 0);
+    const gpg = perGame(p.curSeasonG, p.lastSeasonG);
+    const toiSec = pooledToiSec;
     const g60 = toiSec > 0 ? (gpg / toiSec) * 3600 : gpg * 3.5;
     const xg60 = mpCur.toi ? (mpCur.ixg / mpCur.toi) * 3600 : g60 * 0.9;
     const g_xg60 = mpCur.toi ? ((mpCur.g - mpCur.ixg) / mpCur.toi) * 3600 : 0;
@@ -207,9 +223,8 @@ export function calculateRookieRatings(
   // 3. CK (Checking) — Hits/60, Hits/GP + custom
   let liveCkPct = isD ? 0.30 : 0.25;
   if (nhlGp > 0) {
-    const hits = Number(p.curSeasonHits ?? p.lastSeasonHits ?? 0);
-    const hpg = nhlCurGp > 0 ? hits / nhlCurGp : hits / Math.max(1, nhlGp);
-    const toiSec = Number(p.curSeasonToi ?? p.lastSeasonToi ?? 0);
+    const hpg = perGame(p.curSeasonHits, p.lastSeasonHits);
+    const toiSec = pooledToiSec;
     const h60 = toiSec > 0 ? (hpg / toiSec) * 3600 : hpg * 3.5;
     const pctH60 = clamp(0, 1, h60 / 8.0);
     const pctHpg = clamp(0, 1, hpg / (isD ? 2.5 : 2.0));
@@ -223,14 +238,13 @@ export function calculateRookieRatings(
   // 4. DF (Defense) — PK TOI, blocks, +/- and relative xGA metrics
   let liveDfPct = isD ? 0.28 : 0.22;
   if (nhlGp > 0) {
-    const pkToi = Number(p.curSeasonShToi ?? p.lastSeasonShToi ?? 0) / 60;
-    const blk = Number(p.curSeasonBlocks ?? p.lastSeasonBlocks ?? 0);
-    const blkPg = nhlCurGp > 0 ? blk / nhlCurGp : blk / Math.max(1, nhlGp);
-    const pm = Number(p.curSeasonPM ?? p.lastSeasonPM ?? 0);
+    const pkToi = blendRate(Number(p.curSeasonShToi ?? 0) * nhlCurGp, Number(p.lastSeasonShToi ?? 0) * nhlLastGp) / 60;
+    const blkPg = perGame(p.curSeasonBlocks, p.lastSeasonBlocks);
+    const pmPg = blendRate(p.curSeasonPM, p.lastSeasonPM);
 
     const pctPk = clamp(0, 1, pkToi / (isD ? 2.5 : 1.5));
     const pctBlk = clamp(0, 1, blkPg / (isD ? 2.0 : 0.9));
-    const pctPm = clamp(0, 1, 0.5 + (pm / Math.max(1, nhlGp)) * 0.3);
+    const pctPm = clamp(0, 1, 0.5 + pmPg * 0.3);
 
     const stdDF = (isD ? w.dfD.pkToiPg : w.dfF.pkToiPg) * pctPk +
                   (isD ? w.dfD.blk60 : w.dfF.blk60) * pctBlk +
@@ -247,8 +261,7 @@ export function calculateRookieRatings(
 
   // 5. DI (Discipline) — Penalties, PIM/60, penalty balance
   let liveDiPct = 0.35;
-  const pim = Number(p.curSeasonPim ?? p.lastSeasonPim ?? ahlCur.pim ?? 0);
-  const pimPg = effectiveGp > 0 ? pim / effectiveGp : 0.3;
+  const pimPg = nhlGp > 0 ? blendRate(p.curSeasonPim, p.lastSeasonPim) : (effectiveGp > 0 ? Number(ahlCur.pim ?? 0) / effectiveGp : 0.3);
   liveDiPct = clamp(0.1, 0.9, 1 - (pimPg / 1.6));
   const diPct = regress(liveDiPct, 0.35);
   const di = clamp(72, 85, lookupRatingFromPercentile("DI", posGroup, diPct));
@@ -278,7 +291,7 @@ export function calculateRookieRatings(
   const ex = clamp(60, 66, 63 + Math.floor((Number.isFinite(career) ? career : 0) / 25));
 
   // 9. EN (Endurance) — TOI per game
-  const toiSec = Number(p.curSeasonToi ?? p.lastSeasonToi ?? 0);
+  const toiSec = pooledToiSec;
   const en = toiSec > 0 ? clamp(72, 85, Math.round(74 + (toiSec / 60 - 11) * 1.5)) : 78;
 
   // 10. DU (Durability) — Realistic rookie baseline
