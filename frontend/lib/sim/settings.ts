@@ -255,7 +255,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   inGameFatiguePct: 100, possessionSkillPct: 0.85, defenseTalentPct: 35, catchUpStrength: 0.07,
   goalsPct: 98, penaltiesPct: 100, severePenaltyPct: 100, hitsPct: 100,
   fightsPct: 35, powerPlayPct: 100, homeAdvPct: 100, homeLastChangePct: 100,
-  pullGoalieEnabled: true, pullGoalieMinGoals: 6, pullGoalieMinShots: 15, pullGoalieSvPct: 0.80,
+  pullGoalieEnabled: true, pullGoalieMinGoals: 6, pullGoalieMinShots: 8, pullGoalieSvPct: 0.80,
   rivalryEnabled: true, rivalryFightMult: 1.8, rivalryPenaltyMult: 1.5,
   scrumChance: 0.25, brawlChance: 0.02, abuseOfficialChance: 0.06, coachFinePimThreshold: 24, coachFineAmount: 100000,
   fightsEnabled: true, penaltiesEnabled: true, playByPlayEnabled: true,
