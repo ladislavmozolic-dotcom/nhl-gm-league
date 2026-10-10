@@ -38,8 +38,26 @@ const gameWhere = ({ season, league, playoffs }: GameFilter) =>
   ({ season, league, status: "FINAL", ...(playoffs ? { seriesId: { not: null } } : { seriesId: null }) });
 
 async function teamLookup() {
-  const teams = await prisma.team.findMany({ select: { id: true, code: true, slug: true, name: true, logoUrl: true } });
+  const teams = await prisma.team.findMany({ select: { id: true, code: true, slug: true, name: true, logoUrl: true, league: true } });
   return new Map(teams.map((t) => [t.id, t]));
+}
+
+
+type TeamInfo = { id: number; code: string | null; slug: string | null; logoUrl: string | null; league: string };
+
+/** Display label for a stat row. A player who has been traded and has not yet played a game for his new
+ *  club shows the CURRENT club with the old one in brackets ("MTL (PIT)"). The row's teamId stays the team
+ *  he actually played for, so team stats pages are unchanged. Once he plays for the new club that club gets
+ *  its own row and nothing is relabelled. */
+function currentTeamLabel(
+  rowTeamId: number | null, hasRowForCurrent: boolean, currentTeamId: number | null | undefined,
+  rowTeam: TeamInfo | null | undefined, teams: Map<number, TeamInfo>, league: string,
+): { teamCode: string | null; teamSlug: string | null; teamLogo: string | null } {
+  const base = { teamCode: rowTeam?.code ?? null, teamSlug: rowTeam?.slug ?? null, teamLogo: rowTeam?.logoUrl ?? null };
+  if (!currentTeamId || hasRowForCurrent || currentTeamId === rowTeamId) return base;
+  const cur = teams.get(currentTeamId);
+  if (!cur || cur.league !== league || !cur.code) return base;
+  return { teamCode: rowTeam?.code ? `${cur.code} (${rowTeam.code})` : cur.code, teamSlug: cur.slug ?? null, teamLogo: cur.logoUrl ?? null };
 }
 
 export async function skaterTotals(season: string, league = "NHL", playoffs = false): Promise<SkaterTotal[]> {
@@ -76,13 +94,16 @@ export async function skaterTotals(season: string, league = "NHL", playoffs = fa
     for (const id of goal.onIceForIds) bumpPm(id, goal.teamId, 1);
     for (const id of goal.onIceAgainstIds) bumpPm(id, againstTeamId, -1);
   }
+  const skaterTeams = new Map<number, Set<number>>();
+  for (const g of grouped) { if (!skaterTeams.has(g.playerId)) skaterTeams.set(g.playerId, new Set()); skaterTeams.get(g.playerId)!.add(g.teamId); }
   return grouped.map((g) => {
     const p = pById.get(g.playerId);
     const t = g.teamId ? teams.get(g.teamId) : null; // team the player actually played for
+    const lab = currentTeamLabel(g.teamId ?? null, skaterTeams.get(g.playerId)!.has(p?.teamId ?? -1), p?.teamId, t, teams, league);
     const s = g._sum;
     return {
       playerId: g.playerId, name: cleanName(p?.name ?? "—"), rookie: isRookieName(p?.name ?? ""),
-      position: p?.position ?? "—", number: p?.number ?? null, teamId: g.teamId ?? null, teamCode: t?.code ?? null, teamSlug: t?.slug ?? null, teamLogo: t?.logoUrl ?? null,
+      position: p?.position ?? "—", number: p?.number ?? null, teamId: g.teamId ?? null, ...lab,
       photoUrl: p?.photoUrl ?? null, slug: p?.slug ?? null,
       gp: g._count._all, goals: s.goals ?? 0, assists: s.assists ?? 0, points: s.points ?? 0, shots: s.shots ?? 0,
       pim: s.pim ?? 0, plusMinus: s.plusMinus ?? 0, plusMinus5v5: pm5v5.get(`${g.playerId}:${g.teamId}`) ?? 0,
@@ -201,21 +222,22 @@ export async function goalieTotals(season: string, league = "NHL", playoffs = fa
     if (r.goalsAgainst === 0) a.shutouts++;
   }
   const [players, teams] = await Promise.all([
-    prisma.player.findMany({ where: { id: { in: [...acc.values()].map((a) => a.playerId) } }, select: { id: true, name: true, photoUrl: true, slug: true } }),
+    prisma.player.findMany({ where: { id: { in: [...acc.values()].map((a) => a.playerId) } }, select: { id: true, name: true, photoUrl: true, slug: true, teamId: true } }),
     teamLookup(),
   ]);
   const pById = new Map(players.map((p) => [p.id, p]));
+  const goalieTeams = new Map<number, Set<number>>();
+  for (const a of acc.values()) { if (!goalieTeams.has(a.playerId)) goalieTeams.set(a.playerId, new Set()); if (a.teamId != null) goalieTeams.get(a.playerId)!.add(a.teamId); }
   return [...acc.values()].map((a) => {
     const p = pById.get(a.playerId);
     const t = a.teamId ? teams.get(a.teamId) : null;
+    const lab = currentTeamLabel(a.teamId ?? null, goalieTeams.get(a.playerId)!.has(p?.teamId ?? -1), p?.teamId, t, teams, league);
     const svPct = a.shotsAgainst ? a.saves / a.shotsAgainst : 0;
     const gaa = a.toiMin ? (a.goalsAgainst * 60) / a.toiMin : 0;
     return {
       ...a,
       name: cleanName(p?.name ?? "—"),
-      teamCode: t?.code ?? null,
-      teamSlug: t?.slug ?? null,
-      teamLogo: t?.logoUrl ?? null,
+      ...lab,
       photoUrl: p?.photoUrl ?? null,
       slug: p?.slug ?? null,
       svPct,
