@@ -1315,9 +1315,9 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
           </div>
           <section className="lines-goalie-panel">
             <div className="sm:col-span-3"><p className="lines-kicker">Goalie decisions</p></div>
-            <label className="lines-goalie-card"><span className="lines-setting-icon">⇊</span><span>Pull goalie down by ≥</span>
+            <label className="lines-goalie-card"><span className="lines-setting-icon">⇊</span><span>Swap goalie after ≥ goals against</span>
               <Stepper value={data.strategy.goaliePull.minGoals} min={1} max={6} w="w-12" onChange={(v) => change((d) => { d.strategy.goaliePull.minGoals = v; })} /></label>
-            <label className="lines-goalie-card"><span className="lines-setting-icon">◷</span><span>Pull at (sec left)</span>
+            <label className="lines-goalie-card"><span className="lines-setting-icon">◷</span><span>Extra attacker (goalie out) at, sec left</span>
               <Stepper value={data.strategy.goaliePull.pullSec} min={0} max={300} step={10} w="w-16" onChange={(v) => change((d) => { d.strategy.goaliePull.pullSec = v; })} /></label>
             <label className="lines-goalie-card"><span className="lines-setting-icon">⇄</span><span>Swap goalie under SV%</span>
               <Stepper value={data.strategy.goaliePull.savePctUnder} min={0} max={100} step={5} w="w-14" onChange={(v) => change((d) => { d.strategy.goaliePull.savePctUnder = v; })} /></label>
