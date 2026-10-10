@@ -517,7 +517,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const setStyle = (k: "ppStyle" | "pkStyle", v: string) => change((d) => { d.system = { ...mergeTactics(d.system), [k]: v as PpStyle & PkStyle }; });
   const FormationPicker = (k: "ppStyle" | "pkStyle", label: string) => {
     const opts = DIAL_LABELS[k];
-    const val = (mergeTactics(data.system) as Record<string, string>)[k] ?? "balanced";
+    const val = (mergeTactics(data.system) as unknown as Record<string, string>)[k] ?? "balanced";
     return (
       <div className="lines-card mb-3 bg-slate-900/40 border border-slate-800 rounded-lg p-3">
         <div className="flex items-baseline gap-2 mb-1.5"><span className="text-sm font-semibold">{label}</span><span className="text-xs text-slate-500">{lang === "cs" ? "klasické NHL systémy — nájdi kurzorom na voľbu" : "classic NHL systems — hover an option for what it does"}</span></div>
@@ -543,7 +543,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     layouts: Record<string, FormationRole[]>; dStartIndex: number; accent: string; goalAtTop?: boolean;
   }) => {
     const unit = (data.situations[unitKey] as SpecialUnit[])[ui];
-    const teamDefault = dial ? (((mergeTactics(data.system) as Record<string, string>)[dial]) ?? "balanced") : "balanced";
+    const teamDefault = dial ? (((mergeTactics(data.system) as unknown as Record<string, string>)[dial]) ?? "balanced") : "balanced";
     const effective = (dial && unit?.style) ? unit.style : teamDefault;
     const filled = slotPlayers(unit?.players ?? [], dStartIndex).length;
     const total = unit?.players?.length ?? 0;
@@ -788,7 +788,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const rolesFor = (ui: number): FormationRole[] | null => {
       if (!roleInfo) return null;
       const unit = units[ui] as SpecialUnit;
-      const teamDefault = ((mergeTactics(data.system) as Record<string, string>)[roleInfo.dial]) ?? "balanced";
+      const teamDefault = ((mergeTactics(data.system) as unknown as Record<string, string>)[roleInfo.dial]) ?? "balanced";
       const effective = unit.style ?? teamDefault;
       return roleInfo.layouts[effective] ?? roleInfo.layouts.balanced;
     };
