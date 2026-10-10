@@ -8,7 +8,7 @@ import UnitsEditor from "./UnitsEditor";
 import type { GoalieInfo } from "@/lib/sim/live";
 
 type GoaliePull = { minGoals: number; savePctUnder: number; pullSec: number };
-type Lines = { forwardLines: ForwardLine[]; defensePairs: DefensePair[]; situations?: { pp?: SpecialUnit[]; pk4?: SpecialUnit[] } & Record<string, unknown>; system?: TeamTactics; strategy?: { goaliePull?: GoaliePull } & Record<string, unknown> } & Record<string, unknown>;
+type Lines = { forwardLines: ForwardLine[]; defensePairs: DefensePair[]; situations?: { pp?: SpecialUnit[]; pk4?: SpecialUnit[]; pp4?: SpecialUnit[]; pk3?: SpecialUnit[]; fourVFour?: SpecialUnit[] } & Record<string, unknown>; system?: TeamTactics; strategy?: { goaliePull?: GoaliePull } & Record<string, unknown> } & Record<string, unknown>;
 const DEFAULT_PULL: GoaliePull = { minGoals: 4, savePctUnder: 80, pullSec: 90 };
 type Opt = { value: string; label: string };
 
@@ -37,6 +37,9 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
   const [def, setDef] = useState<DefensePair[]>([]);
   const [pp, setPp] = useState<SpecialUnit[]>([]);
   const [pk, setPk] = useState<SpecialUnit[]>([]);
+  const [pp4, setPp4] = useState<SpecialUnit[]>([]);
+  const [pk3, setPk3] = useState<SpecialUnit[]>([]);
+  const [v4, setV4] = useState<SpecialUnit[]>([]);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [timeoutQueued, setTimeoutQueued] = useState(false);
   const [goalieQueued, setGoalieQueued] = useState(false);
@@ -51,6 +54,7 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
         setLines(j.lines as Lines); setApplied(j.applied ?? 0);
         setFwd((j.lines as Lines).forwardLines ?? []); setDef((j.lines as Lines).defensePairs ?? []); setRoster(j.roster ?? []);
         setPp((j.lines as Lines).situations?.pp ?? []); setPk((j.lines as Lines).situations?.pk4 ?? []);
+        setPp4((j.lines as Lines).situations?.pp4 ?? []); setPk3((j.lines as Lines).situations?.pk3 ?? []); setV4((j.lines as Lines).situations?.fourVFour ?? []);
         setDials({ ...DEFAULT_DIALS, ...((j.lines as Lines).system ?? {}) });
         setPullSec((j.lines as Lines).strategy?.goaliePull?.pullSec ?? DEFAULT_PULL.pullSec);
       })
@@ -71,16 +75,17 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
 
   const set = (k: keyof TeamTactics, v: string) => { setDials((d) => ({ ...d, [k]: v })); setDirty(true); setMsg(null); };
   const editLines = (f: ForwardLine[], d: DefensePair[]) => { setFwd(f); setDef(d); setDirty(true); setMsg(null); };
-  const resetLines = () => { if (!lines) return; setFwd(lines.forwardLines); setDef(lines.defensePairs); setPp(lines.situations?.pp ?? []); setPk(lines.situations?.pk4 ?? []); setMsg(null); };
-  const editUnits = (which: "pp" | "pk") => (u: SpecialUnit[]) => { (which === "pp" ? setPp : setPk)(u); setDirty(true); setMsg(null); };
+  const resetLines = () => { if (!lines) return; setFwd(lines.forwardLines); setDef(lines.defensePairs); setPp(lines.situations?.pp ?? []); setPk(lines.situations?.pk4 ?? []); setPp4(lines.situations?.pp4 ?? []); setPk3(lines.situations?.pk3 ?? []); setV4(lines.situations?.fourVFour ?? []); setMsg(null); };
+  const editUnits = (which: "pp" | "pk" | "pp4" | "pk3" | "v4") => (u: SpecialUnit[]) => { ({ pp: setPp, pk: setPk, pp4: setPp4, pk3: setPk3, v4: setV4 })[which](u); setDirty(true); setMsg(null); };
+  const unitsEdited = (cur: SpecialUnit[], key: "pp" | "pk4" | "pp4" | "pk3" | "fourVFour") => JSON.stringify(cur.map((u) => u.players)) !== JSON.stringify((lines?.situations?.[key] ?? []).map((u) => u.players));
   const linesEdited = !!lines && (JSON.stringify(fwd) !== JSON.stringify(lines.forwardLines) || JSON.stringify(def) !== JSON.stringify(lines.defensePairs)
-    || JSON.stringify(pp.map((u) => u.players)) !== JSON.stringify((lines.situations?.pp ?? []).map((u) => u.players)) || JSON.stringify(pk.map((u) => u.players)) !== JSON.stringify((lines.situations?.pk4 ?? []).map((u) => u.players)));
+    || unitsEdited(pp, "pp") || unitsEdited(pk, "pk4") || unitsEdited(pp4, "pp4") || unitsEdited(pk3, "pk3") || unitsEdited(v4, "fourVFour"));
   const preset = (name: string) => { setDials((d) => ({ ...d, ...PRESETS[name], preset: name })); setDirty(true); setMsg(null); };
 
   const withEdits = (l: Lines): Lines => ({
     ...l,
     forwardLines: fwd, defensePairs: def,
-    situations: { ...(l.situations ?? {}), pp, pk4: pk } as Lines["situations"],
+    situations: { ...(l.situations ?? {}), pp, pk4: pk, pp4, pk3, fourVFour: v4 } as Lines["situations"],
     system: { ...(l.system ?? {}), ...dials },
     strategy: { ...(l.strategy ?? {}), goaliePull: { ...DEFAULT_PULL, ...(l.strategy?.goaliePull ?? {}), pullSec } },
   });
@@ -160,8 +165,18 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
                 {roster.length === 0 ? <p className="text-xs text-slate-500">Loading your roster…</p> : (
                   <>
                     <LinesEditor forwards={fwd} defense={def} roster={roster} outIds={outIds} disabled={!lines} onChange={editLines} />
-                    {pp.length > 0 && <div className="mt-4 border-t border-slate-800 pt-3"><UnitsEditor title="Power play" kinds={["F", "F", "F", "D", "D"]} units={pp} roster={roster} outIds={outIds} disabled={!lines} onChange={editUnits("pp")} /></div>}
-                    {pk.length > 0 && <div className="mt-4"><UnitsEditor title="Penalty kill" kinds={["F", "F", "D", "D"]} units={pk} roster={roster} outIds={outIds} disabled={!lines} onChange={editUnits("pk")} /></div>}
+                    {pp.length > 0 && <div className="mt-4 border-t border-slate-800 pt-3"><UnitsEditor title="Power play" tag="PP" kinds={["F", "F", "F", "D", "D"]} units={pp} roster={roster} outIds={outIds} disabled={!lines} onChange={editUnits("pp")} /></div>}
+                    {pk.length > 0 && <div className="mt-4"><UnitsEditor title="Penalty kill" tag="PK" kinds={["F", "F", "D", "D"]} units={pk} roster={roster} outIds={outIds} disabled={!lines} onChange={editUnits("pk")} /></div>}
+                    {(pp4.length > 0 || pk3.length > 0 || v4.length > 0) && (
+                      <details className="mt-4 rounded-lg border border-slate-800/80">
+                        <summary className="cursor-pointer select-none px-3 py-1.5 text-[11px] font-semibold text-slate-400">More special situations — 4-on-3, 5-on-3, 4-on-4</summary>
+                        <div className="space-y-4 px-3 pb-3 pt-2">
+                          {pp4.length > 0 && <UnitsEditor title="Power play — 4 on 3" tag="4v3" kinds={["F", "F", "F", "D"]} units={pp4} roster={roster} outIds={outIds} disabled={!lines} onChange={editUnits("pp4")} />}
+                          {pk3.length > 0 && <UnitsEditor title="Penalty kill — 5 on 3" tag="5v3" kinds={["F", "D", "D"]} units={pk3} roster={roster} outIds={outIds} disabled={!lines} onChange={editUnits("pk3")} />}
+                          {v4.length > 0 && <UnitsEditor title="Even strength — 4 on 4" tag="4v4" kinds={["F", "F", "D", "D"]} units={v4} roster={roster} outIds={outIds} disabled={!lines} onChange={editUnits("v4")} />}
+                        </div>
+                      </details>
+                    )}
                     {linesEdited && <button onClick={resetLines} className="mt-2 text-[11px] text-slate-400 hover:text-white underline">Undo my line edits</button>}
                   </>
                 )}

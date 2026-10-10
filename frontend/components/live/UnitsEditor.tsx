@@ -6,6 +6,7 @@ import type { RosterPlayer } from "./LinesEditor";
 
 type Props = {
   title: string;
+  tag: string; // short unit label, e.g. "PP", "PK", "4v3"
   /** slot kinds in order, e.g. PP = F F F D D */
   kinds: Array<"F" | "D">;
   units: SpecialUnit[];
@@ -18,7 +19,7 @@ type Props = {
 const isD = (p: RosterPlayer) => { const n = naturalSlots(p.position, p.shoots); return n.has("LD") || n.has("RD"); };
 
 /** Special-teams units (power play / penalty kill): pick who plays each slot. Forwards fill F slots, defensemen D slots. */
-export default function UnitsEditor({ title, kinds, units, roster, outIds, disabled, onChange }: Props) {
+export default function UnitsEditor({ title, tag, kinds, units, roster, outIds, disabled, onChange }: Props) {
   const out = new Set(outIds);
   const byId = new Map(roster.map((p) => [p.id, p]));
   return (
@@ -27,7 +28,7 @@ export default function UnitsEditor({ title, kinds, units, roster, outIds, disab
       <div className="space-y-2">
         {units.map((u, ui) => (
           <div key={ui} className="grid items-end gap-2" style={{ gridTemplateColumns: `2.5rem repeat(${kinds.length}, minmax(0, 1fr))` }}>
-            <span className="text-[11px] text-slate-500 pb-2">{title.startsWith("Power") ? "PP" : "PK"}{ui + 1}</span>
+            <span className="text-[11px] text-slate-500 pb-2">{tag}{ui + 1}</span>
             {kinds.map((kind, si) => {
               const value = u.players[si] ?? null;
               const pool = roster.filter((p) => isD(p) === (kind === "D") || p.id === value);
