@@ -18,7 +18,6 @@ export const DICT: Dict = {
   // top-nav labels (menu keys from lib/menu-config.ts)
   "menu.home": { en: "Home", cs: "Domov", de: "Start", ru: "Главная" },
   "menu.scores": { en: "Scores", cs: "Výsledky", de: "Ergebnisse", ru: "Результаты" },
-  "menu.live": { en: "🔴 Live", cs: "🔴 Naživo", de: "🔴 Live", ru: "🔴 Live" },
   "menu.standings": { en: "Standings", cs: "Tabulka", de: "Tabelle", ru: "Таблица" },
   "menu.schedule": { en: "Schedule", cs: "Rozpis", de: "Spielplan", ru: "Расписание" },
   "menu.trades": { en: "Trades", cs: "Výměny", de: "Transfers", ru: "Обмены" },
