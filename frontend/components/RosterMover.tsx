@@ -22,6 +22,7 @@ type Player = {
   recallExempt?: boolean;
   recallDaysLeft?: number;
   recallGamesLeft?: number;
+  suspendedGames?: number;
 };
 
 const isAhlOnly = (p: Player) => p.capHit === 100_000;
@@ -137,6 +138,7 @@ export default function RosterMover({
   };
 
   const canMove = (p: Player, to: RosterSide) => {
+    if ((p.suspendedGames ?? 0) > 0) return false; // serves his suspension where he is
     if (isNhlSide(to)) return !isAhlOnly(p);
     if (!isNhlSide(p.side)) return true;
     return p.contractType !== "ONE_WAY" || isAhlOnly(p) || !!p.recallExempt;
@@ -185,8 +187,8 @@ export default function RosterMover({
 
   const autoRoster = () => {
     const byOV = (a: Player, b: Player) => b.overall - a.overall;
-    const sk = rows.filter((r) => !r.isGoalie);
-    const gk = rows.filter((r) => r.isGoalie);
+    const sk = rows.filter((r) => !r.isGoalie && !(r.suspendedGames ?? 0));
+    const gk = rows.filter((r) => r.isGoalie && !(r.suspendedGames ?? 0));
     const forcedUp = (p: Player) => p.contractType === "ONE_WAY" && !isAhlOnly(p);
     const proPool = (pool: Player[], n: number) => {
       const forced = pool.filter(forcedUp);
@@ -198,7 +200,7 @@ export default function RosterMover({
     const remGk = gk.filter((p) => !proIds.has(p.id)).sort(byOV);
     const farmIds = new Set([...remSk.slice(0, 18), ...remGk.slice(0, 2)].map((p) => p.id));
     setRows((prev) =>
-      prev.map((p) => ({ ...p, side: proIds.has(p.id) ? "pro" : farmIds.has(p.id) ? "farm" : "farm-scratched" }))
+      prev.map((p) => (p.suspendedGames ?? 0) > 0 ? p : ({ ...p, side: proIds.has(p.id) ? "pro" : farmIds.has(p.id) ? "farm" : "farm-scratched" }))
     );
     setSaved(false);
     setErr(null);
@@ -265,6 +267,7 @@ export default function RosterMover({
   const Row = ({ p }: { p: Player }) => {
     const oneWay = p.contractType === "ONE_WAY";
     const ahlOnly = isAhlOnly(p);
+    const susp = (p.suspendedGames ?? 0) > 0;
     const tooExpensive = p.capHit > WAIVER_CAP_HIT_LIMIT;
 
     return (
@@ -300,6 +303,12 @@ export default function RosterMover({
               </span>
             )}
 
+            {susp && (
+              <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded border border-rose-500/50 text-rose-300 bg-rose-500/10 whitespace-nowrap">
+                {isCs ? `🚫 Suspendovaný · ${p.suspendedGames}` : `🚫 Suspension · ${p.suspendedGames} left`}
+              </span>
+            )}
+
             {ahlOnly ? (
               <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded border border-emerald-500/40 text-emerald-300 bg-emerald-500/10">
                 {isCs ? "Iba AHL" : "AHL only"}
@@ -332,7 +341,7 @@ export default function RosterMover({
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {p.side === "pro" && (
+          {!susp && p.side === "pro" && (
             <>
               <MoveBtn p={p} to="pro-scratched" label={isCs ? "Posadiť" : "Scratch"} />
               {oneWay && !ahlOnly && !p.recallExempt ? (
@@ -351,7 +360,7 @@ export default function RosterMover({
             </>
           )}
 
-          {p.side === "pro-scratched" && (
+          {!susp && p.side === "pro-scratched" && (
             <>
               <MoveBtn p={p} to="pro" label={isCs ? "Nasadiť" : "Dress"} variant="emerald" />
               {oneWay && !ahlOnly && !p.recallExempt ? (
@@ -370,14 +379,14 @@ export default function RosterMover({
             </>
           )}
 
-          {p.side === "farm" && (
+          {!susp && p.side === "farm" && (
             <>
               <MoveBtn p={p} to="pro" label={isCs ? "↑ NHL" : "↑ Pro"} variant="blue" />
               <MoveBtn p={p} to="farm-scratched" label={isCs ? "Posadiť" : "Scratch"} />
             </>
           )}
 
-          {p.side === "farm-scratched" && (
+          {!susp && p.side === "farm-scratched" && (
             <>
               <MoveBtn p={p} to="pro" label={isCs ? "↑ NHL" : "↑ Pro"} variant="blue" />
               <MoveBtn p={p} to="farm" label={isCs ? "Nasadiť" : "Dress"} variant="emerald" />
