@@ -24,7 +24,11 @@ export type TeamTactics = {
   ppStyle?: PpStyle;  // power-play formation
   pkStyle?: PkStyle;  // penalty-kill structure
   preset?: string; // name of the applied preset, if any
+  // The manager's own tweaks per preset (preset name -> dials), so switching presets and back restores them.
+  presetOverrides?: Record<string, PresetDials>;
 };
+
+export type PresetDials = Pick<TeamTactics, "tempo" | "forecheck" | "puckStyle" | "dZone" | "ppStyle" | "pkStyle">;
 
 export const DEFAULT_TACTICS: TeamTactics = {
   tempo: "balanced", forecheck: "balanced", puckStyle: "balanced", dZone: "balanced",

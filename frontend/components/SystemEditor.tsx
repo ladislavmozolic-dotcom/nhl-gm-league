@@ -129,8 +129,15 @@ export default function SystemEditor({
     setError(null);
   };
 
+  const dialsOf = (t: TeamTactics) => ({
+    tempo: t.tempo, forecheck: t.forecheck, puckStyle: t.puckStyle, dZone: t.dZone,
+    ppStyle: t.ppStyle ?? "balanced", pkStyle: t.pkStyle ?? "balanced",
+  });
+
   const applyPreset = (name: string) => {
-    setTac(savedTac.preset === name ? savedTac : mergeTactics(PRESETS[name]));
+    // Restore the manager's own tweaks for this preset if they saved any, else the stock preset.
+    const custom = tac.presetOverrides?.[name];
+    setTac(mergeTactics({ ...PRESETS[name], ...(custom ?? {}), preset: name, presetOverrides: tac.presetOverrides }));
     setSaved(false);
     setError(null);
   };
@@ -141,7 +148,21 @@ export default function SystemEditor({
         const response = await fetch(`/api/teams/${teamId}/tactics`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(tac),
+          // Remember the current dials under the active preset (dropped again if they equal the stock preset).
+          body: JSON.stringify({
+            ...tac,
+            presetOverrides: (() => {
+              const ov = { ...(tac.presetOverrides ?? {}) };
+              const p = tac.preset;
+              if (p && PRESETS[p]) {
+                const cur = dialsOf(tac);
+                const base = dialsOf(mergeTactics(PRESETS[p]));
+                if (JSON.stringify(cur) === JSON.stringify(base)) delete ov[p];
+                else ov[p] = cur;
+              }
+              return ov;
+            })(),
+          }),
         });
         const res = (await response.json()) as { ok: true; tactics: TeamTactics } | { ok: false; error?: string };
         if (res.ok) {

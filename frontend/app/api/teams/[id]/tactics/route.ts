@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { canManageTeam } from "@/lib/auth";
 import {
   mergeTactics,
+  PRESETS,
+  type PresetDials,
   type TeamTactics,
   type Tempo,
   type Forecheck,
@@ -38,6 +40,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ ok: false, error: "invalid tactics" }, { status: 400 });
   }
 
+  // Per-preset custom dials: keep only known preset names with valid dials.
+  const presetOverrides: Record<string, PresetDials> = {};
+  const rawOv = (body as { presetOverrides?: unknown }).presetOverrides;
+  if (rawOv && typeof rawOv === "object") {
+    for (const [name, v] of Object.entries(rawOv as Record<string, Partial<PresetDials>>)) {
+      if (!(name in PRESETS) || !v) continue;
+      if (allowed.tempo.has(v.tempo as Tempo) && allowed.forecheck.has(v.forecheck as Forecheck)
+        && allowed.puckStyle.has(v.puckStyle as PuckStyle) && allowed.dZone.has(v.dZone as DZone)
+        && allowed.ppStyle.has((v.ppStyle ?? "balanced") as PpStyle) && allowed.pkStyle.has((v.pkStyle ?? "balanced") as PkStyle)) {
+        presetOverrides[name] = {
+          tempo: v.tempo!, forecheck: v.forecheck!, puckStyle: v.puckStyle!, dZone: v.dZone!,
+          ppStyle: v.ppStyle ?? "balanced", pkStyle: v.pkStyle ?? "balanced",
+        };
+      }
+    }
+  }
+
   const clean = mergeTactics({
     tempo: body.tempo,
     forecheck: body.forecheck,
@@ -46,6 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ppStyle: body.ppStyle ?? "balanced",
     pkStyle: body.pkStyle ?? "balanced",
     ...(typeof body.preset === "string" ? { preset: body.preset } : {}),
+    presetOverrides,
   });
   const saved = await prisma.teamLines.upsert({
     where: { teamId },
