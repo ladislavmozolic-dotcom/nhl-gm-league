@@ -2,6 +2,7 @@
 // (no engine imports) — wording mirrors lib/sim/playbyplay.ts so live and the final report read alike.
 
 import type { SimEvent } from "./events";
+import { RUSH_LABEL, overGlassText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 export type LiveLine = { seq: number; period: number; seconds: number; teamId?: number; /** set when this line means a skater has left the game */ outPlayerId?: number; /** replaces the period/clock label (e.g. "SO") */ tag?: string; kind: "goal" | "penalty" | "save" | "note" | "period"; major: boolean; text: string };
 
@@ -32,16 +33,17 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
     case "GOAL": {
       if (m<{ so?: boolean }>(e)?.so) return null;
       const mm = m<{ emptyNet?: boolean; assistNames?: string[] }>(e);
-      const tag = mm?.emptyNet ? " (EN)" : e.strength && e.strength !== "EV" ? ` (${e.strength})` : "";
+      const tag = (mm?.emptyNet ? " (EN)" : e.strength && e.strength !== "EV" ? ` (${e.strength})` : "") + (m<{ penaltyShot?: boolean }>(e)?.penaltyShot ? " (penalty shot)" : m<{ rush?: string }>(e)?.rush ? ` (${RUSH_LABEL[m<{ rush?: string }>(e)!.rush!] ?? "rush"})` : "");
       const a = mm?.assistNames ?? [];
       return { ...base, kind: "goal", major: true, text: `GOAL${tag} — ${e.playerName ?? "?"}${a.length ? `, assisted by ${a.join(" and ")}` : ", unassisted"}.` };
     }
-    case "SAVE": return { ...base, kind: "save", major: false, text: `Shot by ${e.targetName ?? "?"} — saved by ${e.playerName ?? "the goalie"}.` };
+    case "SAVE": return { ...base, kind: "save", major: !!m<{ rush?: string }>(e)?.rush, text: `Shot by ${e.targetName ?? "?"} — saved by ${e.playerName ?? "the goalie"}${m<{ rush?: string }>(e)?.rush ? ` on the ${RUSH_LABEL[m<{ rush?: string }>(e)!.rush!] ?? "rush"}` : ""}.` };
     case "PENALTY": {
-      const mm = m<{ penalty?: string; minutes?: number; severity?: string; washedOut?: boolean }>(e);
+      const mm = m<{ penalty?: string; minutes?: number; severity?: string; washedOut?: boolean; overGlass?: boolean }>(e);
       if (mm?.penalty === "Fighting") return null; // narrated as a fight
       if (mm?.severity === "Game Misconduct") return null; // folded into its major
       if (mm?.washedOut) return { ...base, kind: "penalty", major: false, text: `The delayed penalty on ${e.playerName} (${mm.penalty ?? "infraction"}) is washed out by the goal.` };
+      if (mm?.overGlass) return { ...base, kind: "penalty", major: true, text: overGlassText(e.playerName ?? "?", mm.minutes ?? 2, mm.severity ?? "Minor") };
       return { ...base, kind: "penalty", major: true, text: `${e.playerName} — ${mm?.penalty ?? "infraction"} (${mm?.minutes ?? 2} min, ${mm?.severity ?? "Minor"}).` };
     }
     case "EJECTION": return { ...base, outPlayerId: e.playerId, kind: "penalty", major: true, text: `${e.playerName ?? "?"} is ejected from the game.` };
@@ -63,6 +65,14 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
     case "RETURN": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} is back on the bench.` };
     case "INJURY": return { ...base, outPlayerId: e.playerId, kind: "note", major: true, text: `${e.playerName ?? "?"} is injured and will not return.` };
     case "FIGHT": return { ...base, kind: "penalty", major: true, text: `Fight: ${e.playerName ?? "?"}${e.targetName ? ` versus ${e.targetName}` : ""}.` };
+    case "RUSH": {
+      const mm = (e.meta ?? {}) as RushMeta;
+      const start = rushStartText(mm, e.playerName ?? "?", e.targetName);
+      const end = rushEndText(mm, e.playerName ?? "?");
+      return { ...base, kind: "note", major: true, text: end ? `${start} ${end}` : start };
+    }
+    case "PENALTY_SHOT": return { ...base, kind: "penalty", major: true, text: `Penalty shot awarded to ${e.playerName ?? "?"}${m<{ why?: string }>(e)?.why ? ` — ${m<{ why?: string }>(e)!.why}` : ""}.` };
+    case "WHISTLE": return { ...base, kind: "note", major: false, text: whistleText((e.meta ?? {}) as WhistleMeta, e.playerName ?? "?", e.teamCode, e.targetName) };
     case "GOALIE_CHANGE": return { ...base, kind: "note", major: true, text: `🥅 ${who} goalie change — ${e.playerName ?? "the backup"} replaces ${e.targetName ?? "the starter"}.` };
     case "SHOOTOUT": {
       const mm = m<{ round?: number; result?: string; homeSo?: number; awaySo?: number }>(e);

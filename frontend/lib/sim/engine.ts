@@ -9,6 +9,7 @@ import { generatePlayByPlay } from "./playbyplay";
 import { DEFAULT_SETTINGS, chemCurveBonusPct, type EngineSettings } from "./settings";
 import { SEVERE_INFRACTIONS, SEVERE_PER_TEAM } from "./infractions";
 import { EventSink, type SimEvent } from "./events";
+import type { WhistleReason } from "./rush-text";
 import { shotProfile, ppShotProfile, expectedGoal, isHighDanger, shotSpeed, sectorIndex, oneTimerHandednessMult, type ShotSector, type ShotStrength, type ShotType } from "./shot-quality";
 import { ENGINE_V2, isExperimentalEngine } from "./version";
 import type {
@@ -170,6 +171,8 @@ type SimState = {
   v3ShootoutDuel: boolean;           // V3 diagnostic feature flag
   v3GarbageTime: boolean;            // V3 diagnostic feature flag
   v3ShooterForm: boolean;            // V3 diagnostic feature flag
+  v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
+  v3Stoppages: boolean;              // V3: generic whistles get a named cause (offside, puck out, tie-up…); delay of game is a D clearing it over the glass
   shooterGoalAt: Record<number, number>;     // V3: absolute game second of each skater's last goal
   shooterColdShots: Record<number, number>;  // V3: shots on goal since each skater's last goal this game
   goalieStreak: Record<number, number>;      // V3: consecutive saves since the goalie last allowed a goal
@@ -933,12 +936,21 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
     const at = times[i];
     const eligible = pool.filter((s) => !servingAt(s.id, at));
     const cand = eligible.length ? eligible : pool;
-    const offender = cand[st.rng.weighted(cand.map((s) => (105 - s.discipline) * (0.5 + s.iceTime)))];
+    let offender = cand[st.rng.weighted(cand.map((s) => (105 - s.discipline) * (0.5 + s.iceTime)))];
     const type = PENALTY_TYPES[st.rng.weighted(PENALTY_TYPES.map((p) => p[1]))][0];
+    // V3: a delay-of-game call is a defenseman clearing it over the glass, not a random skater
+    if (st.v3Stoppages && type === "Delay of game") {
+      const ds = cand.filter((s) => s.isDefense);
+      if (ds.length) offender = ds[st.rng.weighted(ds.map((s) => (105 - s.discipline) * (0.5 + s.iceTime)))];
+    }
     const roll = st.rng.next();
     const minutes = type === "Slashing" && roll < 0.05 ? 4 : roll < 0.02 ? 5 : 2;
     const severity = minutes === 4 ? "Double Minor" : minutes === 5 ? "Major" : "Minor";
     addPenalty(st, team, offender, period, at, type, minutes, severity, true);
+    if (st.v3Stoppages && type === "Delay of game") { // mark it so the play-by-play / live feed can say "over the glass"
+      const evs = st.sink.all(), last = evs[evs.length - 1];
+      if (last?.type === "PENALTY") last.meta = { ...(last.meta ?? {}), overGlass: true };
+    }
     // severe infractions can carry an added misconduct (10) or game misconduct
     if (SEVERE_TYPES.includes(type) && roll < 0.08) {
       const gm = roll < 0.02;
@@ -1295,6 +1307,19 @@ export function v3ShiftLimit(baseSeconds: number, unit: SimSkater[]): number {
 const LAST_CHANGE_MATCHUP_BOOST = 1.35;
 // per-tick chance a defensive-zone carrier ices it (× icingRatePct/100, fatigue, forecheck)
 const ICING_RATE = 0.0055;
+
+// ---- V3: transition rushes (breakaways, 2-on-1, 3-on-2) ----------------------------------------
+type RushKind = "BREAKAWAY" | "2ON1" | "3ON2";
+type RushWhy = "strip" | "entry" | "pass" | "save" | "clear";
+/** A rush shot waiting to be taken on the next tick: how dangerous, how blockable, where from. */
+type RushCtx = { kind: RushKind; danger: number; blockMult: number; missMult: number; xgMult: number; sector: ShotSector; shotType: ShotType };
+/** Chance that a turnover of this kind (by where the giver was) becomes an odd-man rush the other way, before skill/system modifiers. */
+const RUSH_BASE: Record<RushWhy, { NEU: number; OFF: number }> = {
+  strip: { NEU: 0.16, OFF: 0.05 }, entry: { NEU: 0.22, OFF: 0 }, pass: { NEU: 0, OFF: 0.07 }, save: { NEU: 0, OFF: 0.05 }, clear: { NEU: 0, OFF: 0.04 },
+};
+/** Calibration knobs (kept in one place so the league totals stay where V3 was tuned): rush frequency, and the
+ *  offsets that make a rush REPLACE ordinary offence instead of adding to it. */
+export const RUSH_TUNING = { rate: 0.2, gate: 0.83, danger: 0.972 };
 // ice-time-weighted team average offense of its forwards / defencemen (depth parity anchor)
 const _posAvgCache = new WeakMap<SimTeam, { f: number; d: number }>();
 function posAvgOff(team: SimTeam, isDefense: boolean): number {
@@ -1504,6 +1529,7 @@ export function v3GarbageTimeShotMult(period: number, marginForTeam: number): nu
   if (marginForTeam <= -3 && period >= 3) return 1.1;
   return 1;
 }
+
 // Per-line deployment tactic → {of, df} multipliers around 1.0. Neutral CK1/DF2/OF2
 // gives exactly 1.0; an offensive line (high OF) presses harder, a checking/defensive
 // line (high DF) suppresses. Effect ~±8%, so a good line still needs the players.
@@ -1556,7 +1582,7 @@ function armLineupDerived(st: SimState, team: SimTeam) {
 }
 
 /** Why play stopped — the moments a live GM may change tactics/lines. */
-export type StopReason = "period-start" | "goal" | "icing" | "whistle" | "line-change" | "goalie-freeze" | "challenge" | "game-end";
+export type StopReason = "period-start" | "goal" | "icing" | "whistle" | "line-change" | "goalie-freeze" | "challenge" | "game-end" | "penalty-shot" | "offside" | "puck-out" | "tie-up" | "hand-pass" | "high-stick";
 /**
  * What a live driver may hand back at a stoppage (`gen.next(change)`): a rebuilt
  * SimTeam (via `buildTeam` with the GM's new lines/system) per side. Only the
@@ -1820,6 +1846,151 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     st.sink.emit({ period, seconds: tick, type: "TIMEOUT", teamId: team.id, teamCode: team.code ?? undefined, importance: "NOTABLE", meta: { why } });
   };
 
+
+  // ---- V3: odd-man rushes off turnovers (breakaway / 2-on-1 / 3-on-2) and the penalty shot a foul can earn ----
+  let rushCtx = null as RushCtx | null; // (assigned from the tryRush closure — the cast keeps TS from narrowing it to null)
+  /** One penalty shot: shooter vs the live goalie. Same bookkeeping as an ordinary shot + goal, no clock runs. */
+  const penaltyShot = (offTeam: SimTeam, defTeam: SimTeam, shooter: SimSkater, tick: number, why: string): boolean => {
+    const gLine = liveGoalieLine(st, defTeam.id), gSim = liveGoalie(st, defTeam);
+    const absT = base + tick, isHomeTeam = offTeam === home;
+    st.sink.emit({ period, seconds: tick, type: "PENALTY_SHOT", teamId: offTeam.id, teamCode: offTeam.code ?? undefined, playerId: shooter.id, playerName: shooter.name, targetId: gSim.id, targetName: gSim.name, importance: "MAJOR", meta: { why } });
+    st.box[offTeam.id].shots++; st.box[offTeam.id].shotsByPeriod[Math.min(period, 4) - 1]++;
+    st.lines[offTeam.id][shooter.id].shots++; gLine.shotsAgainst++;
+    const xg = 0.31;
+    st.lines[offTeam.id][shooter.id].xg += xg; st.box[offTeam.id].xgFor += xg; st.box[offTeam.id].hdFor++; st.lines[offTeam.id][shooter.id].hdShots++; gLine.xga += xg;
+    const zi = sectorIndex("SLOT");
+    st.box[offTeam.id].shotSectors[zi]++; st.lines[offTeam.id][shooter.id].shotZones[zi]++; gLine.faceZones[zi]++; gLine.hdShotsAg++;
+    const finish = (0.8 + 0.4 * ((shooter.attrs.ps ?? 50) + (shooter.attrs.sc ?? 50)) / 130);
+    const p = Math.max(0.12, Math.min(0.55, conversion(shooter.offense, effGoalieQuality(gSim), isHomeTeam, "EV") * 3.0 * finish));
+    st.sink.emit({ period, seconds: tick, type: "SHOT", teamId: offTeam.id, teamCode: offTeam.code ?? undefined, playerId: shooter.id, playerName: shooter.name, targetId: gSim.id, targetName: gSim.name, zone: "OFF", sector: "SLOT", shotType: "WRIST", strength: "EV", xg, importance: "NOTABLE", meta: { danger: 3, setup: "carry", penaltyShot: true } });
+    if (rng.chance(p)) {
+      gLine.goalsAgainst++;
+      recordGoal(st, offTeam, defTeam, period, tick, "EV", false, shooter, { sector: "SLOT", shotType: "WRIST", xg }, undefined, null);
+      const ge = st.sink.all(); for (let i = ge.length - 1; i >= 0; i--) if (ge[i].type === "GOAL") { ge[i].meta = { ...(ge[i].meta ?? {}), penaltyShot: true }; break; }
+      st.goalieStreak[defTeam.id] = 0; st.lastGoalAgainst[defTeam.id] = absT; st.shooterGoalAt[shooter.id] = absT; st.shooterColdShots[shooter.id] = 0;
+      momoOnGoal(st, offTeam.id, defTeam.id, absT);
+      maybePullGoalie(st, defTeam);
+      return true;
+    }
+    gLine.saves++; st.goalieStreak[defTeam.id] = (st.goalieStreak[defTeam.id] ?? 0) + 1; gLine.saveZones[zi]++; gLine.hdSaves++;
+    st.sink.emit({ period, seconds: tick, type: "SAVE", teamId: defTeam.id, teamCode: defTeam.code ?? undefined, playerId: gSim.id, playerName: gSim.name, targetId: shooter.id, targetName: shooter.name, zone: "OFF", sector: "SLOT", shotType: "WRIST", xg, importance: "NOTABLE", meta: { danger: 3, setup: "carry", penaltyShot: true } });
+    return false;
+  };
+  /**
+   * A turnover by `oldTeam` (its puck carrier `giver`, in `oldZone`) may hand the other side an odd-man rush. Rolls whether it
+   * does, what kind, and resolves the first beat (caught from behind, pass picked off, or the shot is set up for the next
+   * tick via rushCtx). Returns true when it took over the play — the caller then `continue`s. No effect (and no RNG) unless
+   * the V3 flag is on.
+   */
+  const tryRush = (oldTeam: SimTeam, oldZone: "DEF" | "NEU" | "OFF", why: RushWhy, giver: SimSkater | null): boolean => {
+    if (!st.v3Rush || oldZone === "DEF" || delayedFor != null || st.emptyNet[home.id] || st.emptyNet[away.id]) return false;
+    const tick = curTick;
+    const baseP = RUSH_BASE[why][oldZone];
+    if (!baseP) return false;
+    const newTeam = other(oldTeam);
+    const attackers = onIceF(newTeam), back = onIceD(oldTeam);
+    if (attackers.length < 2 || !back.length) return false;
+    const sk = (s: SimSkater) => s.attrs.sk ?? 50;
+    const byPace = [...attackers].sort((a, b) => sk(b) - sk(a));
+    const atkSk = (sk(byPace[0]) + sk(byPace[1])) / 2, backSk = back.reduce((t, s) => t + sk(s), 0) / back.length;
+    const gap = (atkSk - backSk) / 100; // + = the counter-attackers are faster than the defence getting back
+    // an aggressive forecheck / pinching D leaves ice behind it; a tired or power-play unit even more
+    const fxF = oldTeam.fwdLineFx[shifts[oldTeam.id].fIdx] ?? oldTeam.tactics, fxD = oldTeam.defPairFx[shifts[oldTeam.id].dIdx] ?? oldTeam.tactics;
+    const aggression = Math.max(0.85, Math.min(1.3, ((fxF.takeaway ?? 1) + (fxD.takeaway ?? 1)) / 2));
+    const tired = giver && fat(oldTeam, giver) < 0.93 ? 1.2 : 1;
+    const pinch = curStr[oldTeam.id] === "PP" ? 1.7 : 1;
+    const p = baseP * RUSH_TUNING.rate * aggression * tired * pinch * Math.max(0.6, 1 + gap * 1.2);
+    if (!rng.chance(Math.min(0.6, p))) return false;
+    const kind = (["BREAKAWAY", "2ON1", "3ON2"] as const)[rng.weighted([
+      0.11 * Math.max(0.4, 1 + gap * 3) * (pinch > 1 ? 1.5 : 1) * Math.max(1, aggression),
+      0.36,
+      0.48 * Math.max(0.6, 1 - gap),
+    ])];
+    const lead = pickByAttr(rng, attackers, (s) => 0.6 * sk(s) + 0.4 * (s.attrs.ph ?? 50)) ?? attackers[0];
+    const others = attackers.filter((s) => s !== lead);
+    const sc = (s: SimSkater) => s.attrs.sc ?? 50;
+    const emit = (outcome: string, extra: Record<string, unknown> = {}) => st.sink.emit({
+      period, seconds: tick, type: "RUSH", teamId: newTeam.id, teamCode: newTeam.code ?? undefined, playerId: lead.id, playerName: lead.name,
+      targetId: giver?.id, targetName: giver?.name, zone: "OFF", importance: "NOTABLE",
+      meta: { kind, why, outcome, support: others.slice(0, 2).map((s) => s.name), ...extra },
+    });
+    const giveBack = (to: SimSkater) => { carrierTeam = oldTeam; carrier = to; zone = "NEU"; setup = "carry"; press = 0; };
+    carrierTeam = newTeam; carrier = lead; zone = "OFF"; press = 0; setup = "carry"; creator = null;
+    if (kind === "BREAKAWAY") {
+      // a defender may still catch him from behind — occasionally with a foul, rarely a penalty shot
+      if (rng.chance(Math.max(0.05, Math.min(0.3, 0.14 - gap * 0.5)))) {
+        const chaser = pickByAttr(rng, back, sk) ?? back[0];
+        if (rng.chance(0.45)) {
+          if (!opts.suddenDeath && rng.chance(0.55)) {
+            emit("hooked", { by: chaser.name, penaltyShot: true });
+            const goal = penaltyShot(newTeam, oldTeam, lead, tick, "fouled on a breakaway");
+            if (goal) { stopWhy = "goal"; } else { stopWhy = "penalty-shot"; }
+            state = "FACEOFF"; setup = "carry"; press = 0; foZone = null;
+            return true;
+          }
+          addPenalty(st, oldTeam, chaser, period, tick + 1, rng.chance(0.5) ? "Hooking" : "Tripping", 2, "Minor", true);
+          emit("hooked", { by: chaser.name });
+          zone = "NEU";
+          return true;
+        }
+        emit("backchecked", { by: chaser.name });
+        giveBack(chaser);
+        return true;
+      }
+      const outlet = rng.chance(0.6) && others.length ? pickByAttr(rng, others, (s) => s.attrs.pa ?? 50) : null;
+      if (outlet) { creator = outlet; setup = "pass"; }
+      const r = rng.next();
+      rushCtx = { kind, danger: 2.7, blockMult: 0, missMult: 0.7, xgMult: 1.65, sector: "SLOT", shotType: r < 0.35 ? "BACKHAND" : r < 0.75 ? "WRIST" : "SNAP" };
+      emit("shot");
+      return true;
+    }
+    const twoOnOne = kind === "2ON1";
+    const selfP = Math.max(0.15, Math.min(0.7, (twoOnOne ? 0.30 : 0.40) + (sc(lead) - 60) * 0.004));
+    if (rng.chance(selfP)) {
+      // he keeps it and shoots — the lone/second defender takes away the pass lane, so it's a lesser look
+      const slot = rng.chance(0.4);
+      rushCtx = { kind, danger: twoOnOne ? 1.0 : 0.9, blockMult: twoOnOne ? 0.65 : 0.85, missMult: 1, xgMult: 1, sector: slot ? "SLOT" : "CIRCLE", shotType: rng.chance(0.5) ? "WRIST" : "SNAP" };
+      emit("shot");
+      return true;
+    }
+    const dDf = back.reduce((t, s) => t + (s.attrs.df ?? 50), 0) / back.length;
+    const broken = Math.max(0.14, Math.min(0.45, (twoOnOne ? 0.26 : 0.30) + (dDf - (lead.attrs.pa ?? 50)) * 0.003));
+    if (rng.chance(broken)) {
+      const d = pickByAttr(rng, back, (s) => s.attrs.df ?? 50) ?? back[0];
+      emit("pass-broken", { by: d.name });
+      giveBack(d);
+      return true;
+    }
+    const shooter = pickByAttr(rng, others, (s) => involvement(sc(s)) * 60) ?? others[0];
+    creator = lead; carrier = shooter; setup = "pass";
+    rushCtx = { kind, danger: twoOnOne ? 1.8 : 1.5, blockMult: twoOnOne ? 0.4 : 0.6, missMult: 1, xgMult: 1, sector: "SLOT", shotType: "ONE_TIMER" };
+    emit("shot");
+    return true;
+  };
+
+  /** V3: a whistle that used to be a bare "line change" gets a real cause from where the puck was; the draw spot and the
+   *  game flow are untouched — this only names the stoppage (and narrates it). */
+  const nameWhistle = (): StopReason => {
+    const tick = curTick;
+    // NHL-like mix of the non-penalty, non-icing, non-freeze whistles (~34/game here): puck out of play and offsides lead
+    const mix: Array<[WhistleReason, number]> = [["puck-out", 0.36], ["offside", 0.24], ["tie-up", 0.18], ["high-stick", 0.12], ["hand-pass", 0.1]];
+    const reason = mix[rng.weighted(mix.map((x) => x[1]))][0];
+    // who is attacking: the carrier's team, unless he is in his own zone — then the other side has the puck pressure
+    const opp = other(carrierTeam), attacker = zone === "DEF" ? opp : carrierTeam;
+    let who: SimSkater = carrier, foe: SimSkater | null = null;
+    if (reason === "offside") who = pickByAttr(rng, onIceF(attacker), (s) => s.attrs.sk ?? 50) ?? who;
+    else if (reason === "hand-pass") who = pickByAttr(rng, onIceF(attacker).concat(onIceD(attacker)), (s) => s.attrs.pa ?? 50) ?? who;
+    else if (reason === "high-stick") { const t = rng.chance(0.5) ? attacker : other(attacker); who = pickByAttr(rng, onIceF(t).concat(onIceD(t)), (s) => 105 - s.discipline) ?? who; }
+    else if (reason === "tie-up") foe = pickByAttr(rng, onIceD(opp).concat(onIceF(opp)), (s) => s.attrs.ck ?? 50);
+    const whoTeam = [...onIceF(home), ...onIceD(home)].some((s) => s.id === who.id) ? home : away;
+    st.sink.emit({
+      period, seconds: tick, type: "WHISTLE", teamId: whoTeam.id, teamCode: whoTeam.code ?? undefined,
+      playerId: who.id, playerName: who.name, targetId: foe?.id, targetName: foe?.name, importance: "NOTABLE",
+      meta: { reason },
+    });
+    return reason;
+  };
+
   for (let tick = 0; tick < PERIOD_SECONDS; tick++) {
     curTick = tick; // for misconduct-box substitution inside onIceF/onIceD
     releaseKnocks(st, period, tick);
@@ -1902,7 +2073,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     } else if (!carrierOnIce) {
       // (icings now add their own real whistles, so fewer changes wait for one)
       if (onIcePool.length && !rng.chance(CFG.icingEnabled ? 0.62 : 0.75)) carrier = pickByAttr(rng, onIcePool, (s) => s.attrs.sk ?? 50) ?? carrier;
-      else { stopWhy = "line-change"; state = "FACEOFF"; setup = "carry"; press = 0; foZone = null; }
+      else { stopWhy = st.v3Stoppages ? nameWhistle() : "line-change"; state = "FACEOFF"; setup = "carry"; press = 0; foZone = null; }
     }
     announceChange(home, tick); announceChange(away, tick);
     // Empty net: a team trailing late in regulation, at even strength OR on a power play
@@ -2143,6 +2314,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     if (rng.chance(0.09)) {
       const keep = Math.pow(ratio(atkSkill(puckHandle(carrier)), defSkill(puckWin(dman))), defFx.takeaway);
       if (!rng.chance(keep)) { // turnover — defenders take over in their own zone
+        if (tryRush(carrierTeam, zone, "strip", carrier)) continue; // V3: lost it in the neutral zone / pinching D caught → odd-man rush the other way
         carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50)) ?? dman;
         zone = "DEF"; setup = "carry"; press = 0; continue;
       }
@@ -2179,7 +2351,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           }
           zone = zone === "DEF" ? "NEU" : "OFF"; setup = "carry";
         }
-        else if (rng.chance(0.4)) { carrierTeam = def; carrier = pickByAttr(rng, onIceF(def), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // stuffed → turnover
+        else if (rng.chance(0.4)) { if (tryRush(carrierTeam, zone, "entry", carrier)) continue; carrierTeam = def; carrier = pickByAttr(rng, onIceF(def), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // stuffed at the blue line → turnover (V3: the classic counter-rush)
       }
       continue;
     }
@@ -2190,19 +2362,21 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // a fraction of these attempts now sail wide (see the MISS check below) instead
     // of always reaching the net, so the upstream rate is boosted to keep the actual
     // on-goal (SOG) rate the calibration is tuned against unchanged.
-    const lateShell = lateShellShotMult(period, tick, margin) * (st.v3GarbageTime ? v3GarbageTimeShotMult(period, margin) : 1);
+    const lateShell = lateShellShotMult(period, tick, margin)
+      * (st.v3GarbageTime ? v3GarbageTimeShotMult(period, margin) : 1);
     const faceoffSetPlay = faceoffPressure?.teamId === carrierTeam.id && tick < faceoffPressure.until ? 1.06 : 1;
     const adaptAtk = adapt(carrierTeam, margin).shots, adaptDef = adapt(def, -margin).allow;
     const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
     const armUp = delayedFor === carrierTeam.id ? 1.2 : 1;
     const crowd = carrierTeam === home ? st.crowdMult : 1;
-    if (!rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd)) continue;
+    if (!rushCtx && !rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd * (st.v3Rush ? RUSH_TUNING.gate : 1))) continue;
+    const R = rushCtx; rushCtx = null; // V3: a rush shot is taken now, whatever the ordinary shot dice say
     // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
     // the puck back to the point for a D one-timer instead — this is how D rack up
     // their goals. But a forward who would PASS keeps the puck (→ his linemate's
     // one-timer and the passer's assist survive), so the point shot only ever
     // cannibalises a forward's own shot, never a scoring-chance pass play.
-    const wantsShot = rng.chance(ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), 0.7));
+    const wantsShot = R ? true : rng.chance(ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), 0.7));
     // A SNIPER shoots it himself; a lower-skill forward is the one who defers to the
     // QB at the point. So the deferral rate falls with the carrier's shot (SC) — an
     // 82+ sniper (McDavid) never gives it up, a grinder defers up to ~1/3 the time.
@@ -2212,20 +2386,20 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // only a plain CARRY defers to the point — a forward who just took a cross-ice
     // feed or a rebound shoots his high-danger look himself (never downgraded to a
     // point shot), so the diversion adds D goals without destroying scoring chances.
-    const pointShot = wantsShot && !carrier.isDefense && zone === "OFF" && setup === "carry" && rng.chance(deferRate);
+    const pointShot = !R && wantsShot && !carrier.isDefense && zone === "OFF" && setup === "carry" && rng.chance(deferRate);
     if (pointShot) { const d = pickByAttr(rng, onIceD(carrierTeam), (s) => Math.pow(involvement(0.62 * (s.attrs.sc ?? 50) + 0.38 * (s.attrs.pa ?? 50)), 3.0) * 60); if (d) carrier = d; } // elite offensive D quarterback the point → they get the goals (steep pick concentrates the top end)
     if (wantsShot) {
       // SHOT — blocked? (DF vs SC). A diverted point shot has traffic/a screen in
       // front, so it's blocked less (and isn't judged by the D's weak SC) — this
       // stops the diversion from leaking goals to blocks and keeps scoring neutral.
-      const blockP = pointShot ? 0.32 : 0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50));
+      const blockP = (pointShot ? 0.32 : 0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50))) * (R ? R.blockMult : 1);
       if (rng.chance(st.v3BlockSkill ? blockP * v3BlockSkillMult(dman.blocking) : blockP)) { setup = "carry"; continue; } // blocked
       // MISS — sails wide or off the iron, before it ever reaches the net (so it
       // does NOT count toward st.box[...].shots or xG — those stay SOG-only, exactly
       // as calibrated). A longer point shot misses more than an in-tight look; a
       // sharper shooter (SC) hits the target more often. MISS_COMPENSATION above
       // keeps the resulting SOG rate at its pre-MISS calibrated level.
-      const missP = pointShot ? 0.34 : Math.max(0.14, 0.27 - ((carrier.attrs.sc ?? 50) - 50) * 0.003);
+      const missP = (pointShot ? 0.34 : Math.max(0.14, 0.27 - ((carrier.attrs.sc ?? 50) - 50) * 0.003)) * (R ? R.missMult : 1);
       if (rng.chance(missP)) {
         st.sink.emit({
           period, seconds: tick, type: "MISS", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined,
@@ -2244,7 +2418,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       // his own shot for it), so it converts near a forward's carry — the goal just
       // moves from the F to the D, keeping league scoring neutral. An organic D dump
       // from the point stays low.
-      const baseDanger = carrier.isDefense ? (pointShot ? 0.92 : 0.63) : setup === "pass" ? 1.75 : setup === "rebound" ? 1.6 : 1.0;
+      const baseDanger = R ? R.danger : carrier.isDefense ? (pointShot ? 0.92 : 0.63) : setup === "pass" ? 1.75 : setup === "rebound" ? 1.6 : 1.0;
       // team-system: rush raises chance danger, shot-volume lowers it (more but softer);
       // the defending team's D-zone posture (collapse) suppresses danger.
       const dangerBias = atkFx.dangerMix * defFx.oppDangerMult;
@@ -2254,7 +2428,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       const homeHasCheckMatch = !isHome && shifts[def.id].fIdx === shifts[def.id].fCheckIdx && shifts[carrierTeam.id].fIdx === shifts[carrierTeam.id].fTopIdx;
       const checkMatch = st.v3CheckingMatchup && homeHasCheckMatch
         ? v3CheckingMatchupDangerMult(onIceF(def), onIceF(carrierTeam)) : 1;
-      const danger = baseDanger * dangerBias * lastChange * checkMatch;
+      const danger = baseDanger * dangerBias * lastChange * checkMatch * (st.v3Rush && !R ? RUSH_TUNING.danger : 1);
       const strengthInfo = strengthDiffAt(carrierTeam, def, tick, active);
       const strength = strengthInfo.state;
       const manAdv3 = strength === "PP" && strengthInfo.diff >= 2; // true 5-on-3 (or better)
@@ -2283,7 +2457,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       // this shift) reshapes that mix further (Diamond denies the seam but
       // leaks net-front; Box suppresses evenly; Aggressive is boom-or-bust).
       // EV/SH shots are untouched.
-      const { sector, shotType } = strength === "PP"
+      const { sector, shotType } = R ? { sector: R.sector, shotType: R.shotType } : strength === "PP"
         ? ppShotProfile(rng, (fourOnThree ? carrierTeam.pp4UnitStyleByPlayer : carrierTeam.ppUnitStyleByPlayer).get(carrier.id) ?? carrierTeam.teamTactics.ppStyle ?? "balanced", {
             isDefense: carrier.isDefense, setup, manAdv3,
             // a true 5-on-3 reads its OWN unit's structure (PK3 tab), not the
@@ -2301,7 +2475,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       const handMult = strength === "PP"
         ? oneTimerHandednessMult(shotType, (fourOnThree ? carrierTeam.pp4UnitSideByPlayer : carrierTeam.ppUnitSideByPlayer).get(carrier.id), carrier.shoots)
         : 1;
-      const xg = expectedGoal(rng, sector, shotType, strengthKey) * handMult;
+      const xg = expectedGoal(rng, sector, shotType, strengthKey) * handMult * (R ? R.xgMult : 1);
       const hd = isHighDanger(sector);
       // Shift Quality: this chance's xG lifts the shooters' on-ice shift, dents the defenders'
       creditShiftXg(st, [...onIceF(carrierTeam), ...onIceD(carrierTeam)], [...onIceF(def), ...onIceD(def)], xg);
@@ -2404,7 +2578,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
         zone: "OFF", sector, shotType,
         strength: strength as SimEvent["strength"], xg,
         importance: hd ? "NOTABLE" : "MINOR",
-        meta: { danger, setup, mph: Math.round(mph), situation: shotSituation },
+        meta: { danger, setup, mph: Math.round(mph), situation: shotSituation, rush: R?.kind },
       });
       if (rng.chance(p)) {
         // Coach's challenge: a few goals are reviewable (offside / goaltender
@@ -2435,6 +2609,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
         }
         if (!defEmptyNet) gLine.goalsAgainst++;
         recordGoal(st, carrierTeam, def, period, tick, strength, defEmptyNet, carrier, { sector, shotType, xg }, undefined, setup !== "carry" ? creator : null);
+        if (R) { const ge = st.sink.all(); for (let i = ge.length - 1; i >= 0; i--) if (ge[i].type === "GOAL") { ge[i].meta = { ...(ge[i].meta ?? {}), rush: R.kind }; break; } }
         if (failedChallenge) {
           st.sink.emit({ period, seconds: tick, type: "CHALLENGE", teamId: def.id, teamCode: def.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "MAJOR", meta: { kind: failedChallenge, won: false } });
           const server = onIceF(def)[0] ?? def.forwards[0];
@@ -2472,7 +2647,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           targetId: carrier.id, targetName: carrier.name,
           zone: "OFF", sector, shotType, xg,
           importance: hd ? "NOTABLE" : "MINOR",
-          meta: { danger, setup },
+          meta: { danger, setup, rush: R?.kind },
         });
       }
       const rb = gSim.attrs.rb ?? 50;
@@ -2484,6 +2659,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           ? Math.max(0.04, Math.min(0.16, 0.08 + ((onIceD(def).reduce((n, s) => n + 0.65 * (s.attrs.df ?? 50) + 0.35 * (s.attrs.ck ?? 50), 0) / Math.max(1, onIceD(def).length)) - 65) * 0.002))
           : 0;
         if (reboundClear > 0 && rng.chance(reboundClear)) {
+          if (tryRush(carrierTeam, "OFF", "clear", carrier)) continue;
           carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50)) ?? dman;
           zone = "DEF"; setup = "carry"; press = 0; continue;
         }
@@ -2494,7 +2670,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
         });
       }
       else if (rng.chance(CFG.zoneFaceoffsEnabled ? 0.095 : 0.12)) { stopWhy = "goalie-freeze"; state = "FACEOFF"; setup = "carry"; press = 0; foZone = CFG.zoneFaceoffsEnabled ? def.id : null; } // goalie freezes it → whistle, draw in his end
-      else { carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // covered & cleared, play on
+      else { if (tryRush(carrierTeam, "OFF", "save", carrier)) continue; carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // covered & cleared, play on (V3: a quick outlet can start a rush)
       continue;
     }
     // PASS — completed (PA vs DF) → puck to a linemate (sets up a one-timer); else intercepted
@@ -2503,6 +2679,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       carrier = pickByAttr(rng, onIceF(carrierTeam), (s) => involvement(0.6 * (s.attrs.sc ?? 50) + 0.4 * (s.attrs.sk ?? 50)) * 60) ?? carrier;
       setup = "pass";
     } else {
+      if (tryRush(carrierTeam, "OFF", "pass", carrier)) continue; // V3: a pass picked off in the zone can go the other way fast
       carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => s.attrs.df ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0;
     }
   }
@@ -2944,7 +3121,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 /**
@@ -3018,6 +3195,8 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3ShootoutDuel: isV3 && (opts.experimentalV3?.shootoutDuel ?? true),
     v3GarbageTime: isV3 && (opts.experimentalV3?.garbageTime ?? true),
     v3ShooterForm: isV3 && (opts.experimentalV3?.shooterForm ?? true),
+    v3Stoppages: isV3 && (opts.experimentalV3?.stoppageRealism ?? CFG.v3StoppageRealism ?? false),
+    v3Rush: isV3 && (opts.experimentalV3?.transitionRush ?? CFG.v3TransitionRush ?? false), // opt-in: Admin → Simulation (the other V3 flags default on)
     shooterGoalAt: {}, shooterColdShots: {},
     goalieStreak: {}, lastGoalAgainst: {},
     lastShotAgainst: {},

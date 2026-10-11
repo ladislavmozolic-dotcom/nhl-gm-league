@@ -8,6 +8,7 @@
 import { RNG } from "./rng";
 import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } from "./types";
 import type { SimEvent } from "./events";
+import { RUSH_LABEL, overGlassText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 const PERIOD_SECONDS = 1200;
 const OT_SECONDS = 300; // 5:00 for regular season OT
@@ -232,7 +233,8 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
       const pl = availableAt(t, p, sec);
       add(p, sec, t.id, "icing", `Icing by ${pl[rng.weighted(pl.map((s) => s.iceTime))].name}.`);
     }
-    for (let i = 0; i < 1 + rng.int(3); i++) { const t = rng.chance(0.5) ? home : away; add(p, rt(), t.id, "offside", `Off-side.`); }
+    // V3 narrates real offsides (WHISTLE events); the random colour line would only double them up
+    if (!stream.some((x) => x.type === "WHISTLE")) for (let i = 0; i < 1 + rng.int(3); i++) { const t = rng.chance(0.5) ? home : away; add(p, rt(), t.id, "offside", `Off-side.`); }
 
     // real events this period, in order
     const periodEvents = stream.filter((x) => x.period === p);
@@ -248,13 +250,16 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         // puck stayed live — reflect that in the flavour text instead of a coin flip.
         const hadRebound = periodEvents.some((x) => x.type === "REBOUND" && x.seconds === e.seconds && x.teamId === shooterTeamId);
         add(p, e.seconds, shooterTeamId, "shot", `Shot by ${shooterName}.`);
-        add(p, e.seconds, e.teamId ?? null, "save", `Stopped by ${e.playerName ?? goalieName(e.teamId ?? home.id)} ${hadRebound ? "with a rebound" : "without a rebound"}.`);
+        const sm = e.meta as { rush?: string; penaltyShot?: boolean } | undefined;
+        const onWhat = sm?.penaltyShot ? " on the penalty shot" : sm?.rush ? ` on the ${RUSH_LABEL[sm.rush] ?? "rush"}` : "";
+        add(p, e.seconds, e.teamId ?? null, "save", `Stopped by ${e.playerName ?? goalieName(e.teamId ?? home.id)}${onWhat} ${hadRebound ? "with a rebound" : "without a rebound"}.`);
       } else if (e.type === "GOAL") {
         const so = (e.meta as { so?: boolean } | undefined)?.so;
         if (so) continue; // shootout handled below
         const en = (e.meta as { emptyNet?: boolean } | undefined)?.emptyNet;
         const assistNames = ((e.meta as { assistNames?: string[] } | undefined)?.assistNames) ?? [];
-        const tag = en ? " (EN)" : e.strength && e.strength !== "EV" ? ` (${e.strength})` : "";
+        const gm = e.meta as { rush?: string; penaltyShot?: boolean } | undefined;
+        const tag = (en ? " (EN)" : e.strength && e.strength !== "EV" ? ` (${e.strength})` : "") + (gm?.penaltyShot ? " (penalty shot)" : gm?.rush ? ` (${RUSH_LABEL[gm.rush] ?? "rush"})` : "");
         add(p, e.seconds, tId, "shot", `Shot by ${e.playerName ?? "?"}.`);
         const gameOver = p >= 4; // sudden-death OT winner
         add(p, e.seconds, tId, "goal",
@@ -265,7 +270,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
           else add(p, e.seconds + 1, null, "faceoff", `${center(home, p, e.seconds).name} wins face-off versus ${center(away, p, e.seconds).name} in neutral zone.`);
         }
       } else if (e.type === "PENALTY") {
-        const m = e.meta as { penalty?: string; minutes?: number; severity?: string; washedOut?: boolean } | undefined;
+        const m = e.meta as { penalty?: string; minutes?: number; severity?: string; washedOut?: boolean; overGlass?: boolean } | undefined;
         if (m?.penalty === "Fighting") continue; // paired into a fight line below
         if (m?.washedOut) { add(p, e.seconds, tId, "penalty", `The delayed penalty on ${e.playerName} (${m?.penalty ?? "infraction"}) is washed out by the goal.`); continue; }
         // a major + game misconduct on the same player in the same second reads as ONE call
@@ -273,7 +278,19 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const gmTwin = m?.severity === "Major" && periodEvents.some((x) => sameCall(x) && (x.meta as { severity?: string } | undefined)?.severity === "Game Misconduct");
         const isGmOfMajor = m?.severity === "Game Misconduct" && periodEvents.some((x) => sameCall(x) && (x.meta as { severity?: string } | undefined)?.severity === "Major");
         if (isGmOfMajor) continue; // folded into the major's line
-        add(p, e.seconds, tId, "penalty", `${e.playerName} penalty for ${m?.penalty ?? "infraction"} (${m?.minutes ?? 2} min, ${gmTwin ? "Major / Game Misconduct" : (m?.severity ?? "Minor")}).`, true);
+        if (m?.overGlass) add(p, e.seconds, tId, "penalty", overGlassText(e.playerName ?? "?", m?.minutes ?? 2, m?.severity ?? "Minor"), true);
+        else add(p, e.seconds, tId, "penalty", `${e.playerName} penalty for ${m?.penalty ?? "infraction"} (${m?.minutes ?? 2} min, ${gmTwin ? "Major / Game Misconduct" : (m?.severity ?? "Minor")}).`, true);
+      } else if (e.type === "RUSH") {
+        // V3 transition rush: the turnover and who is going the other way, then (if it ends without a shot) how it died
+        const rm = (e.meta ?? {}) as RushMeta;
+        add(p, e.seconds, tId, "rush", rushStartText(rm, e.playerName ?? "?", e.targetName), true);
+        const end = rushEndText(rm, e.playerName ?? "?");
+        if (end) add(p, e.seconds, tId, "rush", end);
+      } else if (e.type === "PENALTY_SHOT") {
+        const why = (e.meta as { why?: string } | undefined)?.why;
+        add(p, e.seconds, tId, "penalty", `Penalty shot awarded to ${e.playerName ?? "?"}${why ? ` — ${why}` : ""}.`, true);
+      } else if (e.type === "WHISTLE") {
+        add(p, e.seconds, tId, "whistle", whistleText((e.meta ?? {}) as WhistleMeta, e.playerName ?? "?", e.teamCode, e.targetName));
       } else if (e.type === "EJECTION") {
         const m = e.meta as { severity?: string } | undefined;
         add(p, e.seconds, tId, "penalty", `${e.playerName ?? "?"} is ejected from the game${m?.severity === "Match" ? " (match penalty)" : ""} — he's done for the night.`, true);

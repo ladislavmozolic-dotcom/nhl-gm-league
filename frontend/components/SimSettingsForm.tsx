@@ -203,6 +203,12 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
         <p className="text-xs text-slate-500 mt-1">The commissioner always sees every tool. Player-profile, Draft Room and post-game panels are not affected.</p>
       </Card>
 
+      <Card title="🏒 V3 realism">
+        <Toggle k="v3TransitionRush" label="Breakaways, 2-on-1 and 3-on-2 rushes off turnovers (+ penalty shots)" />
+        <Toggle k="v3StoppageRealism" label="Named stoppages — offside, puck out of play, tie-up, hand pass; delay of game = puck over the glass" />
+        <p className="text-xs text-slate-500 mt-1">Only the V3 engine reads these; V2 ignores them. Calibrated to leave goals, shots and penalties where V3 already is — they change the <em>shape</em> of play and the play-by-play, not the league totals.</p>
+      </Card>
+
       <Card title="📺 Live Matches (V3)">
         <Toggle k="liveMatchesEnabled" label="Play rounds live — watch games unfold and let GMs coach at stoppages" />
         <p className="text-xs text-slate-500 mb-2">Off: Simulate Day resolves every game instantly, exactly as before. Needs the V3 engine; ignored on any other engine.</p>

@@ -130,6 +130,9 @@ export type EngineSettings = {
   liveMatchesEnabled: boolean;       // off = Simulate Day resolves games instantly, exactly as before
   livePeriodSec: number;             // wall-clock seconds one 20-minute period takes to watch (default 300 = 5 min)
   liveIntermissionSec: number;       // wall-clock seconds each intermission lasts (the guaranteed lines window)
+  // V3 realism (V3 engine only; ignored elsewhere)
+  v3TransitionRush: boolean;         // turnovers can become breakaways / 2-on-1 / 3-on-2 the other way, incl. penalty shots
+  v3StoppageRealism: boolean;        // generic whistles get a named cause (offside, puck out, tie-up…); delay of game = puck over the glass
   // Detailed-Finance revenue constants (lib/finance-tuning.ts maps these)
   finJerseyNet: number; finJerseyScale: number; finApparelBase: number; finOtherBase: number;
   finTradeBoostPct: number; finTradeBoostHalfLife: number;
@@ -285,7 +288,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   faWeightF: { sc: 0.42, pa: 0.38, df: 0.12, sk: 0.08 },
   faWeightD: { df: 0.40, pa: 0.30, sc: 0.20, sk: 0.10 },
   faWeightG: { ag: 0.34, sc: 0.30, rb: 0.26, hs: 0.10 },
-  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, liveMatchesEnabled: false, livePeriodSec: 300, liveIntermissionSec: 30, intelligenceRollout: "full",
+  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, liveMatchesEnabled: false, livePeriodSec: 300, liveIntermissionSec: 30, v3TransitionRush: false, v3StoppageRealism: false, intelligenceRollout: "full",
   faLowballMaxBumpPct: 25, iceUnhappyPct: 80, iceWarnDays: 5, iceRequestDays: 20, resignLockDays: 10,
   finJerseyNet: 120, finJerseyScale: 40000, finApparelBase: 3200000, finOtherBase: 1400000,
   finTradeBoostPct: 60, finTradeBoostHalfLife: 21,
