@@ -170,78 +170,87 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
         <LiveBoard logos={logos} variant="horizontal" activeGameId={gameId} mineTeamIds={mine} />
       </section>
 
-      {/* 2. MAIN GAME HEADER / SCOREBOARD */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-4 text-xs uppercase tracking-wide">
-          <span className={view?.status === "live" ? "text-red-400 font-bold" : "text-slate-500"}>{view?.status === "live" ? "● LIVE" : ""}</span>
-          <div className="flex items-center gap-2.5 flex-wrap justify-end">
-            {/* Boxscore toggle button */}
-            <button
-              onClick={toggleBoxscore}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
-                showBoxscore
-                  ? "bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm shadow-emerald-900"
-                  : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
-              }`}
-              title="Prepnúť zobrazenie Boxscore (góly a vylúčenia)"
-            >
-              <span>📊 Boxscore:</span>
-              <span className={`px-1.5 py-0.2 rounded text-[10px] ${showBoxscore ? "bg-emerald-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
-                {showBoxscore ? "ZAP" : "VYP"}
-              </span>
-            </button>
+      {/* 2. MAIN GAME HEADER / SCOREBOARD (Zobrazené keď je 2D klzisko vypnuté) */}
+      {!showRink && (
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 mb-3">
+          <div className="flex items-center justify-between mb-4 text-xs uppercase tracking-wide">
+            <span className={view?.status === "live" ? "text-red-400 font-bold" : "text-slate-500"}>{view?.status === "live" ? "● LIVE" : ""}</span>
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
+              {/* Boxscore toggle button */}
+              <button
+                onClick={toggleBoxscore}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                  showBoxscore
+                    ? "bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm shadow-emerald-900"
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+                }`}
+                title="Prepnúť zobrazenie Boxscore (góly a vylúčenia)"
+              >
+                <span>📊 Boxscore:</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] ${showBoxscore ? "bg-emerald-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
+                  {showBoxscore ? "ZAP" : "VYP"}
+                </span>
+              </button>
 
-            {/* 2D Rink toggle button */}
-            <button
-              onClick={toggleRink}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
-                showRink
-                  ? "bg-sky-950 text-sky-300 border-sky-600 shadow-sm shadow-sky-900"
-                  : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
-              }`}
-              title="Prepnúť vizuálne 2D klzisko (EHM štýl)"
-            >
-              <span>🏒 2D Klzisko:</span>
-              <span className={`px-1.5 py-0.2 rounded text-[10px] ${showRink ? "bg-sky-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
-                {showRink ? "ZAP" : "VYP"}
-              </span>
-            </button>
-            <span className="text-slate-300 font-semibold text-sm normal-case tracking-normal">{status}</span>
+              {/* 2D Rink toggle button */}
+              <button
+                onClick={toggleRink}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                  showRink
+                    ? "bg-sky-950 text-sky-300 border-sky-600 shadow-sm shadow-sky-900"
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+                }`}
+                title="Prepnúť vizuálne 2D klzisko (EHM štýl)"
+              >
+                <span>🏒 2D Klzisko:</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] ${showRink ? "bg-sky-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
+                  {showRink ? "ZAP" : "VYP"}
+                </span>
+              </button>
+              <span className="text-slate-300 font-semibold text-sm normal-case tracking-normal">{status}</span>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <TeamBlock logos={logos} t={away} score={view && view.status !== "pending" ? view.score.away : "–"} align="left" />
-          <span className="text-slate-600 text-xl sm:text-2xl">@</span>
-          <TeamBlock logos={logos} t={home} score={view && view.status !== "pending" ? view.score.home : "–"} align="right" />
-        </div>
-        {view && view.status !== "pending" && (
-          <div className="grid grid-cols-3 text-center mt-4 text-sm text-slate-400">
-            <span className="tabular-nums">{view.shots.away}</span><span className="text-[11px] uppercase tracking-wide text-slate-500">Shots on goal</span><span className="tabular-nums">{view.shots.home}</span>
+          <div className="flex items-center gap-3">
+            <TeamBlock logos={logos} t={away} score={view && view.status !== "pending" ? view.score.away : "–"} align="left" />
+            <span className="text-slate-600 text-xl sm:text-2xl">@</span>
+            <TeamBlock logos={logos} t={home} score={view && view.status !== "pending" ? view.score.home : "–"} align="right" />
           </div>
-        )}
-      </div>
+          {view && view.status !== "pending" && (
+            <div className="grid grid-cols-3 text-center mt-4 text-sm text-slate-400">
+              <span className="tabular-nums">{view.shots.away}</span><span className="text-[11px] uppercase tracking-wide text-slate-500">Shots on goal</span><span className="tabular-nums">{view.shots.home}</span>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* 3. 2D RINK TRACKER */}
+      {/* 3. 2D RINK TRACKER (Obsahuje unifikovaný scoreboard s ovládaním zvuku, rýchlosti a boxscore) */}
       {showRink && (
-        <LiveRinkTracker
-          gameId={gameId}
-          homeTeamId={home.id}
-          awayTeamId={away.id}
-          homeTeamName={home.name}
-          awayTeamName={away.name}
-          homeLogoUrl={logos[home.id] || ""}
-          awayLogoUrl={logos[away.id] || ""}
-          homeScore={view && view.status !== "pending" ? view.score.home : 0}
-          awayScore={view && view.status !== "pending" ? view.score.away : 0}
-          homeSog={view && view.status !== "pending" ? view.shots.home : 0}
-          awaySog={view && view.status !== "pending" ? view.shots.away : 0}
-          periodStr={view ? periodLabel(view.period) : "1. Tretina"}
-          clockStr={view ? (view.status === "final" ? "0:00" : view.shootout ? "SO" : fmtRemainingClock(view.clock, view.period)) : "20:00"}
-          isLive={view?.status === "live"}
-          standaloneControls={false}
-          events={view?.events ?? []}
-          liveLines={lines}
-        />
+        <div className="mb-3">
+          <LiveRinkTracker
+            gameId={gameId}
+            homeTeamId={home.id}
+            awayTeamId={away.id}
+            homeTeamName={home.name}
+            awayTeamName={away.name}
+            homeLogoUrl={logos[home.id] || ""}
+            awayLogoUrl={logos[away.id] || ""}
+            homeScore={view && view.status !== "pending" ? view.score.home : 0}
+            awayScore={view && view.status !== "pending" ? view.score.away : 0}
+            homeSog={view && view.status !== "pending" ? view.shots.home : 0}
+            awaySog={view && view.status !== "pending" ? view.shots.away : 0}
+            periodStr={view ? periodLabel(view.period) : "1. Tretina"}
+            clockStr={view ? (view.status === "final" ? "0:00" : view.shootout ? "SO" : fmtRemainingClock(view.clock, view.period)) : "20:00"}
+            isLive={view?.status === "live"}
+            standaloneControls={false}
+            events={view?.events ?? []}
+            liveLines={lines}
+            showBoxscore={showBoxscore}
+            onToggleBoxscore={toggleBoxscore}
+            showRink={showRink}
+            onToggleRink={toggleRink}
+            statusText={status}
+          />
+        </div>
       )}
 
       {/* 4. LIVE BOXSCORE CARD (GÓLY & VYLÚČENIA) */}

@@ -35,6 +35,11 @@ export interface LiveRinkTrackerProps {
   standaloneControls?: boolean;
   events?: SimEvent[];
   liveLines?: LiveLine[];
+  showBoxscore?: boolean;
+  onToggleBoxscore?: () => void;
+  showRink?: boolean;
+  onToggleRink?: () => void;
+  statusText?: string;
 }
 
 interface Player {
@@ -201,13 +206,35 @@ export default function LiveRinkTracker({
   isLive = false,
   standaloneControls = true,
   events = [],
-  liveLines = []
+  liveLines = [],
+  showBoxscore = false,
+  onToggleBoxscore,
+  showRink = false,
+  onToggleRink,
+  statusText = ""
 }: LiveRinkTrackerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Audio Context ref
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [audioEnabled, setAudioEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("v3_live_audio_enabled") !== "false";
+      } catch {}
+    }
+    return true;
+  });
+
+  const toggleAudio = useCallback(() => {
+    setAudioEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("v3_live_audio_enabled", String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // Sim State
   const [isPlaying, setIsPlaying] = useState(true);
@@ -1608,13 +1635,12 @@ export default function LiveRinkTracker({
       puck.reboundVy *= Math.pow(0.92, dt * 60);
     }
 
-    // Game Clock countdown (in standalone sandbox or live match)
-    if (standaloneControls || isLive) {
-      clockTimerRef.current += dt * (standaloneControls ? simSpeed : 1);
-      if (clockTimerRef.current >= 1.0) {
-        clockTimerRef.current = 0;
-        setGameClockSeconds((sec) => Math.max(0, sec - 1));
-      }
+    // Game Clock countdown
+    clockTimerRef.current += dt * simSpeed;
+    if (clockTimerRef.current >= 1.0) {
+      const step = Math.floor(clockTimerRef.current);
+      clockTimerRef.current -= step;
+      setGameClockSeconds((sec) => Math.max(0, sec - step));
     }
   }, [isPlaying, simSpeed, isShortenBench, isPullGoalie, playSound, addCommentary, triggerGoal, standaloneControls, isLive, awayTeamName, homeTeamName, switchForwardLine, switchDefensePair]);
 
@@ -1841,6 +1867,103 @@ export default function LiveRinkTracker({
     <div className="w-full flex flex-col gap-3 font-sans select-none text-slate-100">
       {/* 1. TOP TICKER / SCOREBOARD */}
       <section className="w-full rounded-2xl bg-gradient-to-r from-[#0e2040] via-[#081328] to-[#2a0b12] border border-slate-700/80 p-4 shadow-xl">
+        {/* Top Control & Status Row */}
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-700/60 flex-wrap gap-2 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={isLive ? "text-red-400 font-black animate-pulse flex items-center gap-1.5" : "text-slate-400 font-bold flex items-center gap-1.5"}>
+              <span className={`w-2 h-2 rounded-full ${isLive ? "bg-red-500 animate-ping" : "bg-slate-500"}`}></span>
+              {isLive ? "● LIVE ZÁPAS" : "ZÁPAS"}
+            </span>
+            {statusText && (
+              <span className="text-slate-400 font-semibold text-xs border-l border-slate-700 pl-2">{statusText}</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Audio Toggle (stlmiť zvuk) */}
+            <button
+              onClick={toggleAudio}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                audioEnabled
+                  ? "bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800"
+                  : "bg-red-950/60 border-red-800 text-red-300 hover:bg-red-900/60"
+              }`}
+              title={audioEnabled ? "Stlmiť zvuk zápasu" : "Zapnúť zvuk zápasu"}
+            >
+              <span>{audioEnabled ? "🔊" : "🔇"}</span>
+              <span className="text-[11px]">{audioEnabled ? "Zvuk ZAP" : "Zvuk VYP"}</span>
+            </button>
+
+            {/* Sim Speed (zrýchlenie časomiery) */}
+            <div className="flex items-center bg-slate-900 rounded-full p-0.5 border border-slate-700 text-[11px] font-bold">
+              <span className="text-[10px] text-slate-400 px-1.5 hidden sm:inline">⚡ Rýchlosť:</span>
+              {[1, 2, 4].map((sp) => (
+                <button
+                  key={sp}
+                  onClick={() => setSimSpeed(sp)}
+                  className={`px-2 py-0.5 rounded-full transition ${
+                    simSpeed === sp
+                      ? "bg-sky-500 text-slate-950 font-black shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                  title={`Nastaviť rýchlosť časomiery a simulácie na ${sp}x`}
+                >
+                  {sp}x
+                </button>
+              ))}
+            </div>
+
+            {/* Play/Pause */}
+            <button
+              onClick={() => setIsPlaying((v) => !v)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition ${
+                isPlaying
+                  ? "bg-amber-950/80 border-amber-600 text-amber-300 hover:bg-amber-900"
+                  : "bg-emerald-950/80 border-emerald-600 text-emerald-300 hover:bg-emerald-900"
+              }`}
+              title={isPlaying ? "Pozastaviť časomieru a simuláciu" : "Spustiť časomieru a simuláciu"}
+            >
+              {isPlaying ? "⏸ Pauza" : "▶ Spustiť"}
+            </button>
+
+            {/* Boxscore toggle button (if provided by parent) */}
+            {onToggleBoxscore && (
+              <button
+                onClick={onToggleBoxscore}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                  showBoxscore
+                    ? "bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm shadow-emerald-900"
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+                }`}
+                title="Prepnúť zobrazenie Boxscore (góly a vylúčenia)"
+              >
+                <span>📊 Boxscore:</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] ${showBoxscore ? "bg-emerald-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
+                  {showBoxscore ? "ZAP" : "VYP"}
+                </span>
+              </button>
+            )}
+
+            {/* 2D Rink toggle button (if provided by parent) */}
+            {onToggleRink && (
+              <button
+                onClick={onToggleRink}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                  showRink
+                    ? "bg-sky-950 text-sky-300 border-sky-600 shadow-sm shadow-sky-900"
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+                }`}
+                title="Prepnúť vizuálne 2D klzisko (EHM štýl)"
+              >
+                <span>🏒 2D Klzisko:</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] ${showRink ? "bg-sky-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
+                  {showRink ? "ZAP" : "VYP"}
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Away Team */}
           <div className="flex items-center gap-3 w-full md:w-auto justify-start">
@@ -1933,39 +2056,8 @@ export default function LiveRinkTracker({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setAudioEnabled((v) => !v)}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:bg-slate-800 transition"
-              title="Zvukové efekty zápasu"
-            >
-              {audioEnabled ? "🔊 Zvuk ZAP" : "🔇 Zvuk VYP"}
-            </button>
-
-            <button
-              onClick={() => setIsPlaying((v) => !v)}
-              className={`px-4 py-1.5 rounded-lg font-black text-white shadow transition ${
-                isPlaying ? "bg-amber-600 hover:bg-amber-500" : "bg-emerald-600 hover:bg-emerald-500"
-              }`}
-            >
-              {isPlaying ? "⏸ Pauza" : "▶ Spustiť"}
-            </button>
-
-            <div className="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-800">
-              {[1, 2, 4].map((sp) => (
-                <button
-                  key={sp}
-                  onClick={() => setSimSpeed(sp)}
-                  className={`px-2 py-1 rounded text-[11px] font-bold ${
-                    simSpeed === sp ? "bg-slate-800 text-sky-400" : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {sp}x
-                </button>
-              ))}
-            </div>
-
-            <button
               onClick={() => triggerGoal()}
-              className="px-3 py-1.5 rounded-lg bg-red-950/80 border border-red-700 text-red-200 font-bold hover:bg-red-900 transition"
+              className="px-3 py-1.5 rounded-lg bg-red-950/80 border border-red-700 text-red-200 font-bold hover:bg-red-900 transition text-xs"
             >
               🚨 Test Gól
             </button>
