@@ -551,6 +551,12 @@ export default function LiveRinkTracker({
       njdRd.targetX = 0.86;
       njdRd.targetY = 0.62 + Math.cos(gameTime * 1.2) * 0.04;
 
+      // Bratt & Hughes actively defend the high slot and cover the point men (Fox & Lindgren)
+      bratt.targetX = 0.74 + Math.sin(gameTime * 1.1) * 0.03;
+      bratt.targetY = 0.38 + Math.cos(gameTime * 0.9) * 0.05;
+      hughes.targetX = 0.74 + Math.cos(gameTime * 1.0) * 0.03;
+      hughes.targetY = 0.60 + Math.sin(gameTime * 1.1) * 0.05;
+
       if (cycleStepRef.current === 0) {
         panarin.targetX = 0.92 + Math.sin(gameTime * 1.5) * 0.03;
         panarin.targetY = 0.32 + Math.cos(gameTime * 1.3) * 0.05;
@@ -560,6 +566,8 @@ export default function LiveRinkTracker({
         lafreniere.targetY = 0.74 + Math.sin(gameTime * 1.1) * 0.04;
         hischier.targetX = puck.x - 0.05;
         hischier.targetY = puck.y;
+        bratt.targetX = 0.78;
+        bratt.targetY = 0.36;
 
         if (phaseTimeRef.current > 3.0) {
           puck.mode = "PASS_FLIGHT";
@@ -584,6 +592,8 @@ export default function LiveRinkTracker({
         panarin.targetY = 0.28;
         hischier.targetX = puck.x - 0.04;
         hischier.targetY = puck.y;
+        hughes.targetX = 0.77;
+        hughes.targetY = 0.65;
 
         if (phaseTimeRef.current > 2.8) {
           puck.mode = "PASS_FLIGHT";
@@ -604,6 +614,8 @@ export default function LiveRinkTracker({
         fox.targetY = 0.50 + Math.sin(gameTime * 1.5) * 0.04;
         zibanejad.targetX = 0.82;
         zibanejad.targetY = 0.46;
+        hughes.targetX = 0.73;
+        hughes.targetY = 0.54; // pressures Fox on the blue line
 
         if (phaseTimeRef.current > 2.4) {
           puck.mode = "PASS_FLIGHT";
@@ -620,6 +632,11 @@ export default function LiveRinkTracker({
           phaseTimeRef.current = 0;
         }
       } else if (cycleStepRef.current === 3) {
+        bratt.targetX = 0.82;
+        bratt.targetY = 0.44;
+        hughes.targetX = 0.80;
+        hughes.targetY = 0.55;
+
         if (phaseTimeRef.current > 1.0) {
           puck.mode = "SHOT_FLIGHT";
           puck.passFromX = puck.x;
@@ -639,6 +656,10 @@ export default function LiveRinkTracker({
         }
       }
     } else if (phaseRef.current === "SHOT") {
+      bratt.targetX = 0.84;
+      bratt.targetY = 0.42;
+      hughes.targetX = 0.82;
+      hughes.targetY = 0.56;
       if (puck.mode === "REBOUND") {
         phaseRef.current = "REBOUND_BATTLE";
         phaseTimeRef.current = 0;
@@ -647,6 +668,8 @@ export default function LiveRinkTracker({
       setZoneText("🥊 SÚBOJ O VYRAZENÝ PUK PRED BRÁNKOU (SLOT SCRAMBLE)");
       hischier.targetX = puck.x; hischier.targetY = puck.y;
       zibanejad.targetX = puck.x; zibanejad.targetY = puck.y;
+      bratt.targetX = puck.x - 0.04; bratt.targetY = puck.y - 0.04;
+      hughes.targetX = puck.x - 0.04; hughes.targetY = puck.y + 0.04;
 
       if (phaseTimeRef.current > 1.4) {
         puck.mode = "CARRIED";

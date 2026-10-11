@@ -11,7 +11,7 @@ import { processFinances } from "@/lib/finance-server";
 import { archiveSeason } from "@/lib/awards";
 import { isAdmin } from "@/lib/auth";
 import { commissionerName } from "@/lib/audit-server";
-import { loadSettings } from "@/lib/sim/settings";
+import { loadSettings, saveSettings, mergeSettings } from "@/lib/sim/settings";
 import { autoFillRosters, fillAhlFromScratched } from "@/lib/roster-fill";
 import { aiGmDaily } from "@/lib/ai-gm";
 import { getLeagueDate, computePhase } from "@/lib/calendar-server";
@@ -153,6 +153,16 @@ export async function startLiveNextDayAction(): Promise<{ ok: true; round: numbe
   });
   if (!started) return { ok: false, error: "A live round is already running." };
   return { ok: true, round, startsInSec: 15 };
+}
+
+/** Admin: toggle liveMatchesEnabled switch directly from Schedule or Sim controls */
+export async function toggleLiveMatchesAction(): Promise<{ ok: boolean; liveMatchesEnabled: boolean }> {
+  if (!(await isAdmin())) throw new Error("Only a league admin can toggle live matches.");
+  const settings = await loadSettings();
+  const next = !settings.liveMatchesEnabled;
+  await saveSettings(mergeSettings({ liveMatchesEnabled: next }));
+  for (const p of ["/schedule", "/admin/season", "/admin/simulation", "/live"]) revalidatePath(p);
+  return { ok: true, liveMatchesEnabled: next };
 }
 
 const DRAFT_ROUNDS = [1, 2, 3, 4, 5, 6, 7];

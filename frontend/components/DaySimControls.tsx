@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { simNextDayAction, simNextDaysAction, restDayAction, startLiveNextDayAction } from "@/app/admin/season/actions";
+import { simNextDayAction, simNextDaysAction, restDayAction, startLiveNextDayAction, toggleLiveMatchesAction } from "@/app/admin/season/actions";
 
 const DAY_OPTIONS = [1, 3, 5, 7, 10, 14, 21, 30];
 
@@ -11,9 +11,23 @@ export default function DaySimControls({ liveEnabled = false }: { liveEnabled?: 
   const [msg, setMsg] = useState<string | null>(null);
   const [tone, setTone] = useState<"ok" | "err" | "info">("info");
   const [days, setDays] = useState(1);
+  const [isLiveActive, setIsLiveActive] = useState(liveEnabled);
 
   const fmt = (d: Date | string | null, round: number | null) =>
     d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : `day ${round}`;
+
+  const toggleLive = () => start(async () => {
+    setMsg(null);
+    try {
+      const r = await toggleLiveMatchesAction();
+      setIsLiveActive(r.liveMatchesEnabled);
+      setTone("ok");
+      setMsg(r.liveMatchesEnabled ? "Live Matches aktivované — zápasy je možné sledovať a trénovať naživo." : "Live Matches vypnuté — zápasy sa simulujú okamžite.");
+    } catch (e) {
+      setTone("err");
+      setMsg((e as Error).message);
+    }
+  });
 
   const simDay = () => start(async () => {
     setMsg(null);
@@ -52,6 +66,24 @@ export default function DaySimControls({ liveEnabled = false }: { liveEnabled?: 
     <div className="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 mb-5">
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xs font-bold uppercase tracking-wider text-amber-400/90">Admin — Manual Sim</span>
+        
+        {/* Live Matches Toggle Button */}
+        <button
+          onClick={toggleLive}
+          disabled={pending}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
+            isLiveActive
+              ? "bg-red-950/80 text-red-300 border-red-700/80 shadow-sm shadow-red-900/50"
+              : "bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200"
+          }`}
+          title="Prepnúť režim živých zápasov (V3 live simulácia s možnosťou sledovania)"
+        >
+          <span>🔴 Live Matches:</span>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${isLiveActive ? "bg-red-500 text-slate-950" : "bg-slate-700 text-slate-300"}`}>
+            {isLiveActive ? "ON" : "OFF"}
+          </span>
+        </button>
+
         <div className="inline-flex items-center gap-1.5">
           <label className="text-xs text-slate-400">Days</label>
           <select value={days} onChange={(e) => setDays(Number(e.target.value))} disabled={pending}
@@ -63,13 +95,13 @@ export default function DaySimControls({ liveEnabled = false }: { liveEnabled?: 
           className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-sm font-semibold">
           {pending ? "Working…" : days <= 1 ? "▶ Sim Next Day" : `▶ Sim ${days} Days`}
         </button>
-        {liveEnabled && (
+        {isLiveActive && (
           <>
             <button onClick={liveDay} disabled={pending}
-              className="px-4 py-2 rounded-lg bg-red-600/90 hover:bg-red-500 disabled:opacity-50 text-sm font-semibold" title="Play the next day live right now — a rehearsal that doesn't wait for 20:30">
-              🔴 Live practice round
+              className="px-4 py-2 rounded-lg bg-red-600/90 hover:bg-red-500 disabled:opacity-50 text-sm font-semibold animate-pulse" title="Play the next day live right now — a rehearsal that doesn't wait for 20:30">
+              🔴 Spustiť Live zápasy dňa
             </button>
-            <Link href="/live" className="text-xs text-red-300 hover:text-red-200 underline">open Live →</Link>
+            <Link href="/live" className="text-xs text-red-300 hover:text-red-200 font-semibold underline">otvoriť Live prehľad →</Link>
           </>
         )}
         <button onClick={restDay} disabled={pending}
