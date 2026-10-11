@@ -53,25 +53,79 @@ interface Puck {
   reboundVy: number;
 }
 
+export const AWAY_FORWARD_LINES = [
+  {
+    num: 1,
+    lw: { name: "A. Panarin", num: "10" },
+    c:  { name: "M. Zibanejad", num: "93" },
+    rw: { name: "A. Lafreniere", num: "13" },
+  },
+  {
+    num: 2,
+    lw: { name: "C. Kreider", num: "20" },
+    c:  { name: "V. Trocheck", num: "16" },
+    rw: { name: "R. Smith", num: "91" },
+  },
+  {
+    num: 3,
+    lw: { name: "W. Cuylle", num: "50" },
+    c:  { name: "F. Chytil", num: "72" },
+    rw: { name: "K. Kakko", num: "24" },
+  },
+  {
+    num: 4,
+    lw: { name: "J. Vesey", num: "26" },
+    c:  { name: "S. Carrick", num: "39" },
+    rw: { name: "M. Rempe", num: "73" },
+  },
+];
+
+export const HOME_FORWARD_LINES = [
+  {
+    num: 1,
+    lw: { name: "J. Bratt", num: "63" },
+    c:  { name: "N. Hischier", num: "13" },
+    rw: { name: "T. Meier", num: "28" },
+  },
+  {
+    num: 2,
+    lw: { name: "O. Palát", num: "18" },
+    c:  { name: "J. Hughes", num: "86" },
+    rw: { name: "D. Mercer", num: "91" },
+  },
+  {
+    num: 3,
+    lw: { name: "P. Cotter", num: "47" },
+    c:  { name: "E. Haula", num: "56" },
+    rw: { name: "S. Noesen", num: "11" },
+  },
+  {
+    num: 4,
+    lw: { name: "K. MacDermid", num: "23" },
+    c:  { name: "C. Lazar", num: "42" },
+    rw: { name: "N. Bastian", num: "14" },
+  },
+];
+
 const INITIAL_PLAYERS: Player[] = [
   // Away Team (Blue)
-  { id: "away-lw", team: "away", x: 0.86, y: 0.30, targetX: 0.86, targetY: 0.30, angle: 0, num: "10", name: "LW1", role: "LW", energy: 82, toi: "14:12", shiftSeconds: 24, speed: 0.32 },
-  { id: "away-c",  team: "away", x: 0.78, y: 0.50, targetX: 0.78, targetY: 0.50, angle: 0, num: "93", name: "C1",  role: "C",  energy: 76, toi: "15:20", shiftSeconds: 32, speed: 0.30 },
-  { id: "away-rw", team: "away", x: 0.84, y: 0.72, targetX: 0.84, targetY: 0.72, angle: 0, num: "13", name: "RW1", role: "RW", energy: 85, toi: "12:45", shiftSeconds: 18, speed: 0.28 },
-  { id: "away-ld", team: "away", x: 0.68, y: 0.32, targetX: 0.68, targetY: 0.32, angle: 0, num: "55", name: "LD1", role: "LD", energy: 62, toi: "16:04", shiftSeconds: 38, speed: 0.26 },
-  { id: "away-rd", team: "away", x: 0.68, y: 0.65, targetX: 0.68, targetY: 0.65, angle: 0, num: "23", name: "RD1", role: "RD", energy: 65, toi: "17:15", shiftSeconds: 35, speed: 0.29 },
-  { id: "away-g",  team: "away", x: 0.08, y: 0.50, targetX: 0.08, targetY: 0.50, angle: 0, num: "31", name: "G1",   role: "G",  isGoalie: true, energy: 95, toi: "33:42", shiftSeconds: 0, speed: 0.20 },
+  { id: "away-lw", team: "away", x: 0.86, y: 0.30, targetX: 0.86, targetY: 0.30, angle: 0, num: "10", name: "A. Panarin", role: "LW", energy: 88, toi: "14:12", shiftSeconds: 15, speed: 0.32 },
+  { id: "away-c",  team: "away", x: 0.78, y: 0.50, targetX: 0.78, targetY: 0.50, angle: 0, num: "93", name: "M. Zibanejad", role: "C",  energy: 82, toi: "15:20", shiftSeconds: 15, speed: 0.30 },
+  { id: "away-rw", team: "away", x: 0.84, y: 0.72, targetX: 0.84, targetY: 0.72, angle: 0, num: "13", name: "A. Lafreniere", role: "RW", energy: 85, toi: "12:45", shiftSeconds: 15, speed: 0.28 },
+  { id: "away-ld", team: "away", x: 0.68, y: 0.32, targetX: 0.68, targetY: 0.32, angle: 0, num: "55", name: "R. Lindgren", role: "LD", energy: 75, toi: "16:04", shiftSeconds: 15, speed: 0.26 },
+  { id: "away-rd", team: "away", x: 0.68, y: 0.65, targetX: 0.68, targetY: 0.65, angle: 0, num: "23", name: "A. Fox", role: "RD", energy: 78, toi: "17:15", shiftSeconds: 15, speed: 0.29 },
+  { id: "away-g",  team: "away", x: 0.08, y: 0.50, targetX: 0.08, targetY: 0.50, angle: 0, num: "31", name: "I. Shesterkin", role: "G",  isGoalie: true, energy: 95, toi: "33:42", shiftSeconds: 0, speed: 0.20 },
 
   // Home Team (Red)
-  { id: "home-lw", team: "home", x: 0.75, y: 0.34, targetX: 0.75, targetY: 0.34, angle: Math.PI, num: "63", name: "LW1", role: "LW", energy: 74, toi: "13:30", shiftSeconds: 26, speed: 0.30 },
-  { id: "home-c",  team: "home", x: 0.82, y: 0.48, targetX: 0.82, targetY: 0.48, angle: Math.PI, num: "13", name: "C1",  role: "C",  energy: 79, toi: "14:40", shiftSeconds: 28, speed: 0.30 },
-  { id: "home-rw", team: "home", x: 0.75, y: 0.66, targetX: 0.75, targetY: 0.66, angle: Math.PI, num: "86", name: "RW1", role: "RW", energy: 63, toi: "15:05", shiftSeconds: 40, speed: 0.31 },
-  { id: "home-ld", team: "home", x: 0.86, y: 0.38, targetX: 0.86, targetY: 0.38, angle: Math.PI, num: "71", name: "LD1", role: "LD", energy: 84, toi: "16:12", shiftSeconds: 20, speed: 0.25 },
-  { id: "home-rd", team: "home", x: 0.86, y: 0.62, targetX: 0.86, targetY: 0.62, angle: Math.PI, num: "7",  name: "RD1", role: "RD", energy: 67, toi: "17:30", shiftSeconds: 32, speed: 0.26 },
-  { id: "home-g",  team: "home", x: 0.915, y: 0.50, targetX: 0.915, targetY: 0.50, angle: Math.PI, num: "25", name: "G1",   role: "G",  isGoalie: true, energy: 92, toi: "33:42", shiftSeconds: 0, speed: 0.22 },
+  { id: "home-lw", team: "home", x: 0.75, y: 0.34, targetX: 0.75, targetY: 0.34, angle: Math.PI, num: "63", name: "J. Bratt", role: "LW", energy: 84, toi: "13:30", shiftSeconds: 12, speed: 0.30 },
+  { id: "home-c",  team: "home", x: 0.82, y: 0.48, targetX: 0.82, targetY: 0.48, angle: Math.PI, num: "13", name: "N. Hischier", role: "C",  energy: 86, toi: "14:40", shiftSeconds: 12, speed: 0.30 },
+  { id: "home-rw", team: "home", x: 0.75, y: 0.66, targetX: 0.75, targetY: 0.66, angle: Math.PI, num: "28", name: "T. Meier", role: "RW", energy: 80, toi: "15:05", shiftSeconds: 12, speed: 0.31 },
+  { id: "home-ld", team: "home", x: 0.86, y: 0.38, targetX: 0.86, targetY: 0.38, angle: Math.PI, num: "71", name: "J. Siegenthaler", role: "LD", energy: 80, toi: "16:12", shiftSeconds: 12, speed: 0.25 },
+  { id: "home-rd", team: "home", x: 0.86, y: 0.62, targetX: 0.86, targetY: 0.62, angle: Math.PI, num: "7",  name: "D. Hamilton", role: "RD", energy: 77, toi: "17:30", shiftSeconds: 12, speed: 0.26 },
+  { id: "home-g",  team: "home", x: 0.915, y: 0.50, targetX: 0.915, targetY: 0.50, angle: Math.PI, num: "25", name: "J. Markström", role: "G",  isGoalie: true, energy: 92, toi: "33:42", shiftSeconds: 0, speed: 0.22 },
 
   // Extra Attacker (6v5)
-  { id: "home-extra", team: "home", x: 0.78, y: 0.52, targetX: 0.78, targetY: 0.52, angle: Math.PI, num: "91", name: "EA", role: "EA", energy: 88, toi: "09:20", shiftSeconds: 10, speed: 0.28 }
+  { id: "home-extra", team: "home", x: 0.78, y: 0.52, targetX: 0.78, targetY: 0.52, angle: Math.PI, num: "91", name: "D. Mercer", role: "EA", energy: 88, toi: "09:20", shiftSeconds: 10, speed: 0.28 }
 ];
 
 export default function LiveRinkTracker({
@@ -130,6 +184,11 @@ export default function LiveRinkTracker({
   const [isPullGoalie, setIsPullGoalie] = useState(false);
   const [timeoutsLeft, setTimeoutsLeft] = useState(1);
   const [activeHomeLine, setActiveHomeLine] = useState(1);
+  const [activeAwayLine, setActiveAwayLine] = useState(1);
+  const activeHomeLineRef = useRef(1);
+  const activeAwayLineRef = useRef(1);
+  const homeShiftTimerRef = useRef(0);
+  const awayShiftTimerRef = useRef(0);
   const [tacticsDrawerOpen, setTacticsDrawerOpen] = useState(false);
 
   // HUD and Commentaries
@@ -270,6 +329,34 @@ export default function LiveRinkTracker({
     centerLogoRef.current = img;
   }, [homeLogoUrl]);
 
+  const switchForwardLine = useCallback((team: "home" | "away", lineNum: number) => {
+    if (team === "home") {
+      setActiveHomeLine(lineNum);
+      activeHomeLineRef.current = lineNum;
+      homeShiftTimerRef.current = 0;
+      const lineData = HOME_FORWARD_LINES[lineNum - 1] || HOME_FORWARD_LINES[0];
+      const lw = playersRef.current.find((p) => p.id === "home-lw");
+      const c  = playersRef.current.find((p) => p.id === "home-c");
+      const rw = playersRef.current.find((p) => p.id === "home-rw");
+      if (lw) { lw.name = lineData.lw.name; lw.num = lineData.lw.num; lw.energy = 96; lw.shiftSeconds = 0; }
+      if (c)  { c.name = lineData.c.name;   c.num = lineData.c.num;   c.energy = 96; c.shiftSeconds = 0; }
+      if (rw) { rw.name = lineData.rw.name; rw.num = lineData.rw.num; rw.energy = 96; rw.shiftSeconds = 0; }
+      addCommentary("STRIEDANIE 🔄", "border-red-500", "bg-red-500/20 text-red-300", `${homeTeamName} posiela na ľad ${lineNum}. útočnú formáciu.`);
+    } else {
+      setActiveAwayLine(lineNum);
+      activeAwayLineRef.current = lineNum;
+      awayShiftTimerRef.current = 0;
+      const lineData = AWAY_FORWARD_LINES[lineNum - 1] || AWAY_FORWARD_LINES[0];
+      const lw = playersRef.current.find((p) => p.id === "away-lw");
+      const c  = playersRef.current.find((p) => p.id === "away-c");
+      const rw = playersRef.current.find((p) => p.id === "away-rw");
+      if (lw) { lw.name = lineData.lw.name; lw.num = lineData.lw.num; lw.energy = 96; lw.shiftSeconds = 0; }
+      if (c)  { c.name = lineData.c.name;   c.num = lineData.c.num;   c.energy = 96; c.shiftSeconds = 0; }
+      if (rw) { rw.name = lineData.rw.name; rw.num = lineData.rw.num; rw.energy = 96; rw.shiftSeconds = 0; }
+      addCommentary("STRIEDANIE 🔄", "border-sky-500", "bg-sky-500/20 text-sky-300", `${awayTeamName} posiela na ľad ${lineNum}. útočnú formáciu.`);
+    }
+  }, [homeTeamName, awayTeamName, addCommentary]);
+
   // Process real match live events if connected to engine
   const seenEventSeqsRef = useRef<Set<number>>(new Set());
   useEffect(() => {
@@ -285,6 +372,11 @@ export default function LiveRinkTracker({
         setGoalOverlay({ visible: true, text: `🚨 GÓÓÓL! ${scorer.toUpperCase()} ${tCode ? `(${tCode})` : ""}` });
         setTimeout(() => setGoalOverlay({ visible: false, text: "" }), 3000);
         addCommentary("GÓL 🚨", "border-red-500", "bg-red-600 text-white font-black", `${scorer} ${tCode ? `(${tCode})` : ""} dáva gól!`);
+        // Fresh lines after goal
+        const nextHome = (activeHomeLineRef.current % 4) + 1;
+        const nextAway = (activeAwayLineRef.current % 4) + 1;
+        switchForwardLine("home", nextHome);
+        switchForwardLine("away", nextAway);
       } else if (ev.type === "SHOT" || ev.type === "SAVE") {
         playSound("shot");
         if (ev.playerName) {
@@ -294,7 +386,7 @@ export default function LiveRinkTracker({
         addCommentary("TREST 🛑", "border-amber-500", "bg-amber-500/20 text-amber-300", `Vylúčenie: ${ev.playerName || "Hráč"} (${ev.targetName || "2 min"})`);
       }
     }
-  }, [events, standaloneControls, playSound, addCommentary]);
+  }, [events, standaloneControls, playSound, addCommentary, switchForwardLine]);
 
   // Goal trigger
   const triggerGoal = useCallback((scorerName = "Mika Zibanejad", teamName = "NYR") => {
@@ -307,7 +399,11 @@ export default function LiveRinkTracker({
     }, 2600);
 
     addCommentary("GÓL 🚨", "border-red-500", "bg-red-600 text-white font-black", `${scorerName} (${teamName}) posiela puk z prvej do šibenice!`);
-  }, [playSound, addCommentary]);
+    const nextHome = (activeHomeLineRef.current % 4) + 1;
+    const nextAway = (activeAwayLineRef.current % 4) + 1;
+    switchForwardLine("home", nextHome);
+    switchForwardLine("away", nextAway);
+  }, [playSound, addCommentary, switchForwardLine]);
 
   // DRAW HOCKEY NET
   const drawGoalNet = (ctx: CanvasRenderingContext2D, gx: number, isLeft: boolean, w: number, h: number) => {
@@ -570,6 +666,18 @@ export default function LiveRinkTracker({
         p.shiftSeconds += dt * simSpeed;
       }
     });
+
+    // Automatic forward line rotations (every ~38-42s of game time)
+    homeShiftTimerRef.current += dt * simSpeed;
+    awayShiftTimerRef.current += dt * simSpeed;
+    if (homeShiftTimerRef.current >= 42) {
+      const nextHome = (activeHomeLineRef.current % 4) + 1;
+      switchForwardLine("home", nextHome);
+    }
+    if (awayShiftTimerRef.current >= 38) {
+      const nextAway = (activeAwayLineRef.current % 4) + 1;
+      switchForwardLine("away", nextAway);
+    }
 
     const awayLw = players.find((p) => p.id === "away-lw")!;
     const awayC  = players.find((p) => p.id === "away-c")!;
@@ -850,7 +958,7 @@ export default function LiveRinkTracker({
         setGameClockSeconds((sec) => Math.max(0, sec - 1));
       }
     }
-  }, [isPlaying, simSpeed, isShortenBench, isPullGoalie, playSound, addCommentary, triggerGoal, standaloneControls, awayTeamName, homeTeamName]);
+  }, [isPlaying, simSpeed, isShortenBench, isPullGoalie, playSound, addCommentary, triggerGoal, standaloneControls, awayTeamName, homeTeamName, switchForwardLine]);
 
   // ANIMATION LOOP
   useEffect(() => {
@@ -1047,16 +1155,6 @@ export default function LiveRinkTracker({
     addCommentary("TIMEOUT ⏸️", "border-amber-500", "bg-amber-500/20 text-amber-300", "Tréner berie oddychový čas (V3 Momentum Reset úspešný, +20% energia hráčom).");
   };
 
-  const selectForwardLine = (lineNum: number) => {
-    setActiveHomeLine(lineNum);
-    playersRef.current
-      .filter((p) => p.team === "home" && !p.isGoalie)
-      .forEach((p) => {
-        p.energy = 95;
-        p.shiftSeconds = 0;
-      });
-    addCommentary("STRIEDANIE 🔄", "border-sky-500", "bg-sky-500/20 text-sky-300", `Tréner posiela na ľad ${lineNum}. útočnú formáciu.`);
-  };
 
   const clockMins = Math.floor(gameClockSeconds / 60);
   const clockSecs = (gameClockSeconds % 60).toString().padStart(2, "0");
@@ -1216,7 +1314,27 @@ export default function LiveRinkTracker({
         <aside className="lg:col-span-3 bg-slate-950/80 rounded-2xl p-3 border border-slate-800 shadow-xl flex flex-col gap-2.5">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <span className="text-xs font-black uppercase text-blue-400">{awayTeamName}</span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">1. Útok</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 font-bold">
+                {activeAwayLine}. Útok
+              </span>
+              <div className="flex items-center gap-0.5 bg-slate-900 rounded p-0.5 border border-slate-800">
+                {[1, 2, 3, 4].map((ln) => (
+                  <button
+                    key={ln}
+                    onClick={() => switchForwardLine("away", ln)}
+                    title={`Nasadiť ${ln}. útok ${awayTeamName}`}
+                    className={`w-5 h-5 rounded text-[10px] font-bold transition flex items-center justify-center ${
+                      activeAwayLine === ln
+                        ? "bg-blue-600 text-white shadow"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    {ln}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="space-y-1.5 text-xs">
             {awaySkaters.map((p) => {
@@ -1323,7 +1441,27 @@ export default function LiveRinkTracker({
         <aside className="lg:col-span-3 bg-slate-950/80 rounded-2xl p-3 border border-slate-800 shadow-xl flex flex-col gap-2.5">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <span className="text-xs font-black uppercase text-red-400">{homeTeamName}</span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800">{activeHomeLine}. Útok</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800 font-bold">
+                {activeHomeLine}. Útok
+              </span>
+              <div className="flex items-center gap-0.5 bg-slate-900 rounded p-0.5 border border-slate-800">
+                {[1, 2, 3, 4].map((ln) => (
+                  <button
+                    key={ln}
+                    onClick={() => switchForwardLine("home", ln)}
+                    title={`Nasadiť ${ln}. útok ${homeTeamName}`}
+                    className={`w-5 h-5 rounded text-[10px] font-bold transition flex items-center justify-center ${
+                      activeHomeLine === ln
+                        ? "bg-red-600 text-white shadow"
+                        : "text-slate-400 hover:text-white hover:bg-slate-800"
+                    }`}
+                  >
+                    {ln}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="space-y-1.5 text-xs">
             {homeSkaters.map((p) => {
@@ -1369,7 +1507,7 @@ export default function LiveRinkTracker({
                 {[1, 2, 3, 4].map((ln) => (
                   <button
                     key={ln}
-                    onClick={() => selectForwardLine(ln)}
+                    onClick={() => switchForwardLine("home", ln)}
                     className={`p-2.5 rounded-xl border text-left font-bold transition ${
                       activeHomeLine === ln ? "bg-red-950/80 border-red-500 text-white" : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800"
                     }`}
