@@ -240,6 +240,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
           isLive={view?.status === "live"}
           standaloneControls={false}
           events={view?.events ?? []}
+          liveLines={lines}
         />
       )}
 

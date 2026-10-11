@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { SimEvent } from "@/lib/sim/events";
+import type { LiveLine } from "@/lib/sim/live-text";
 
 export interface ForwardLineData {
   num: number;
@@ -27,6 +28,7 @@ export interface LiveRinkTrackerProps {
   isLive?: boolean;
   standaloneControls?: boolean;
   events?: SimEvent[];
+  liveLines?: LiveLine[];
 }
 
 interface Player {
@@ -154,7 +156,8 @@ export default function LiveRinkTracker({
   clockStr = "20:00",
   isLive = false,
   standaloneControls = true,
-  events = []
+  events = [],
+  liveLines = []
 }: LiveRinkTrackerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -218,6 +221,52 @@ export default function LiveRinkTracker({
   const [feed, setFeed] = useState<Array<{ id: number; time: string; badge: string; border: string; bg: string; text: string }>>([
     { id: 1, time: clockStr || "20:00", badge: "ÚVOD", border: "border-emerald-500", bg: "bg-emerald-500/20 text-emerald-300", text: `Zápas ${awayTeamName} vs ${homeTeamName} bol zahájený úvodným buly.` }
   ]);
+
+  // Merge real match broadcast lines into commentary feed when provided
+  const displayFeed = useMemo(() => {
+    if (liveLines && liveLines.length > 0) {
+      const mapped = liveLines.map((l) => {
+        let badge = "INFO ℹ️";
+        let border = "border-slate-500";
+        let bg = "bg-slate-700 text-slate-200";
+
+        if (l.kind === "goal") {
+          badge = "GÓL 🚨";
+          border = "border-red-500";
+          bg = "bg-red-600 text-white font-black";
+        } else if (l.kind === "penalty") {
+          badge = "TREST 🛑";
+          border = "border-amber-500";
+          bg = "bg-amber-500/20 text-amber-300 font-bold";
+        } else if (l.kind === "save") {
+          badge = "ZÁKROK 🧤";
+          border = "border-sky-500";
+          bg = "bg-sky-500/20 text-sky-300 font-bold";
+        } else if (l.kind === "period") {
+          badge = "TRETINA ⏱";
+          border = "border-emerald-500";
+          bg = "bg-emerald-500/20 text-emerald-300 font-bold";
+        }
+
+        const mins = Math.floor(l.seconds / 60);
+        const secs = (l.seconds % 60).toString().padStart(2, "0");
+        const timeStr = l.tag ?? `${mins}:${secs}`;
+
+        return {
+          id: l.seq,
+          time: timeStr,
+          badge,
+          border,
+          bg,
+          text: l.text,
+        };
+      });
+
+      const localShifts = feed.filter((f) => f.badge.includes("STRIEDANIE"));
+      return [...localShifts, ...mapped.reverse()].slice(0, 30);
+    }
+    return feed;
+  }, [liveLines, feed]);
 
   // Simulation Refs
   const playersRef = useRef<Player[]>(JSON.parse(JSON.stringify(INITIAL_PLAYERS)));
@@ -1505,7 +1554,7 @@ export default function LiveRinkTracker({
               <span className="text-[10px] text-emerald-400 font-bold">● LIVE STREAM</span>
             </div>
             <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1 text-xs">
-              {feed.map((f) => (
+              {displayFeed.map((f) => (
                 <div key={f.id} className={`p-2 rounded-xl bg-slate-900/90 border-l-4 ${f.border} flex items-start gap-2 shadow`}>
                   <span className="font-mono text-[11px] text-slate-400 pt-0.5 font-bold shrink-0">{f.time}</span>
                   <div>
