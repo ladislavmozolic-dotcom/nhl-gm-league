@@ -142,6 +142,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
             clockStr={view ? fmtClock(view.clock) : "20:00"}
             isLive={view?.status === "live"}
             standaloneControls={false}
+            events={view?.events ?? []}
           />
         )}
 
