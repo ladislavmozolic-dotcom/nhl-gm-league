@@ -349,6 +349,9 @@ export default function LiveRinkTracker({
   const skateTrailsRef = useRef<Array<{ x: number; y: number }>>([]);
   // Flow states: NEUTRAL -> AWAY_RUSH -> AWAY_OZONE -> AWAY_SHOT -> HOME_RUSH -> HOME_OZONE -> HOME_SHOT
   const phaseRef = useRef<"NEUTRAL" | "AWAY_RUSH" | "AWAY_OZONE" | "AWAY_SHOT" | "HOME_RUSH" | "HOME_COUNTER" | "HOME_OZONE" | "HOME_SHOT">("NEUTRAL");
+  // EHM authentic play types: Point slap shot, one-timer circle, slot wrister, rush wing shot, wraparound
+  const attackPlayTypeRef = useRef<"POINT_SHOT" | "ONE_TIMER" | "SLOT_SHOT" | "RUSH_SHOT" | "WRAPAROUND">("SLOT_SHOT");
+  const hadReboundScrambleRef = useRef(false);
   const phaseTimeRef = useRef(0);
   const cycleStepRef = useRef(0);
   const globalSimTimeRef = useRef(0);
@@ -828,23 +831,26 @@ export default function LiveRinkTracker({
     const homeRd = players.find((p) => p.id === "home-rd")!;
     const homeG  = players.find((p) => p.id === "home-g")!;
 
-    // Goalie tracking (both nets)
+    // Goalie tracking (both nets) with dynamic angle challenge
     if (homeG) {
       if (!isPullGoalie) {
-        homeG.targetX = 0.915;
-        homeG.targetY = 0.50 + Math.max(-0.06, Math.min(0.06, (puck.y - 0.50) * 0.55));
+        // Step out to top of crease on distant/point shots to cut angle, tuck in on close shots
+        const challengeOffset = puck.mode === "SHOT_FLIGHT" && puck.passFromX < 0.75 ? -0.015 : 0;
+        homeG.targetX = 0.915 + challengeOffset;
+        homeG.targetY = 0.50 + Math.max(-0.065, Math.min(0.065, (puck.y - 0.50) * 0.58));
       } else {
         homeG.targetX = 0.98;
         homeG.targetY = 0.50;
       }
     }
     if (awayG) {
-      awayG.targetX = 0.085;
-      awayG.targetY = 0.50 + Math.max(-0.06, Math.min(0.06, (puck.y - 0.50) * 0.55));
+      const challengeOffset = puck.mode === "SHOT_FLIGHT" && puck.passFromX > 0.25 ? 0.015 : 0;
+      awayG.targetX = 0.085 + challengeOffset;
+      awayG.targetY = 0.50 + Math.max(-0.065, Math.min(0.065, (puck.y - 0.50) * 0.58));
     }
 
     // ==========================================
-    // AUTHENTIC CONTINUOUS TWO-WAY HOCKEY GAMEPLAY FLOW
+    // AUTHENTIC CONTINUOUS TWO-WAY HOCKEY GAMEPLAY FLOW (EHM ENGINE)
     // ==========================================
     if (phaseRef.current === "NEUTRAL") {
       setZoneText("⚡ BOJ V STREDNOM PÁSME (NEUTRAL ZONE TRANSITION)");
@@ -862,6 +868,10 @@ export default function LiveRinkTracker({
       homeRd.targetX = 0.70 + Math.sin(gameTime * 1.0) * 0.03; homeRd.targetY = 0.64 + Math.cos(gameTime * 1.2) * 0.04;
 
       if (phaseTimeRef.current > 2.2) {
+        const playRand = Math.random();
+        const nextPlay = playRand < 0.22 ? "POINT_SHOT" : playRand < 0.44 ? "ONE_TIMER" : playRand < 0.66 ? "SLOT_SHOT" : playRand < 0.86 ? "RUSH_SHOT" : "WRAPAROUND";
+        attackPlayTypeRef.current = nextPlay;
+        hadReboundScrambleRef.current = false;
         if (Math.random() < 0.5) {
           puck.mode = "CARRIED";
           puck.carrierId = "away-lw";
@@ -908,6 +918,23 @@ export default function LiveRinkTracker({
       homeRw.targetX = Math.max(0.66, 0.50 + rushProgress * 0.20);
       homeRw.targetY = 0.68;
 
+      // EHM Tactical Variation: Direct snap shot on the rush off the wing!
+      if (attackPlayTypeRef.current === "RUSH_SHOT" && rushProgress >= 0.74) {
+        puck.mode = "SHOT_FLIGHT";
+        puck.passFromX = awayLw.x; puck.passFromY = awayLw.y;
+        puck.passToX = 0.92; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.08;
+        puck.passProgress = 0; puck.passDuration = 0.28;
+        puck.passReceiverId = null;
+        playSound("shot");
+        setShotAlertVisible(true);
+        setTimeout(() => setShotAlertVisible(false), 1200);
+        addCommentary("STRELA Z KRÍDLA 🎯", "border-sky-500", "bg-sky-500/20 text-sky-300", `${awayLw.name} prenikol po krídle a páli v jazde!`);
+        phaseRef.current = "AWAY_SHOT";
+        phaseTimeRef.current = 0;
+        hadReboundScrambleRef.current = false;
+        return;
+      }
+
       if (rushProgress >= 1.0) {
         phaseRef.current = "AWAY_OZONE";
         cycleStepRef.current = 0;
@@ -916,10 +943,10 @@ export default function LiveRinkTracker({
     } else if (phaseRef.current === "AWAY_OZONE") {
       setZoneText(`🔄 ${awayTeamName.toUpperCase()} TLAK V ÚTOČNOM PÁSME`);
       // Defensemen actively walk the blue line
-      awayLd.targetX = 0.68 + Math.sin(gameTime * 1.2) * 0.02;
-      awayLd.targetY = 0.33 + Math.cos(gameTime * 1.5) * 0.06;
-      awayRd.targetX = 0.68 + Math.cos(gameTime * 1.2) * 0.02;
-      awayRd.targetY = 0.67 + Math.sin(gameTime * 1.5) * 0.06;
+      awayLd.targetX = 0.69 + Math.sin(gameTime * 1.2) * 0.02;
+      awayLd.targetY = 0.30 + Math.cos(gameTime * 1.5) * 0.05;
+      awayRd.targetX = 0.69 + Math.cos(gameTime * 1.2) * 0.02;
+      awayRd.targetY = 0.70 + Math.sin(gameTime * 1.5) * 0.05;
 
       // Defending players shadow and collapse
       homeLd.targetX = 0.85 + Math.sin(gameTime * 1.4) * 0.02;
@@ -931,64 +958,179 @@ export default function LiveRinkTracker({
       homeC.targetX = Math.min(0.85, Math.max(0.75, puck.x - 0.04));
       homeC.targetY = puck.y;
 
-      if (cycleStepRef.current === 0) {
-        // Continuous curve/cycle in corner
-        awayLw.targetX = 0.86 + Math.cos(gameTime * 2.0) * 0.06;
-        awayLw.targetY = 0.28 + Math.sin(gameTime * 2.0) * 0.08;
-        awayC.targetX = 0.80 + Math.sin(gameTime * 1.8) * 0.04;
-        awayC.targetY = 0.48;
-        awayRw.targetX = 0.84 + Math.cos(gameTime * 1.8) * 0.04;
-        awayRw.targetY = 0.70;
+      const playType = attackPlayTypeRef.current;
 
-        if (phaseTimeRef.current > 2.2) {
-          puck.mode = "PASS_FLIGHT";
-          puck.passFromX = puck.x; puck.passFromY = puck.y;
-          puck.passToX = awayRw.x; puck.passToY = awayRw.y;
-          puck.passProgress = 0; puck.passDuration = 0.55;
-          puck.passReceiverId = "away-rw";
-          playSound("pass");
-          addCommentary("PRIHRÁVKA", "border-sky-500", "bg-sky-500/20 text-sky-300", `${awayTeamName} kombinuje v útočnom pásme.`);
-          cycleStepRef.current = 1; phaseTimeRef.current = 0;
+      if (playType === "POINT_SHOT") {
+        // EHM Play 1: Slap shot from the blue line by defenseman with net-front traffic
+        if (cycleStepRef.current === 0) {
+          awayLw.targetX = 0.86; awayLw.targetY = 0.28;
+          awayC.targetX = 0.84;  awayC.targetY = 0.48;
+          awayRw.targetX = 0.85; awayRw.targetY = 0.68;
+          if (phaseTimeRef.current > 1.8) {
+            puck.mode = "PASS_FLIGHT";
+            puck.passFromX = puck.x; puck.passFromY = puck.y;
+            puck.passToX = awayLd.x; puck.passToY = awayLd.y;
+            puck.passProgress = 0; puck.passDuration = 0.48;
+            puck.passReceiverId = "away-ld";
+            playSound("pass");
+            addCommentary("PRIHRÁVKA NA MODRÚ 🏒", "border-sky-500", "bg-sky-500/20 text-sky-300", `${awayTeamName} rozohráva na modrú čiaru.`);
+            cycleStepRef.current = 1; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 1) {
+          awayLd.targetX = 0.70; awayLd.targetY = 0.36;
+          awayC.targetX = 0.88; awayC.targetY = 0.48; // screen goalie
+          awayRw.targetX = 0.87; awayRw.targetY = 0.56;
+          if (phaseTimeRef.current > 0.9) {
+            puck.mode = "SHOT_FLIGHT";
+            puck.passFromX = awayLd.x; puck.passFromY = awayLd.y;
+            puck.passToX = 0.92; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.08;
+            puck.passProgress = 0; puck.passDuration = 0.26; // Booming slapshot!
+            puck.passReceiverId = null;
+            playSound("shot");
+            setShotAlertVisible(true);
+            setTimeout(() => setShotAlertVisible(false), 1200);
+            addCommentary("PRÍKLEP OD MODREJ 🚀", "border-sky-500", "bg-sky-600 text-white font-bold", `${awayLd.name} napriahol od modrej čiary! Tvrdá delovka cez clonu!`);
+            phaseRef.current = "AWAY_SHOT";
+            phaseTimeRef.current = 0;
+            hadReboundScrambleRef.current = false;
+          }
         }
-      } else if (cycleStepRef.current === 1) {
-        // Continuous movement along boards to slot
-        awayRw.targetX = 0.82 + Math.sin(gameTime * 2.0) * 0.04;
-        awayRw.targetY = 0.66 + Math.cos(gameTime * 2.0) * 0.06;
-        awayC.targetX = 0.78 + Math.cos(gameTime * 2.2) * 0.05;
-        awayC.targetY = 0.50 + Math.sin(gameTime * 2.2) * 0.04;
-        awayLw.targetX = 0.88; awayLw.targetY = 0.35;
+      } else if (playType === "ONE_TIMER") {
+        // EHM Play 2: Cross-ice seam pass & One-Timer from faceoff circle (Ovechkin spot)
+        if (cycleStepRef.current === 0) {
+          awayRw.targetX = 0.85; awayRw.targetY = 0.72;
+          awayLw.targetX = 0.83; awayLw.targetY = 0.28;
+          awayC.targetX = 0.82;  awayC.targetY = 0.50;
+          if (phaseTimeRef.current > 1.8) {
+            puck.mode = "PASS_FLIGHT";
+            puck.passFromX = puck.x; puck.passFromY = puck.y;
+            puck.passToX = awayLw.x; puck.passToY = awayLw.y;
+            puck.passProgress = 0; puck.passDuration = 0.40;
+            puck.passReceiverId = "away-lw";
+            playSound("pass");
+            addCommentary("KRÍŽNA PRIHRÁVKA ⚡", "border-sky-500", "bg-sky-500/20 text-sky-300", `${awayRw.name} posiela krížny pas cez pásmo na voľného ${awayLw.name}!`);
+            cycleStepRef.current = 1; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 1) {
+          awayLw.targetX = 0.83; awayLw.targetY = 0.28;
+          if (phaseTimeRef.current > 0.4) {
+            puck.mode = "SHOT_FLIGHT";
+            puck.passFromX = awayLw.x; puck.passFromY = awayLw.y;
+            puck.passToX = 0.92; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.08;
+            puck.passProgress = 0; puck.passDuration = 0.24; // Instant one-timer blast!
+            puck.passReceiverId = null;
+            playSound("shot");
+            setShotAlertVisible(true);
+            setTimeout(() => setShotAlertVisible(false), 1200);
+            addCommentary("STRELA Z PRVEJ 💥", "border-emerald-500", "bg-emerald-600 text-white font-bold", `${awayLw.name} páli bez prípravy z prvej z kruhu!`);
+            phaseRef.current = "AWAY_SHOT";
+            phaseTimeRef.current = 0;
+            hadReboundScrambleRef.current = false;
+          }
+        }
+      } else if (playType === "WRAPAROUND") {
+        // EHM Play 3: Wraparound attempt from behind the net
+        if (cycleStepRef.current === 0) {
+          awayRw.targetX = 0.94; awayRw.targetY = 0.44;
+          if (phaseTimeRef.current > 1.5) {
+            cycleStepRef.current = 1; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 1) {
+          awayRw.targetX = 0.90; awayRw.targetY = 0.54;
+          if (phaseTimeRef.current > 0.7) {
+            puck.mode = "SHOT_FLIGHT";
+            puck.passFromX = awayRw.x; puck.passFromY = awayRw.y;
+            puck.passToX = 0.92; puck.passToY = 0.50 + (Math.random() - 0.5) * 0.04;
+            puck.passProgress = 0; puck.passDuration = 0.24;
+            puck.passReceiverId = null;
+            playSound("shot");
+            setShotAlertVisible(true);
+            setTimeout(() => setShotAlertVisible(false), 1200);
+            addCommentary("ZASUNUTIE SPOZA BRÁNKY 🏒", "border-amber-500", "bg-amber-500/20 text-amber-300", `${awayRw.name} obkrúžil bránku a snaží sa zasunúť puk k žŕdke!`);
+            phaseRef.current = "AWAY_SHOT";
+            phaseTimeRef.current = 0;
+            hadReboundScrambleRef.current = false;
+          }
+        }
+      } else {
+        // EHM Play 4: Slot wrist shot from between the faceoff circles
+        if (cycleStepRef.current === 0) {
+          awayLw.targetX = 0.86 + Math.cos(gameTime * 2.0) * 0.05;
+          awayLw.targetY = 0.28 + Math.sin(gameTime * 2.0) * 0.06;
+          awayC.targetX = 0.80 + Math.sin(gameTime * 1.8) * 0.04;
+          awayC.targetY = 0.48;
+          awayRw.targetX = 0.84 + Math.cos(gameTime * 1.8) * 0.04;
+          awayRw.targetY = 0.70;
 
-        if (phaseTimeRef.current > 1.8) {
-          puck.mode = "PASS_FLIGHT";
-          puck.passFromX = puck.x; puck.passFromY = puck.y;
-          puck.passToX = awayC.x; puck.passToY = awayC.y;
-          puck.passProgress = 0; puck.passDuration = 0.45;
-          puck.passReceiverId = "away-c";
-          playSound("pass");
-          addCommentary("ŠANCA 🔥", "border-emerald-500", "bg-emerald-500/20 text-emerald-300", `Prihrávka medzi kruhy, ${awayTeamName} sa dostáva do zakončenia!`);
-          cycleStepRef.current = 2; phaseTimeRef.current = 0;
-        }
-      } else if (cycleStepRef.current === 2) {
-        awayC.targetX = 0.82; awayC.targetY = 0.50;
-        if (phaseTimeRef.current > 0.9) {
-          puck.mode = "SHOT_FLIGHT";
-          puck.passFromX = puck.x; puck.passFromY = puck.y;
-          puck.passToX = 0.92; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.07;
-          puck.passProgress = 0; puck.passDuration = 0.32;
-          puck.passReceiverId = null;
-          playSound("shot");
-          setShotAlertVisible(true);
-          setTimeout(() => setShotAlertVisible(false), 1200);
-          phaseRef.current = "AWAY_SHOT";
-          phaseTimeRef.current = 0;
+          if (phaseTimeRef.current > 2.0) {
+            puck.mode = "PASS_FLIGHT";
+            puck.passFromX = puck.x; puck.passFromY = puck.y;
+            puck.passToX = awayRw.x; puck.passToY = awayRw.y;
+            puck.passProgress = 0; puck.passDuration = 0.50;
+            puck.passReceiverId = "away-rw";
+            playSound("pass");
+            addCommentary("PRIHRÁVKA", "border-sky-500", "bg-sky-500/20 text-sky-300", `${awayTeamName} kombinuje v útočnom pásme.`);
+            cycleStepRef.current = 1; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 1) {
+          awayRw.targetX = 0.82 + Math.sin(gameTime * 2.0) * 0.04;
+          awayRw.targetY = 0.66 + Math.cos(gameTime * 2.0) * 0.06;
+          awayC.targetX = 0.79 + Math.cos(gameTime * 2.2) * 0.04;
+          awayC.targetY = 0.50 + Math.sin(gameTime * 2.2) * 0.04;
+          awayLw.targetX = 0.88; awayLw.targetY = 0.35;
+
+          if (phaseTimeRef.current > 1.6) {
+            puck.mode = "PASS_FLIGHT";
+            puck.passFromX = puck.x; puck.passFromY = puck.y;
+            puck.passToX = awayC.x; puck.passToY = awayC.y;
+            puck.passProgress = 0; puck.passDuration = 0.42;
+            puck.passReceiverId = "away-c";
+            playSound("pass");
+            addCommentary("ŠANCA 🔥", "border-emerald-500", "bg-emerald-500/20 text-emerald-300", `Prihrávka medzi kruhy, ${awayTeamName} sa dostáva do zakončenia!`);
+            cycleStepRef.current = 2; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 2) {
+          awayC.targetX = 0.80; awayC.targetY = 0.50;
+          if (phaseTimeRef.current > 0.8) {
+            puck.mode = "SHOT_FLIGHT";
+            puck.passFromX = awayC.x; puck.passFromY = awayC.y;
+            puck.passToX = 0.92; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.07;
+            puck.passProgress = 0; puck.passDuration = 0.30;
+            puck.passReceiverId = null;
+            playSound("shot");
+            setShotAlertVisible(true);
+            setTimeout(() => setShotAlertVisible(false), 1200);
+            addCommentary("ZAKONČENIE Z MEDZIKRUŽIA 🔥", "border-emerald-500", "bg-emerald-500/20 text-emerald-300", `${awayC.name} pohotovo zakončuje švihom zo slotu!`);
+            phaseRef.current = "AWAY_SHOT";
+            phaseTimeRef.current = 0;
+            hadReboundScrambleRef.current = false;
+          }
         }
       }
     } else if (phaseRef.current === "AWAY_SHOT") {
-      if (puck.mode === "REBOUND" || phaseTimeRef.current > 1.0) {
+      // Rebound scramble or breakout
+      if (!hadReboundScrambleRef.current && puck.mode === "REBOUND" && Math.random() < 0.32 && phaseTimeRef.current < 0.5) {
+        hadReboundScrambleRef.current = true;
+        awayC.targetX = 0.89; awayC.targetY = puck.y;
+        puck.mode = "SHOT_FLIGHT";
+        puck.passFromX = puck.x; puck.passFromY = puck.y;
+        puck.passToX = 0.92; puck.passToY = 0.50 + (Math.random() - 0.5) * 0.06;
+        puck.passProgress = 0; puck.passDuration = 0.22;
+        puck.passReceiverId = null;
+        playSound("shot");
+        addCommentary("DORÁŽKA PRED BRÁNKOU ⚔️", "border-amber-500", "bg-amber-600 text-white font-bold", `Puk poskakuje pred bránkoviskom, ${awayC.name} doráža!`);
+        phaseTimeRef.current = 0;
+        return;
+      }
+
+      if (puck.mode === "REBOUND" || phaseTimeRef.current > 1.1) {
+        const playRand = Math.random();
+        attackPlayTypeRef.current = playRand < 0.22 ? "POINT_SHOT" : playRand < 0.44 ? "ONE_TIMER" : playRand < 0.66 ? "SLOT_SHOT" : playRand < 0.86 ? "RUSH_SHOT" : "WRAPAROUND";
         phaseRef.current = "HOME_RUSH";
         puck.mode = "CARRIED";
         puck.carrierId = "home-c";
         phaseTimeRef.current = 0;
+        hadReboundScrambleRef.current = false;
         addCommentary("ZÁKROK & BREJK ⚡", "border-red-500", "bg-red-500/20 text-red-300", `${homeTeamName} získava puk a vyráža do protiútoku!`);
       }
     } else if (phaseRef.current === "HOME_RUSH") {
@@ -1023,6 +1165,23 @@ export default function LiveRinkTracker({
       awayRw.targetX = Math.min(0.34, 0.50 - rushProgress * 0.20);
       awayRw.targetY = 0.68;
 
+      // EHM Tactical Variation: Direct snap shot on the rush off the wing!
+      if (attackPlayTypeRef.current === "RUSH_SHOT" && rushProgress >= 0.74) {
+        puck.mode = "SHOT_FLIGHT";
+        puck.passFromX = homeC.x; puck.passFromY = homeC.y;
+        puck.passToX = 0.08; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.08;
+        puck.passProgress = 0; puck.passDuration = 0.28;
+        puck.passReceiverId = null;
+        playSound("shot");
+        setShotAlertVisible(true);
+        setTimeout(() => setShotAlertVisible(false), 1200);
+        addCommentary("STRELA Z KRÍDLA 🎯", "border-red-500", "bg-red-500/20 text-red-300", `${homeC.name} prenikol do pásma a páli v plnej jazde!`);
+        phaseRef.current = "HOME_SHOT";
+        phaseTimeRef.current = 0;
+        hadReboundScrambleRef.current = false;
+        return;
+      }
+
       if (rushProgress >= 1.0) {
         phaseRef.current = "HOME_OZONE";
         cycleStepRef.current = 0;
@@ -1031,10 +1190,10 @@ export default function LiveRinkTracker({
     } else if (phaseRef.current === "HOME_OZONE") {
       setZoneText(`🔄 ${homeTeamName.toUpperCase()} TLAK V ÚTOČNOM PÁSME`);
       // Defensemen walk blue line
-      homeLd.targetX = 0.32 + Math.sin(gameTime * 1.2) * 0.02;
-      homeLd.targetY = 0.33 + Math.cos(gameTime * 1.5) * 0.06;
-      homeRd.targetX = 0.32 + Math.cos(gameTime * 1.2) * 0.02;
-      homeRd.targetY = 0.67 + Math.sin(gameTime * 1.5) * 0.06;
+      homeLd.targetX = 0.31 + Math.sin(gameTime * 1.2) * 0.02;
+      homeLd.targetY = 0.30 + Math.cos(gameTime * 1.5) * 0.05;
+      homeRd.targetX = 0.31 + Math.cos(gameTime * 1.2) * 0.02;
+      homeRd.targetY = 0.70 + Math.sin(gameTime * 1.5) * 0.05;
 
       // Away defenders collapse towards slot
       awayLd.targetX = 0.15 + Math.sin(gameTime * 1.4) * 0.02;
@@ -1046,62 +1205,178 @@ export default function LiveRinkTracker({
       awayC.targetX = Math.max(0.15, Math.min(0.25, puck.x + 0.04));
       awayC.targetY = puck.y;
 
-      if (cycleStepRef.current === 0) {
-        homeLw.targetX = 0.14 + Math.cos(gameTime * 2.0) * 0.06;
-        homeLw.targetY = 0.28 + Math.sin(gameTime * 2.0) * 0.08;
-        homeC.targetX = 0.20 + Math.sin(gameTime * 1.8) * 0.04;
-        homeC.targetY = 0.48;
-        homeRw.targetX = 0.16 + Math.cos(gameTime * 1.8) * 0.04;
-        homeRw.targetY = 0.70;
+      const playType = attackPlayTypeRef.current;
 
-        if (phaseTimeRef.current > 2.2) {
-          puck.mode = "PASS_FLIGHT";
-          puck.passFromX = puck.x; puck.passFromY = puck.y;
-          puck.passToX = homeRw.x; puck.passToY = homeRw.y;
-          puck.passProgress = 0; puck.passDuration = 0.55;
-          puck.passReceiverId = "home-rw";
-          playSound("pass");
-          addCommentary("PRIHRÁVKA", "border-red-500", "bg-red-500/20 text-red-300", `${homeTeamName} roztočil kolotoč v útočnom pásme.`);
-          cycleStepRef.current = 1; phaseTimeRef.current = 0;
+      if (playType === "POINT_SHOT") {
+        // EHM: Slap shot from the blue line by defenseman
+        if (cycleStepRef.current === 0) {
+          homeLw.targetX = 0.14; homeLw.targetY = 0.28;
+          homeC.targetX = 0.16;  homeC.targetY = 0.48;
+          homeRw.targetX = 0.15; homeRw.targetY = 0.68;
+          if (phaseTimeRef.current > 1.8) {
+            puck.mode = "PASS_FLIGHT";
+            puck.passFromX = puck.x; puck.passFromY = puck.y;
+            puck.passToX = homeLd.x; puck.passToY = homeLd.y;
+            puck.passProgress = 0; puck.passDuration = 0.48;
+            puck.passReceiverId = "home-ld";
+            playSound("pass");
+            addCommentary("PRIHRÁVKA NA MODRÚ 🏒", "border-red-500", "bg-red-500/20 text-red-300", `${homeTeamName} rozohráva na modrú čiaru.`);
+            cycleStepRef.current = 1; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 1) {
+          homeLd.targetX = 0.30; homeLd.targetY = 0.36;
+          homeC.targetX = 0.12; homeC.targetY = 0.48; // screen goalie
+          homeRw.targetX = 0.13; homeRw.targetY = 0.56;
+          if (phaseTimeRef.current > 0.9) {
+            puck.mode = "SHOT_FLIGHT";
+            puck.passFromX = homeLd.x; puck.passFromY = homeLd.y;
+            puck.passToX = 0.08; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.08;
+            puck.passProgress = 0; puck.passDuration = 0.26;
+            puck.passReceiverId = null;
+            playSound("shot");
+            setShotAlertVisible(true);
+            setTimeout(() => setShotAlertVisible(false), 1200);
+            addCommentary("PRÍKLEP OD MODREJ 🚀", "border-red-500", "bg-red-600 text-white font-bold", `${homeLd.name} napriahol od modrej čiary! Tvrdá delovka cez clonu!`);
+            phaseRef.current = "HOME_SHOT";
+            phaseTimeRef.current = 0;
+            hadReboundScrambleRef.current = false;
+          }
         }
-      } else if (cycleStepRef.current === 1) {
-        homeRw.targetX = 0.18 + Math.sin(gameTime * 2.0) * 0.04;
-        homeRw.targetY = 0.66 + Math.cos(gameTime * 2.0) * 0.06;
-        homeC.targetX = 0.22 + Math.cos(gameTime * 2.2) * 0.05;
-        homeC.targetY = 0.50 + Math.sin(gameTime * 2.2) * 0.04;
-        homeLw.targetX = 0.12; homeLw.targetY = 0.35;
+      } else if (playType === "ONE_TIMER") {
+        // EHM: One-Timer from faceoff circle
+        if (cycleStepRef.current === 0) {
+          homeRw.targetX = 0.15; homeRw.targetY = 0.72;
+          homeLw.targetX = 0.17; homeLw.targetY = 0.28;
+          homeC.targetX = 0.18;  homeC.targetY = 0.50;
+          if (phaseTimeRef.current > 1.8) {
+            puck.mode = "PASS_FLIGHT";
+            puck.passFromX = puck.x; puck.passFromY = puck.y;
+            puck.passToX = homeLw.x; puck.passToY = homeLw.y;
+            puck.passProgress = 0; puck.passDuration = 0.40;
+            puck.passReceiverId = "home-lw";
+            playSound("pass");
+            addCommentary("KRÍŽNA PRIHRÁVKA ⚡", "border-red-500", "bg-red-500/20 text-red-300", `${homeRw.name} krížnym pasom nachádza ${homeLw.name} v kruhu!`);
+            cycleStepRef.current = 1; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 1) {
+          homeLw.targetX = 0.17; homeLw.targetY = 0.28;
+          if (phaseTimeRef.current > 0.4) {
+            puck.mode = "SHOT_FLIGHT";
+            puck.passFromX = homeLw.x; puck.passFromY = homeLw.y;
+            puck.passToX = 0.08; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.08;
+            puck.passProgress = 0; puck.passDuration = 0.24;
+            puck.passReceiverId = null;
+            playSound("shot");
+            setShotAlertVisible(true);
+            setTimeout(() => setShotAlertVisible(false), 1200);
+            addCommentary("STRELA Z PRVEJ 💥", "border-red-500", "bg-red-600 text-white font-bold", `${homeLw.name} páli bez prípravy z prvej z kruhu!`);
+            phaseRef.current = "HOME_SHOT";
+            phaseTimeRef.current = 0;
+            hadReboundScrambleRef.current = false;
+          }
+        }
+      } else if (playType === "WRAPAROUND") {
+        // EHM: Wraparound attempt
+        if (cycleStepRef.current === 0) {
+          homeRw.targetX = 0.06; homeRw.targetY = 0.44;
+          if (phaseTimeRef.current > 1.5) {
+            cycleStepRef.current = 1; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 1) {
+          homeRw.targetX = 0.10; homeRw.targetY = 0.54;
+          if (phaseTimeRef.current > 0.7) {
+            puck.mode = "SHOT_FLIGHT";
+            puck.passFromX = homeRw.x; puck.passFromY = homeRw.y;
+            puck.passToX = 0.08; puck.passToY = 0.50 + (Math.random() - 0.5) * 0.04;
+            puck.passProgress = 0; puck.passDuration = 0.24;
+            puck.passReceiverId = null;
+            playSound("shot");
+            setShotAlertVisible(true);
+            setTimeout(() => setShotAlertVisible(false), 1200);
+            addCommentary("ZASUNUTIE SPOZA BRÁNKY 🏒", "border-amber-500", "bg-amber-500/20 text-amber-300", `${homeRw.name} obkrúžil bránku a snaží sa zasunúť puk k žŕdke!`);
+            phaseRef.current = "HOME_SHOT";
+            phaseTimeRef.current = 0;
+            hadReboundScrambleRef.current = false;
+          }
+        }
+      } else {
+        // EHM: Slot wrist shot
+        if (cycleStepRef.current === 0) {
+          homeLw.targetX = 0.14 + Math.cos(gameTime * 2.0) * 0.05;
+          homeLw.targetY = 0.28 + Math.sin(gameTime * 2.0) * 0.06;
+          homeC.targetX = 0.20 + Math.sin(gameTime * 1.8) * 0.04;
+          homeC.targetY = 0.48;
+          homeRw.targetX = 0.16 + Math.cos(gameTime * 1.8) * 0.04;
+          homeRw.targetY = 0.70;
 
-        if (phaseTimeRef.current > 1.8) {
-          puck.mode = "PASS_FLIGHT";
-          puck.passFromX = puck.x; puck.passFromY = puck.y;
-          puck.passToX = homeC.x; puck.passToY = homeC.y;
-          puck.passProgress = 0; puck.passDuration = 0.45;
-          puck.passReceiverId = "home-c";
-          playSound("pass");
-          addCommentary("ŠANCA 🔥", "border-amber-500", "bg-amber-500/20 text-amber-300", `Krásna prihrávka pred bránku, ${homeTeamName} v obrovskej šanci!`);
-          cycleStepRef.current = 2; phaseTimeRef.current = 0;
-        }
-      } else if (cycleStepRef.current === 2) {
-        homeC.targetX = 0.18; homeC.targetY = 0.50;
-        if (phaseTimeRef.current > 0.9) {
-          puck.mode = "SHOT_FLIGHT";
-          puck.passFromX = puck.x; puck.passFromY = puck.y;
-          puck.passToX = 0.08; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.07;
-          puck.passProgress = 0; puck.passDuration = 0.32;
-          puck.passReceiverId = null;
-          playSound("shot");
-          setShotAlertVisible(true);
-          setTimeout(() => setShotAlertVisible(false), 1200);
-          phaseRef.current = "HOME_SHOT";
-          phaseTimeRef.current = 0;
+          if (phaseTimeRef.current > 2.0) {
+            puck.mode = "PASS_FLIGHT";
+            puck.passFromX = puck.x; puck.passFromY = puck.y;
+            puck.passToX = homeRw.x; puck.passToY = homeRw.y;
+            puck.passProgress = 0; puck.passDuration = 0.50;
+            puck.passReceiverId = "home-rw";
+            playSound("pass");
+            addCommentary("PRIHRÁVKA", "border-red-500", "bg-red-500/20 text-red-300", `${homeTeamName} roztočil kolotoč v útočnom pásme.`);
+            cycleStepRef.current = 1; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 1) {
+          homeRw.targetX = 0.18 + Math.sin(gameTime * 2.0) * 0.04;
+          homeRw.targetY = 0.66 + Math.cos(gameTime * 2.0) * 0.06;
+          homeC.targetX = 0.21 + Math.cos(gameTime * 2.2) * 0.04;
+          homeC.targetY = 0.50 + Math.sin(gameTime * 2.2) * 0.04;
+          homeLw.targetX = 0.12; homeLw.targetY = 0.35;
+
+          if (phaseTimeRef.current > 1.6) {
+            puck.mode = "PASS_FLIGHT";
+            puck.passFromX = puck.x; puck.passFromY = puck.y;
+            puck.passToX = homeC.x; puck.passToY = homeC.y;
+            puck.passProgress = 0; puck.passDuration = 0.42;
+            puck.passReceiverId = "home-c";
+            playSound("pass");
+            addCommentary("ŠANCA 🔥", "border-amber-500", "bg-amber-500/20 text-amber-300", `Krásna prihrávka pred bránku, ${homeTeamName} v obrovskej šanci!`);
+            cycleStepRef.current = 2; phaseTimeRef.current = 0;
+          }
+        } else if (cycleStepRef.current === 2) {
+          homeC.targetX = 0.20; homeC.targetY = 0.50;
+          if (phaseTimeRef.current > 0.8) {
+            puck.mode = "SHOT_FLIGHT";
+            puck.passFromX = homeC.x; puck.passFromY = homeC.y;
+            puck.passToX = 0.08; puck.passToY = 0.48 + (Math.random() - 0.5) * 0.07;
+            puck.passProgress = 0; puck.passDuration = 0.30;
+            puck.passReceiverId = null;
+            playSound("shot");
+            setShotAlertVisible(true);
+            setTimeout(() => setShotAlertVisible(false), 1200);
+            addCommentary("ZAKONČENIE Z MEDZIKRUŽIA 🔥", "border-amber-500", "bg-amber-500/20 text-amber-300", `${homeC.name} pohotovo zakončuje švihom zo slotu!`);
+            phaseRef.current = "HOME_SHOT";
+            phaseTimeRef.current = 0;
+            hadReboundScrambleRef.current = false;
+          }
         }
       }
     } else if (phaseRef.current === "HOME_SHOT") {
-      if (puck.mode === "REBOUND" || phaseTimeRef.current > 1.0) {
+      if (!hadReboundScrambleRef.current && puck.mode === "REBOUND" && Math.random() < 0.32 && phaseTimeRef.current < 0.5) {
+        hadReboundScrambleRef.current = true;
+        homeC.targetX = 0.11; homeC.targetY = puck.y;
+        puck.mode = "SHOT_FLIGHT";
+        puck.passFromX = puck.x; puck.passFromY = puck.y;
+        puck.passToX = 0.08; puck.passToY = 0.50 + (Math.random() - 0.5) * 0.06;
+        puck.passProgress = 0; puck.passDuration = 0.22;
+        puck.passReceiverId = null;
+        playSound("shot");
+        addCommentary("DORÁŽKA PRED BRÁNKOU ⚔️", "border-amber-500", "bg-amber-600 text-white font-bold", `Puk poskakuje pred bránkoviskom, ${homeC.name} doráža!`);
+        phaseTimeRef.current = 0;
+        return;
+      }
+
+      if (puck.mode === "REBOUND" || phaseTimeRef.current > 1.1) {
+        const playRand = Math.random();
+        attackPlayTypeRef.current = playRand < 0.22 ? "POINT_SHOT" : playRand < 0.44 ? "ONE_TIMER" : playRand < 0.66 ? "SLOT_SHOT" : playRand < 0.86 ? "RUSH_SHOT" : "WRAPAROUND";
         phaseRef.current = "AWAY_RUSH";
         puck.mode = "CARRIED";
         puck.carrierId = "away-c";
         phaseTimeRef.current = 0;
+        hadReboundScrambleRef.current = false;
         addCommentary("ZÁKROK 🛑", "border-blue-500", "bg-blue-500/20 text-blue-300", `Brankár ${awayTeamName} vyráža puk, protiútok ${awayTeamName}!`);
       }
     }
