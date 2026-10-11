@@ -109,6 +109,12 @@ const UI_TEXT = {
     capWarning: "⚠ Cap Over Limit",
     getsCap: "acquires",
     sendsCap: "sheds",
+    floorTitle: "Salary floor",
+    floorHeadroom: "above the floor after trade",
+    floorBreach: "would fall BELOW the salary floor",
+    floorStill: "stays below the salary floor",
+    floorAlready: "is already below the floor",
+    floorNote: "Under-floor game days are fined by the League Bank and raise next season's floor. This does not block the trade.",
     capFlowCalc: "Cap Space Flow & Balance",
     rulesTitle: "Trade Rules & Retention Limits",
     rulesBody: "Max salary retention is 50% per contract, with up to 3 total slots and 10% of league cap ceiling. Deals are evaluated and approved by League Commission.",
@@ -156,6 +162,12 @@ const UI_TEXT = {
     capWarning: "⚠ Prekročený platový strop",
     getsCap: "získa",
     sendsCap: "odovzdá",
+    floorTitle: "Platová podlaha",
+    floorHeadroom: "nad podlahou po výmene",
+    floorBreach: "by kleslo POD platovú podlahu",
+    floorStill: "zostáva pod platovou podlahou",
+    floorAlready: "je už pod podlahou",
+    floorNote: "Zápasové dni pod podlahou sa pokutujú cez Ligovú banku a zvyšujú podlahu na ďalšiu sezónu. Výmenu to neblokuje.",
     capFlowCalc: "Bilancia a dopad na platový strop",
     rulesTitle: "Pravidlá výmen & Retencia",
     rulesBody: "Max. retencia platu je 50% na hráča, celkovo max. 3 sloty a 10% z platového stropu. Výmeny posudzuje a schvaľuje Ligová Komisia.",
@@ -1339,6 +1351,37 @@ export default function TradeBuilder({
                   <div className="font-mono font-bold text-slate-200 text-sm mt-0.5">{money(mineSent)}</div>
                   <div className="text-[9px] text-slate-500">{tTxt.sendsCap}: {money(theirsSent)}</div>
                 </div>
+              </div>
+
+              {/* Salary floor check — informational (never blocks the trade) */}
+              <div className="pt-2 border-t border-slate-800/70 space-y-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{tTxt.floorTitle}</div>
+                {([[me.name, meCap, meCapDelta], [opp.name, oppCap, oppCapDelta]] as const).map(([nm, cp, dl]) => {
+                  const floorV = cp.floor ?? 0;
+                  if (!floorV) return null;
+                  const before = cp.committed, after = cp.committed + dl;
+                  const underBefore = Math.max(0, floorV - before), underAfter = Math.max(0, floorV - after);
+                  const headroom = after - floorV;
+                  const bad = underAfter > 0;
+                  return (
+                    <div key={nm} className={`rounded-lg border px-2 py-1.5 text-[11px] ${bad ? "bg-amber-950/30 border-amber-800/50 text-amber-300" : "bg-slate-900/60 border-slate-800 text-slate-300"}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate font-medium">{nm}</span>
+                        <span className="font-mono font-bold shrink-0">
+                          {bad ? `−${money(underAfter)}` : `+${money(headroom)}`}
+                        </span>
+                      </div>
+                      <div className="text-[10px] opacity-80">
+                        {bad
+                          ? `⚠ ${nm} ${underBefore > 0 ? (dl === 0 ? tTxt.floorAlready : tTxt.floorStill) : tTxt.floorBreach} (${tTxt.floorTitle.toLowerCase()} ${money(floorV)})`
+                          : `${tTxt.floorHeadroom} (${tTxt.floorTitle.toLowerCase()} ${money(floorV)})`}
+                      </div>
+                    </div>
+                  );
+                })}
+                {(meCap.floor && meCap.committed + meCapDelta < meCap.floor) || (oppCap.floor && oppCap.committed + oppCapDelta < oppCap.floor) ? (
+                  <p className="text-[10px] text-slate-500">{tTxt.floorNote}</p>
+                ) : null}
               </div>
             </div>
 
