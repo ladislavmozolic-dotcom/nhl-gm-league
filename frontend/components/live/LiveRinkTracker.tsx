@@ -11,6 +11,12 @@ export interface ForwardLineData {
   rw: { name: string; num: string };
 }
 
+export interface DefensePairData {
+  num: number;
+  ld: { name: string; num: string };
+  rd: { name: string; num: string };
+}
+
 export interface LiveRinkTrackerProps {
   gameId?: number;
   homeTeamId?: number;
@@ -121,6 +127,42 @@ export const HOME_FORWARD_LINES = [
   },
 ];
 
+export const AWAY_DEFENSE_PAIRS: DefensePairData[] = [
+  {
+    num: 1,
+    ld: { name: "R. Lindgren", num: "55" },
+    rd: { name: "A. Fox", num: "23" },
+  },
+  {
+    num: 2,
+    ld: { name: "K. Miller", num: "79" },
+    rd: { name: "B. Schneider", num: "4" },
+  },
+  {
+    num: 3,
+    ld: { name: "Z. Jones", num: "6" },
+    rd: { name: "J. Trouba", num: "8" },
+  },
+];
+
+export const HOME_DEFENSE_PAIRS: DefensePairData[] = [
+  {
+    num: 1,
+    ld: { name: "J. Siegenthaler", num: "71" },
+    rd: { name: "D. Hamilton", num: "7" },
+  },
+  {
+    num: 2,
+    ld: { name: "B. Dillon", num: "5" },
+    rd: { name: "B. Pesce", num: "22" },
+  },
+  {
+    num: 3,
+    ld: { name: "L. Hughes", num: "43" },
+    rd: { name: "S. Nemec", num: "17" },
+  },
+];
+
 const INITIAL_PLAYERS: Player[] = [
   // Away Team (Blue)
   { id: "away-lw", team: "away", x: 0.86, y: 0.30, targetX: 0.86, targetY: 0.30, angle: 0, num: "10", name: "A. Panarin", role: "LW", energy: 88, toi: "14:12", shiftSeconds: 15, speed: 0.32 },
@@ -210,6 +252,16 @@ export default function LiveRinkTracker({
   const activeAwayLineRef = useRef(1);
   const homeShiftTimerRef = useRef(0);
   const awayShiftTimerRef = useRef(0);
+
+  const [activeHomeDef, setActiveHomeDef] = useState(1);
+  const [activeAwayDef, setActiveAwayDef] = useState(1);
+  const activeHomeDefRef = useRef(1);
+  const activeAwayDefRef = useRef(1);
+  const homeDefShiftTimerRef = useRef(0);
+  const awayDefShiftTimerRef = useRef(0);
+
+  const [benchVersion, setBenchVersion] = useState(0);
+  const benchTimerRef = useRef(0);
   const [tacticsDrawerOpen, setTacticsDrawerOpen] = useState(false);
 
   // Dynamic Lines Data
@@ -217,6 +269,11 @@ export default function LiveRinkTracker({
   const [homeForwardLines, setHomeForwardLines] = useState<ForwardLineData[]>(HOME_FORWARD_LINES);
   const awayForwardLinesRef = useRef<ForwardLineData[]>(AWAY_FORWARD_LINES);
   const homeForwardLinesRef = useRef<ForwardLineData[]>(HOME_FORWARD_LINES);
+
+  const [awayDefensePairs, setAwayDefensePairs] = useState<DefensePairData[]>(AWAY_DEFENSE_PAIRS);
+  const [homeDefensePairs, setHomeDefensePairs] = useState<DefensePairData[]>(HOME_DEFENSE_PAIRS);
+  const awayDefensePairsRef = useRef<DefensePairData[]>(AWAY_DEFENSE_PAIRS);
+  const homeDefensePairsRef = useRef<DefensePairData[]>(HOME_DEFENSE_PAIRS);
 
   // HUD and Commentaries
   const [puckCarrierName, setPuckCarrierName] = useState(awayTeamName + " (#10)");
@@ -299,24 +356,34 @@ export default function LiveRinkTracker({
           setAwayForwardLines(awayM.forwardLines);
           awayForwardLinesRef.current = awayM.forwardLines;
         }
+        if (homeM.defensePairs?.length) {
+          setHomeDefensePairs(homeM.defensePairs);
+          homeDefensePairsRef.current = homeM.defensePairs;
+        }
+        if (awayM.defensePairs?.length) {
+          setAwayDefensePairs(awayM.defensePairs);
+          awayDefensePairsRef.current = awayM.defensePairs;
+        }
 
         // Apply real names and jersey numbers to active players
         const hLine1 = homeM.forwardLines?.[0];
         const aLine1 = awayM.forwardLines?.[0];
+        const hDef1 = homeM.defensePairs?.[0] || homeM.defense;
+        const aDef1 = awayM.defensePairs?.[0] || awayM.defense;
 
         playersRef.current.forEach((p) => {
           if (p.id === "away-lw" && aLine1?.lw) { p.name = aLine1.lw.name; p.num = aLine1.lw.num; }
           if (p.id === "away-c"  && aLine1?.c)  { p.name = aLine1.c.name;  p.num = aLine1.c.num; }
           if (p.id === "away-rw" && aLine1?.rw) { p.name = aLine1.rw.name; p.num = aLine1.rw.num; }
-          if (p.id === "away-ld" && awayM.defense?.ld) { p.name = awayM.defense.ld.name; p.num = awayM.defense.ld.num; }
-          if (p.id === "away-rd" && awayM.defense?.rd) { p.name = awayM.defense.rd.name; p.num = awayM.defense.rd.num; }
+          if (p.id === "away-ld" && aDef1?.ld)  { p.name = aDef1.ld.name;  p.num = aDef1.ld.num; }
+          if (p.id === "away-rd" && aDef1?.rd)  { p.name = aDef1.rd.name;  p.num = aDef1.rd.num; }
           if (p.id === "away-g"  && awayM.goalie) { p.name = awayM.goalie.name; p.num = awayM.goalie.num; }
 
           if (p.id === "home-lw" && hLine1?.lw) { p.name = hLine1.lw.name; p.num = hLine1.lw.num; }
           if (p.id === "home-c"  && hLine1?.c)  { p.name = hLine1.c.name;  p.num = hLine1.c.num; }
           if (p.id === "home-rw" && hLine1?.rw) { p.name = hLine1.rw.name; p.num = hLine1.rw.num; }
-          if (p.id === "home-ld" && homeM.defense?.ld) { p.name = homeM.defense.ld.name; p.num = homeM.defense.ld.num; }
-          if (p.id === "home-rd" && homeM.defense?.rd) { p.name = homeM.defense.rd.name; p.num = homeM.defense.rd.num; }
+          if (p.id === "home-ld" && hDef1?.ld)  { p.name = hDef1.ld.name;  p.num = hDef1.ld.num; }
+          if (p.id === "home-rd" && hDef1?.rd)  { p.name = hDef1.rd.name;  p.num = hDef1.rd.num; }
           if (p.id === "home-g"  && homeM.goalie) { p.name = homeM.goalie.name; p.num = homeM.goalie.num; }
           if (p.id === "home-extra" && homeM.extra) { p.name = homeM.extra.name; p.num = homeM.extra.num; }
         });
@@ -324,6 +391,7 @@ export default function LiveRinkTracker({
         if (aLine1?.c) {
           setPuckCarrierName(`${aLine1.c.name} (${awayTeamName})`);
         }
+        setBenchVersion((v) => (v + 1) % 100000);
       })
       .catch((err) => {
         console.warn("Failed to load matchup lines:", err);
@@ -462,6 +530,31 @@ export default function LiveRinkTracker({
     centerLogoRef.current = img;
   }, [homeLogoUrl]);
 
+  const switchDefensePair = useCallback((team: "home" | "away", pairNum: number) => {
+    if (team === "home") {
+      setActiveHomeDef(pairNum);
+      activeHomeDefRef.current = pairNum;
+      homeDefShiftTimerRef.current = 0;
+      const pairs = homeDefensePairsRef.current;
+      const pairData = pairs[pairNum - 1] || pairs[0] || HOME_DEFENSE_PAIRS[0];
+      const ld = playersRef.current.find((p) => p.id === "home-ld");
+      const rd = playersRef.current.find((p) => p.id === "home-rd");
+      if (ld && pairData?.ld) { ld.name = pairData.ld.name; ld.num = pairData.ld.num; ld.energy = 96; ld.shiftSeconds = 0; }
+      if (rd && pairData?.rd) { rd.name = pairData.rd.name; rd.num = pairData.rd.num; rd.energy = 96; rd.shiftSeconds = 0; }
+    } else {
+      setActiveAwayDef(pairNum);
+      activeAwayDefRef.current = pairNum;
+      awayDefShiftTimerRef.current = 0;
+      const pairs = awayDefensePairsRef.current;
+      const pairData = pairs[pairNum - 1] || pairs[0] || AWAY_DEFENSE_PAIRS[0];
+      const ld = playersRef.current.find((p) => p.id === "away-ld");
+      const rd = playersRef.current.find((p) => p.id === "away-rd");
+      if (ld && pairData?.ld) { ld.name = pairData.ld.name; ld.num = pairData.ld.num; ld.energy = 96; ld.shiftSeconds = 0; }
+      if (rd && pairData?.rd) { rd.name = pairData.rd.name; rd.num = pairData.rd.num; rd.energy = 96; rd.shiftSeconds = 0; }
+    }
+    setBenchVersion((v) => (v + 1) % 100000);
+  }, []);
+
   const switchForwardLine = useCallback((team: "home" | "away", lineNum: number) => {
     if (team === "home") {
       setActiveHomeLine(lineNum);
@@ -472,9 +565,12 @@ export default function LiveRinkTracker({
       const lw = playersRef.current.find((p) => p.id === "home-lw");
       const c  = playersRef.current.find((p) => p.id === "home-c");
       const rw = playersRef.current.find((p) => p.id === "home-rw");
-      if (lw) { lw.name = lineData.lw.name; lw.num = lineData.lw.num; lw.energy = 96; lw.shiftSeconds = 0; }
-      if (c)  { c.name = lineData.c.name;   c.num = lineData.c.num;   c.energy = 96; c.shiftSeconds = 0; }
-      if (rw) { rw.name = lineData.rw.name; rw.num = lineData.rw.num; rw.energy = 96; rw.shiftSeconds = 0; }
+      if (lw && lineData?.lw) { lw.name = lineData.lw.name; lw.num = lineData.lw.num; lw.energy = 96; lw.shiftSeconds = 0; }
+      if (c && lineData?.c)   { c.name = lineData.c.name;   c.num = lineData.c.num;   c.energy = 96; c.shiftSeconds = 0; }
+      if (rw && lineData?.rw) { rw.name = lineData.rw.name; rw.num = lineData.rw.num; rw.energy = 96; rw.shiftSeconds = 0; }
+      if (puckRef.current.carrierId === "home-lw" && lw) setPuckCarrierName(`${lw.name} (${homeTeamName})`);
+      if (puckRef.current.carrierId === "home-c"  && c)  setPuckCarrierName(`${c.name} (${homeTeamName})`);
+      if (puckRef.current.carrierId === "home-rw" && rw) setPuckCarrierName(`${rw.name} (${homeTeamName})`);
       addCommentary("STRIEDANIE 🔄", "border-red-500", "bg-red-500/20 text-red-300", `${homeTeamName} posiela na ľad ${lineNum}. útočnú formáciu.`);
     } else {
       setActiveAwayLine(lineNum);
@@ -485,11 +581,15 @@ export default function LiveRinkTracker({
       const lw = playersRef.current.find((p) => p.id === "away-lw");
       const c  = playersRef.current.find((p) => p.id === "away-c");
       const rw = playersRef.current.find((p) => p.id === "away-rw");
-      if (lw) { lw.name = lineData.lw.name; lw.num = lineData.lw.num; lw.energy = 96; lw.shiftSeconds = 0; }
-      if (c)  { c.name = lineData.c.name;   c.num = lineData.c.num;   c.energy = 96; c.shiftSeconds = 0; }
-      if (rw) { rw.name = lineData.rw.name; rw.num = lineData.rw.num; rw.energy = 96; rw.shiftSeconds = 0; }
+      if (lw && lineData?.lw) { lw.name = lineData.lw.name; lw.num = lineData.lw.num; lw.energy = 96; lw.shiftSeconds = 0; }
+      if (c && lineData?.c)   { c.name = lineData.c.name;   c.num = lineData.c.num;   c.energy = 96; c.shiftSeconds = 0; }
+      if (rw && lineData?.rw) { rw.name = lineData.rw.name; rw.num = lineData.rw.num; rw.energy = 96; rw.shiftSeconds = 0; }
+      if (puckRef.current.carrierId === "away-lw" && lw) setPuckCarrierName(`${lw.name} (${awayTeamName})`);
+      if (puckRef.current.carrierId === "away-c"  && c)  setPuckCarrierName(`${c.name} (${awayTeamName})`);
+      if (puckRef.current.carrierId === "away-rw" && rw) setPuckCarrierName(`${rw.name} (${awayTeamName})`);
       addCommentary("STRIEDANIE 🔄", "border-sky-500", "bg-sky-500/20 text-sky-300", `${awayTeamName} posiela na ľad ${lineNum}. útočnú formáciu.`);
     }
+    setBenchVersion((v) => (v + 1) % 100000);
   }, [homeTeamName, awayTeamName, addCommentary]);
 
   // Process real match live events if connected to engine
@@ -519,9 +619,21 @@ export default function LiveRinkTracker({
         }
       } else if (ev.type === "PENALTY") {
         addCommentary("TREST 🛑", "border-amber-500", "bg-amber-500/20 text-amber-300", `Vylúčenie: ${ev.playerName || "Hráč"} (${ev.targetName || "2 min"})`);
+      } else if (ev.type === "LINE_CHANGE") {
+        const isHome = ev.teamId === homeTeamId || (ev.teamCode && ev.teamCode === homeTeamName);
+        const meta = ev.meta as { unit?: string; label?: string; names?: string[] } | undefined;
+        if (meta?.unit === "F" || !meta?.unit) {
+          const match = meta?.label?.match(/\d+/);
+          const lineNum = match ? parseInt(match[0], 10) : ((isHome ? activeHomeLineRef.current : activeAwayLineRef.current) % 4) + 1;
+          switchForwardLine(isHome ? "home" : "away", Math.max(1, Math.min(4, lineNum)));
+        } else if (meta?.unit === "D") {
+          const match = meta?.label?.match(/\d+/);
+          const pairNum = match ? parseInt(match[0], 10) : ((isHome ? activeHomeDefRef.current : activeAwayDefRef.current) % 3) + 1;
+          switchDefensePair(isHome ? "home" : "away", Math.max(1, Math.min(3, pairNum)));
+        }
       }
     }
-  }, [events, standaloneControls, playSound, addCommentary, switchForwardLine]);
+  }, [events, standaloneControls, playSound, addCommentary, switchForwardLine, switchDefensePair, homeTeamId, homeTeamName]);
 
   // Goal trigger
   const triggerGoal = useCallback((scorerName?: string, teamName?: string) => {
@@ -801,20 +913,39 @@ export default function LiveRinkTracker({
     players.forEach((p) => {
       if (!p.isGoalie) {
         p.energy = Math.max(25, p.energy - (drain * dt));
-        p.shiftSeconds += dt * simSpeed;
+        p.shiftSeconds += dt * (standaloneControls ? simSpeed : 1);
       }
     });
 
-    // Automatic forward line rotations (every ~38-42s of game time)
-    homeShiftTimerRef.current += dt * simSpeed;
-    awayShiftTimerRef.current += dt * simSpeed;
-    if (homeShiftTimerRef.current >= 42) {
+    // Automatic forward line rotations (every ~14-15s of action)
+    homeShiftTimerRef.current += dt * (standaloneControls ? simSpeed : 1);
+    awayShiftTimerRef.current += dt * (standaloneControls ? simSpeed : 1);
+    if (homeShiftTimerRef.current >= 15) {
       const nextHome = (activeHomeLineRef.current % 4) + 1;
       switchForwardLine("home", nextHome);
     }
-    if (awayShiftTimerRef.current >= 38) {
+    if (awayShiftTimerRef.current >= 14) {
       const nextAway = (activeAwayLineRef.current % 4) + 1;
       switchForwardLine("away", nextAway);
+    }
+
+    // Automatic defense pair rotations (every ~24-26s of action)
+    homeDefShiftTimerRef.current += dt * (standaloneControls ? simSpeed : 1);
+    awayDefShiftTimerRef.current += dt * (standaloneControls ? simSpeed : 1);
+    if (homeDefShiftTimerRef.current >= 26) {
+      const nextHomeDef = (activeHomeDefRef.current % 3) + 1;
+      switchDefensePair("home", nextHomeDef);
+    }
+    if (awayDefShiftTimerRef.current >= 24) {
+      const nextAwayDef = (activeAwayDefRef.current % 3) + 1;
+      switchDefensePair("away", nextAwayDef);
+    }
+
+    // Bench UI refresh timer: keeps shift seconds & stamina live on screen
+    benchTimerRef.current += dt;
+    if (benchTimerRef.current >= 0.5) {
+      benchTimerRef.current = 0;
+      setBenchVersion((v) => (v + 1) % 100000);
     }
 
     const awayLw = players.find((p) => p.id === "away-lw")!;
@@ -1485,7 +1616,7 @@ export default function LiveRinkTracker({
         setGameClockSeconds((sec) => Math.max(0, sec - 1));
       }
     }
-  }, [isPlaying, simSpeed, isShortenBench, isPullGoalie, playSound, addCommentary, triggerGoal, standaloneControls, isLive, awayTeamName, homeTeamName, switchForwardLine]);
+  }, [isPlaying, simSpeed, isShortenBench, isPullGoalie, playSound, addCommentary, triggerGoal, standaloneControls, isLive, awayTeamName, homeTeamName, switchForwardLine, switchDefensePair]);
 
   // ANIMATION LOOP
   useEffect(() => {
@@ -1696,8 +1827,15 @@ export default function LiveRinkTracker({
   const displayXgAway = Math.max(0.05, displaySogAway * 0.075).toFixed(2);
   const displayXgHome = Math.max(0.05, displaySogHome * 0.075).toFixed(2);
 
-  const awaySkaters = playersRef.current.filter((p) => p.team === "away" && !p.isGoalie);
-  const homeSkaters = playersRef.current.filter((p) => p.team === "home" && !p.isGoalie && p.id !== "home-extra");
+  const awaySkaters = useMemo(() => {
+    return playersRef.current.filter((p) => p.team === "away" && !p.isGoalie);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [benchVersion, activeAwayLine, activeAwayDef]);
+
+  const homeSkaters = useMemo(() => {
+    return playersRef.current.filter((p) => p.team === "home" && !p.isGoalie && p.id !== "home-extra");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [benchVersion, activeHomeLine, activeHomeDef]);
 
   return (
     <div className="w-full flex flex-col gap-3 font-sans select-none text-slate-100">

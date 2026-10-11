@@ -104,28 +104,39 @@ async function getTeamMatchup(teamId: number, fallbackName: string) {
     });
   }
 
-  // Defense Pair 1
+  // Defense Pairs (up to 3)
   const usedDefIds = new Set<number>();
-  const dp = linesData?.defensePairs?.[0];
-  let ld = dp?.ld ? playerMap.get(dp.ld) : null;
-  if (!ld) ld = defensemen[0] || rawPlayers.find((p) => !p.isGoalie && !usedFwdIds.has(p.id));
-  if (ld) usedDefIds.add(ld.id);
+  const defensePairs = [];
+  for (let i = 0; i < 3; i++) {
+    const dp = linesData?.defensePairs?.[i];
+    let ld = dp?.ld ? playerMap.get(dp.ld) : null;
+    if (!ld || usedDefIds.has(ld.id)) {
+      ld = defensemen.find((d) => !usedDefIds.has(d.id)) || rawPlayers.find((p) => !p.isGoalie && !usedFwdIds.has(p.id) && !usedDefIds.has(p.id));
+    }
+    if (ld) usedDefIds.add(ld.id);
 
-  let rd = dp?.rd ? playerMap.get(dp.rd) : null;
-  if (!rd || usedDefIds.has(rd.id)) {
-    rd = defensemen.find((d) => !usedDefIds.has(d.id)) || rawPlayers.find((p) => !p.isGoalie && !usedFwdIds.has(p.id) && !usedDefIds.has(p.id));
+    let rd = dp?.rd ? playerMap.get(dp.rd) : null;
+    if (!rd || usedDefIds.has(rd.id)) {
+      rd = defensemen.find((d) => !usedDefIds.has(d.id)) || rawPlayers.find((p) => !p.isGoalie && !usedFwdIds.has(p.id) && !usedDefIds.has(p.id));
+    }
+    if (rd) usedDefIds.add(rd.id);
+
+    defensePairs.push({
+      num: i + 1,
+      ld: {
+        name: ld ? formatShortName(ld.name) : `LD ${i + 1}`,
+        num: String(ld?.number ?? (i * 2 + 4)),
+      },
+      rd: {
+        name: rd ? formatShortName(rd.name) : `RD ${i + 1}`,
+        num: String(rd?.number ?? (i * 2 + 5)),
+      },
+    });
   }
-  if (rd) usedDefIds.add(rd.id);
 
-  const defense = {
-    ld: {
-      name: ld ? formatShortName(ld.name) : "LD",
-      num: String(ld?.number ?? 4),
-    },
-    rd: {
-      name: rd ? formatShortName(rd.name) : "RD",
-      num: String(rd?.number ?? 5),
-    },
+  const defense = defensePairs[0] || {
+    ld: { name: "LD", num: "4" },
+    rd: { name: "RD", num: "5" },
   };
 
   // Goalie
@@ -152,6 +163,7 @@ async function getTeamMatchup(teamId: number, fallbackName: string) {
     logoUrl: team?.logoUrl || null,
     forwardLines,
     defense,
+    defensePairs,
     goalie,
     extra,
   };
