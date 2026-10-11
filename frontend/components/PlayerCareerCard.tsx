@@ -62,7 +62,7 @@ function SkaterSection({ title, rows, isPlayoff, lang = "en" }: { title: string;
               <th className="px-3 py-2.5 text-right font-medium">G</th>
               <th className="px-3 py-2.5 text-right font-medium">A</th>
               <th className="px-3 py-2.5 text-right font-medium">PTS</th>
-              <th className="px-3 py-2.5 text-right font-medium">+/-</th>
+              <th className="px-3 py-2.5 text-right font-medium" title="Even-strength (5v5) plus/minus. Seasons played before 2026-27 use the NHL rule (even strength + short-handed).">+/-</th>
               <th className="px-3 py-2.5 text-right font-medium">PIM</th>
               <th className="px-3 py-2.5 text-right font-medium">S</th>
               <th className="px-3 py-2.5 text-right font-medium">S%</th>
@@ -122,6 +122,7 @@ function SkaterSection({ title, rows, isPlayoff, lang = "en" }: { title: string;
           </tbody>
         </table>
       </div>
+      <p className="px-3 py-2 text-[11px] text-slate-500">+/- is even-strength (5v5). Seasons before 2026-27 use the NHL rule (even strength + short-handed).</p>
     </div>
   );
 }

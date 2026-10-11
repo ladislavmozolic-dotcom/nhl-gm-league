@@ -673,8 +673,9 @@ function recordGoal(
   if (strength === "PP") st.box[off.id].ppGoals++;
   st.box[off.id].goalsByPeriod[Math.min(period, 4) - 1]++; // every OT period folds into the OT column
 
-  // +/- : even-strength AND short-handed goals count (real NHL rule); PP and SO don't.
-  if (strength === "EV" || strength === "SH") {
+  // +/- is the league's even-strength +/- (5v5): only EV goals with the net occupied count — no PP, SH, empty-net or SO.
+  // This is the same definition the Stats pages reconstruct from the goal log, so every page shows one number.
+  if (strength === "EV" && !emptyNet) {
     for (const s of onFor) st.lines[off.id][s.id].plusMinus += 1;
     for (const s of onAgainst) st.lines[def.id][s.id].plusMinus -= 1;
   }
