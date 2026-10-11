@@ -224,10 +224,13 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       {/* 3. 2D RINK TRACKER */}
       {showRink && (
         <LiveRinkTracker
+          gameId={gameId}
+          homeTeamId={home.id}
+          awayTeamId={away.id}
           homeTeamName={home.name}
           awayTeamName={away.name}
-          homeLogoUrl={logos[home.id] || "/NHLlogos/new_jersey_devils.png"}
-          awayLogoUrl={logos[away.id] || "/NHLlogos/new_york_rangers.png"}
+          homeLogoUrl={logos[home.id] || ""}
+          awayLogoUrl={logos[away.id] || ""}
           homeScore={view && view.status !== "pending" ? view.score.home : 0}
           awayScore={view && view.status !== "pending" ? view.score.away : 0}
           homeSog={view && view.status !== "pending" ? view.shots.home : 0}

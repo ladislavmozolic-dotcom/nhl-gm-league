@@ -3,7 +3,17 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import type { SimEvent } from "@/lib/sim/events";
 
+export interface ForwardLineData {
+  num: number;
+  lw: { name: string; num: string };
+  c: { name: string; num: string };
+  rw: { name: string; num: string };
+}
+
 export interface LiveRinkTrackerProps {
+  gameId?: number;
+  homeTeamId?: number;
+  awayTeamId?: number;
   homeTeamName?: string;
   awayTeamName?: string;
   homeLogoUrl?: string;
@@ -129,10 +139,13 @@ const INITIAL_PLAYERS: Player[] = [
 ];
 
 export default function LiveRinkTracker({
+  gameId,
+  homeTeamId,
+  awayTeamId,
   homeTeamName = "Domáci",
   awayTeamName = "Hostia",
-  homeLogoUrl = "/NHLlogos/new_jersey_devils.png",
-  awayLogoUrl = "/NHLlogos/new_york_rangers.png",
+  homeLogoUrl = "",
+  awayLogoUrl = "",
   homeScore = 0,
   awayScore = 0,
   homeSog = 0,
@@ -191,6 +204,12 @@ export default function LiveRinkTracker({
   const awayShiftTimerRef = useRef(0);
   const [tacticsDrawerOpen, setTacticsDrawerOpen] = useState(false);
 
+  // Dynamic Lines Data
+  const [awayForwardLines, setAwayForwardLines] = useState<ForwardLineData[]>(AWAY_FORWARD_LINES);
+  const [homeForwardLines, setHomeForwardLines] = useState<ForwardLineData[]>(HOME_FORWARD_LINES);
+  const awayForwardLinesRef = useRef<ForwardLineData[]>(AWAY_FORWARD_LINES);
+  const homeForwardLinesRef = useRef<ForwardLineData[]>(HOME_FORWARD_LINES);
+
   // HUD and Commentaries
   const [puckCarrierName, setPuckCarrierName] = useState(awayTeamName + " (#10)");
   const [zoneText, setZoneText] = useState("⚡ SÚBOJ V STREDNOM PÁSME");
@@ -202,6 +221,60 @@ export default function LiveRinkTracker({
 
   // Simulation Refs
   const playersRef = useRef<Player[]>(JSON.parse(JSON.stringify(INITIAL_PLAYERS)));
+
+  // Load real team lines and rosters for both teams
+  useEffect(() => {
+    if (!gameId && !homeTeamId && !awayTeamId) return;
+
+    const url = gameId
+      ? `/api/live/games/${gameId}/matchup?homeTeamId=${homeTeamId || ""}&awayTeamId=${awayTeamId || ""}`
+      : `/api/live/games/0/matchup?homeTeamId=${homeTeamId || ""}&awayTeamId=${awayTeamId || ""}`;
+
+    fetch(url)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.home || !data?.away) return;
+        const homeM = data.home;
+        const awayM = data.away;
+
+        if (homeM.forwardLines?.length) {
+          setHomeForwardLines(homeM.forwardLines);
+          homeForwardLinesRef.current = homeM.forwardLines;
+        }
+        if (awayM.forwardLines?.length) {
+          setAwayForwardLines(awayM.forwardLines);
+          awayForwardLinesRef.current = awayM.forwardLines;
+        }
+
+        // Apply real names and jersey numbers to active players
+        const hLine1 = homeM.forwardLines?.[0];
+        const aLine1 = awayM.forwardLines?.[0];
+
+        playersRef.current.forEach((p) => {
+          if (p.id === "away-lw" && aLine1?.lw) { p.name = aLine1.lw.name; p.num = aLine1.lw.num; }
+          if (p.id === "away-c"  && aLine1?.c)  { p.name = aLine1.c.name;  p.num = aLine1.c.num; }
+          if (p.id === "away-rw" && aLine1?.rw) { p.name = aLine1.rw.name; p.num = aLine1.rw.num; }
+          if (p.id === "away-ld" && awayM.defense?.ld) { p.name = awayM.defense.ld.name; p.num = awayM.defense.ld.num; }
+          if (p.id === "away-rd" && awayM.defense?.rd) { p.name = awayM.defense.rd.name; p.num = awayM.defense.rd.num; }
+          if (p.id === "away-g"  && awayM.goalie) { p.name = awayM.goalie.name; p.num = awayM.goalie.num; }
+
+          if (p.id === "home-lw" && hLine1?.lw) { p.name = hLine1.lw.name; p.num = hLine1.lw.num; }
+          if (p.id === "home-c"  && hLine1?.c)  { p.name = hLine1.c.name;  p.num = hLine1.c.num; }
+          if (p.id === "home-rw" && hLine1?.rw) { p.name = hLine1.rw.name; p.num = hLine1.rw.num; }
+          if (p.id === "home-ld" && homeM.defense?.ld) { p.name = homeM.defense.ld.name; p.num = homeM.defense.ld.num; }
+          if (p.id === "home-rd" && homeM.defense?.rd) { p.name = homeM.defense.rd.name; p.num = homeM.defense.rd.num; }
+          if (p.id === "home-g"  && homeM.goalie) { p.name = homeM.goalie.name; p.num = homeM.goalie.num; }
+          if (p.id === "home-extra" && homeM.extra) { p.name = homeM.extra.name; p.num = homeM.extra.num; }
+        });
+
+        if (aLine1?.c) {
+          setPuckCarrierName(`${aLine1.c.name} (${awayTeamName})`);
+        }
+      })
+      .catch((err) => {
+        console.warn("Failed to load matchup lines:", err);
+      });
+  }, [gameId, homeTeamId, awayTeamId, awayTeamName]);
   const puckRef = useRef<Puck>({
     x: 0.50,
     y: 0.50,
@@ -323,7 +396,10 @@ export default function LiveRinkTracker({
 
   // Load home logo for center ice
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !homeLogoUrl) {
+      centerLogoRef.current = null;
+      return;
+    }
     const img = new Image();
     img.src = homeLogoUrl;
     centerLogoRef.current = img;
@@ -334,7 +410,8 @@ export default function LiveRinkTracker({
       setActiveHomeLine(lineNum);
       activeHomeLineRef.current = lineNum;
       homeShiftTimerRef.current = 0;
-      const lineData = HOME_FORWARD_LINES[lineNum - 1] || HOME_FORWARD_LINES[0];
+      const lines = homeForwardLinesRef.current;
+      const lineData = lines[lineNum - 1] || lines[0] || HOME_FORWARD_LINES[0];
       const lw = playersRef.current.find((p) => p.id === "home-lw");
       const c  = playersRef.current.find((p) => p.id === "home-c");
       const rw = playersRef.current.find((p) => p.id === "home-rw");
@@ -346,7 +423,8 @@ export default function LiveRinkTracker({
       setActiveAwayLine(lineNum);
       activeAwayLineRef.current = lineNum;
       awayShiftTimerRef.current = 0;
-      const lineData = AWAY_FORWARD_LINES[lineNum - 1] || AWAY_FORWARD_LINES[0];
+      const lines = awayForwardLinesRef.current;
+      const lineData = lines[lineNum - 1] || lines[0] || AWAY_FORWARD_LINES[0];
       const lw = playersRef.current.find((p) => p.id === "away-lw");
       const c  = playersRef.current.find((p) => p.id === "away-c");
       const rw = playersRef.current.find((p) => p.id === "away-rw");
@@ -389,21 +467,24 @@ export default function LiveRinkTracker({
   }, [events, standaloneControls, playSound, addCommentary, switchForwardLine]);
 
   // Goal trigger
-  const triggerGoal = useCallback((scorerName = "Mika Zibanejad", teamName = "NYR") => {
+  const triggerGoal = useCallback((scorerName?: string, teamName?: string) => {
+    const sTeam = teamName || awayTeamName;
+    const defaultScorer = awayForwardLinesRef.current[0]?.c?.name || "Útočník";
+    const sName = scorerName || defaultScorer;
     setScoreAwayState((s) => s + 1);
     playSound("horn");
 
-    setGoalOverlay({ visible: true, text: `GÓL! ${scorerName.toUpperCase()} (${teamName})` });
+    setGoalOverlay({ visible: true, text: `GÓL! ${sName.toUpperCase()} (${sTeam})` });
     setTimeout(() => {
       setGoalOverlay({ visible: false, text: "" });
     }, 2600);
 
-    addCommentary("GÓL 🚨", "border-red-500", "bg-red-600 text-white font-black", `${scorerName} (${teamName}) posiela puk z prvej do šibenice!`);
+    addCommentary("GÓL 🚨", "border-red-500", "bg-red-600 text-white font-black", `${sName} (${sTeam}) posiela puk z prvej do šibenice!`);
     const nextHome = (activeHomeLineRef.current % 4) + 1;
     const nextAway = (activeAwayLineRef.current % 4) + 1;
     switchForwardLine("home", nextHome);
     switchForwardLine("away", nextAway);
-  }, [playSound, addCommentary, switchForwardLine]);
+  }, [awayTeamName, playSound, addCommentary, switchForwardLine]);
 
   // DRAW HOCKEY NET
   const drawGoalNet = (ctx: CanvasRenderingContext2D, gx: number, isLeft: boolean, w: number, h: number) => {
