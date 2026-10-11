@@ -270,6 +270,32 @@ export default function LiveRinkTracker({
     centerLogoRef.current = img;
   }, [homeLogoUrl]);
 
+  // Process real match live events if connected to engine
+  const seenEventSeqsRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (standaloneControls || !events?.length) return;
+    for (const ev of events) {
+      if (seenEventSeqsRef.current.has(ev.seq)) continue;
+      seenEventSeqsRef.current.add(ev.seq);
+
+      if (ev.type === "GOAL") {
+        playSound("horn");
+        const tCode = ev.teamCode || (ev.teamId ? "TÍM" : "");
+        const scorer = ev.playerName || "Hráč";
+        setGoalOverlay({ visible: true, text: `🚨 GÓÓÓL! ${scorer.toUpperCase()} ${tCode ? `(${tCode})` : ""}` });
+        setTimeout(() => setGoalOverlay({ visible: false, text: "" }), 3000);
+        addCommentary("GÓL 🚨", "border-red-500", "bg-red-600 text-white font-black", `${scorer} ${tCode ? `(${tCode})` : ""} dáva gól!`);
+      } else if (ev.type === "SHOT" || ev.type === "SAVE") {
+        playSound("shot");
+        if (ev.playerName) {
+          addCommentary("STRELA ⚡", "border-sky-500", "bg-sky-500/20 text-sky-300", `${ev.playerName} zakončuje na bránku!`);
+        }
+      } else if (ev.type === "PENALTY") {
+        addCommentary("TREST 🛑", "border-amber-500", "bg-amber-500/20 text-amber-300", `Vylúčenie: ${ev.playerName || "Hráč"} (${ev.targetName || "2 min"})`);
+      }
+    }
+  }, [events, standaloneControls, playSound, addCommentary]);
+
   // Goal trigger
   const triggerGoal = useCallback((scorerName = "Mika Zibanejad", teamName = "NYR") => {
     setScoreAwayState((s) => s + 1);
@@ -1036,6 +1062,15 @@ export default function LiveRinkTracker({
   const clockSecs = (gameClockSeconds % 60).toString().padStart(2, "0");
   const displayClock = `${clockMins}:${clockSecs}`;
 
+  const displayScoreAway = standaloneControls ? scoreAwayState : awayScore;
+  const displayScoreHome = standaloneControls ? scoreHomeState : homeScore;
+  const displaySogAway = standaloneControls ? sogAwayState : awaySog;
+  const displaySogHome = standaloneControls ? sogHomeState : homeSog;
+  const displayClockStr = standaloneControls ? displayClock : (clockStr || "20:00");
+  const displayPeriodStr = standaloneControls ? periodStr : (periodStr || "1. Tretina");
+  const displayXgAway = Math.max(0.05, displaySogAway * 0.075).toFixed(2);
+  const displayXgHome = Math.max(0.05, displaySogHome * 0.075).toFixed(2);
+
   const awaySkaters = playersRef.current.filter((p) => p.team === "away" && !p.isGoalie);
   const homeSkaters = playersRef.current.filter((p) => p.team === "home" && !p.isGoalie && p.id !== "njd-extra");
 
@@ -1052,8 +1087,8 @@ export default function LiveRinkTracker({
             <div>
               <h2 className="text-lg md:text-xl font-black text-white">{awayTeamName}</h2>
               <div className="flex items-center gap-2 text-xs text-slate-300 mt-1">
-                <span className="bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">Strely: <strong className="text-white font-mono">{sogAwayState}</strong></span>
-                <span className="bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">xG: <strong className="text-sky-300 font-mono">1.84</strong></span>
+                <span className="bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">Strely: <strong className="text-white font-mono">{displaySogAway}</strong></span>
+                <span className="bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">xG: <strong className="text-sky-300 font-mono">{displayXgAway}</strong></span>
               </div>
             </div>
           </div>
@@ -1061,12 +1096,12 @@ export default function LiveRinkTracker({
           {/* Score Capsule */}
           <div className="flex flex-col items-center justify-center">
             <div className="flex items-center gap-4">
-              <span className="text-4xl md:text-6xl font-black font-mono tabular-nums text-white drop-shadow">{scoreAwayState}</span>
+              <span className="text-4xl md:text-6xl font-black font-mono tabular-nums text-white drop-shadow">{displayScoreAway}</span>
               <div className="flex flex-col items-center px-4 py-1.5 bg-[#01040a] rounded-xl border border-slate-700 shadow-inner">
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 animate-pulse">{periodStr}</span>
-                <span className="font-mono text-2xl md:text-3xl font-black text-amber-400">{displayClock}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 animate-pulse">{displayPeriodStr}</span>
+                <span className="font-mono text-2xl md:text-3xl font-black text-amber-400">{displayClockStr}</span>
               </div>
-              <span className="text-4xl md:text-6xl font-black font-mono tabular-nums text-white drop-shadow">{scoreHomeState}</span>
+              <span className="text-4xl md:text-6xl font-black font-mono tabular-nums text-white drop-shadow">{displayScoreHome}</span>
             </div>
             <div className="mt-2 text-[11px] font-bold px-3 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300">
               {isPullGoalie ? <span className="text-red-400 font-black animate-pulse">🚨 EMPTY NET (6 NA 5)</span> : "Rovnovážny stav 5 na 5"}
@@ -1078,8 +1113,8 @@ export default function LiveRinkTracker({
             <div>
               <h2 className="text-lg md:text-xl font-black text-white">{homeTeamName}</h2>
               <div className="flex items-center justify-end gap-2 text-xs text-slate-300 mt-1">
-                <span className="bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">xG: <strong className="text-red-300 font-mono">1.32</strong></span>
-                <span className="bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">Strely: <strong className="text-white font-mono">{sogHomeState}</strong></span>
+                <span className="bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">xG: <strong className="text-red-300 font-mono">{displayXgHome}</strong></span>
+                <span className="bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700">Strely: <strong className="text-white font-mono">{displaySogHome}</strong></span>
               </div>
             </div>
             <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-red-500/60 p-2 flex items-center justify-center shadow-lg">
