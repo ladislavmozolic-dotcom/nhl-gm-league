@@ -79,13 +79,17 @@ function SkaterSection({ title, rows, isPlayoff, lang = "en" }: { title: string;
                 <tr key={i} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/20">
                   <td className="px-3 py-2.5 text-left font-medium">{r.season}</td>
                   <td className="px-3 py-2.5 text-left">
-                    {r.teamSlug ? (
-                      <Link href={`/teams/${r.teamSlug}`} className="hover:text-blue-400 font-medium">
-                        {r.teamCode ?? "—"}
-                      </Link>
-                    ) : (
-                      <span className="font-medium text-slate-400">{r.teamCode ?? "—"}</span>
-                    )}
+                    <span className="inline-flex items-center gap-2">
+                      {/* plain <img>: team logos are served outside the Next image optimizer */}
+                      {r.teamLogo && <img src={r.teamLogo} alt="" className="h-5 w-5 object-contain" />}
+                      {r.teamSlug ? (
+                        <Link href={`/teams/${r.teamSlug}`} className="hover:text-blue-400 font-medium">
+                          {r.teamCode ?? "—"}
+                        </Link>
+                      ) : (
+                        <span className="font-medium text-slate-400">{r.teamCode ?? "—"}</span>
+                      )}
+                    </span>
                   </td>
                   <td className={cellCls}>{r.gp}</td>
                   <td className={`${cellCls} font-semibold text-white`}>{r.goals}</td>
@@ -181,13 +185,16 @@ function GoalieSection({ title, rows, isPlayoff, lang = "en" }: { title: string;
               <tr key={i} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/20">
                 <td className="px-3 py-2.5 text-left font-medium">{r.season}</td>
                 <td className="px-3 py-2.5 text-left">
-                  {r.teamSlug ? (
-                    <Link href={`/teams/${r.teamSlug}`} className="hover:text-blue-400 font-medium">
-                      {r.teamCode ?? "—"}
-                    </Link>
-                  ) : (
-                    <span className="font-medium text-slate-400">{r.teamCode ?? "—"}</span>
-                  )}
+                  <span className="inline-flex items-center gap-2">
+                    {r.teamLogo && <img src={r.teamLogo} alt="" className="h-5 w-5 object-contain" />}
+                    {r.teamSlug ? (
+                      <Link href={`/teams/${r.teamSlug}`} className="hover:text-blue-400 font-medium">
+                        {r.teamCode ?? "—"}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-slate-400">{r.teamCode ?? "—"}</span>
+                    )}
+                  </span>
                 </td>
                 <td className={cellCls}>{r.gp}</td>
                 <td className={`${cellCls} font-semibold text-white`}>{r.wins}</td>

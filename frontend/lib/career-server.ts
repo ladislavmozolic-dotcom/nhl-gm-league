@@ -74,8 +74,8 @@ export async function archiveSeasonStats(season: string, league = "NHL"): Promis
 
 // ---------- player career ----------
 
-export type CareerSkaterRow = { season: string; league: string; isPlayoff: boolean; teamCode: string | null; teamSlug: string | null; gp: number; goals: number; assists: number; points: number; pim: number; plusMinus: number; shots: number; hits: number; blocks: number };
-export type CareerGoalieRow = { season: string; league: string; isPlayoff: boolean; teamCode: string | null; teamSlug: string | null; gp: number; wins: number; losses: number; otl: number; shutouts: number; shotsAgainst: number; saves: number; goalsAgainst: number; svPct: number; gaa: number };
+export type CareerSkaterRow = { season: string; league: string; isPlayoff: boolean; teamCode: string | null; teamSlug: string | null; teamLogo?: string | null; gp: number; goals: number; assists: number; points: number; pim: number; plusMinus: number; shots: number; hits: number; blocks: number };
+export type CareerGoalieRow = { season: string; league: string; isPlayoff: boolean; teamCode: string | null; teamSlug: string | null; teamLogo?: string | null; gp: number; wins: number; losses: number; otl: number; shutouts: number; shotsAgainst: number; saves: number; goalsAgainst: number; svPct: number; gaa: number };
 export type PlayerCareer = {
   isGoalie: boolean;
   skater: CareerSkaterRow[];
@@ -85,13 +85,13 @@ export type PlayerCareer = {
   goalieTotals: { gp: number; wins: number; shutouts: number; svPct: number; gaa: number } | null;
 };
 
-const teamMap = async () => new Map((await prisma.team.findMany({ select: { id: true, code: true, name: true, slug: true } })).map((t) => [t.id, t]));
+const teamMap = async () => new Map((await prisma.team.findMany({ select: { id: true, code: true, name: true, slug: true, logoUrl: true, league: true } })).map((t) => [t.id, t]));
 
 export async function playerCareer(playerId: number): Promise<PlayerCareer> {
-  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { position: true, name: true } });
+  const p = await prisma.player.findUnique({ where: { id: playerId }, select: { position: true, name: true, teamId: true, rosterType: true } });
   const isGoalie = (p?.position ?? "") === "G";
   const tm = await teamMap();
-  const tc = (id: number) => { const t = tm.get(id); return { code: t?.code ?? t?.name ?? null, slug: t?.slug ?? null }; };
+  const tc = (id: number) => { const t = tm.get(id); return { code: t?.code ?? t?.name ?? null, slug: t?.slug ?? null, logo: t?.logoUrl ?? null }; };
 
   const skater: CareerSkaterRow[] = [];
   const goalie: CareerGoalieRow[] = [];
@@ -109,6 +109,20 @@ export async function playerCareer(playerId: number): Promise<PlayerCareer> {
     for (const r of archived) skater.push(mkSkaterRow(r, tc(r.teamId)));
     for (const league of ["NHL", "AHL"]) for (const isPlayoff of [false, true]) {
       for (const live of await liveSkater(playerId, ACTIVE_SEASON, league, isPlayoff)) skater.push(mkSkaterRow({ ...live, season: ACTIVE_SEASON, league, isPlayoff }, tc(live.teamId)));
+    }
+  }
+
+  // A player traded this season who hasn't dressed for his new club yet still gets that club's row (zeros),
+  // so the history reads "PIT 6 GP" then "MTL 0 GP" instead of hiding the move.
+  const curTeam = p?.rosterType === "NHL" && p.teamId != null ? tm.get(p.teamId) : undefined;
+  if (curTeam && curTeam.league === "NHL") {
+    const sameBucket = (r: { season: string; league: string; isPlayoff: boolean }) => r.season === ACTIVE_SEASON && r.league === "NHL" && !r.isPlayoff;
+    const rows = isGoalie ? goalie : skater;
+    if (rows.some(sameBucket) && !rows.some((r) => sameBucket(r) && r.teamSlug === curTeam.slug)) {
+      const zero = { season: ACTIVE_SEASON, league: "NHL", isPlayoff: false, gp: 0 };
+      const t = { code: curTeam.code, slug: curTeam.slug, logo: curTeam.logoUrl ?? null };
+      if (isGoalie) goalie.push(mkGoalieRow({ ...zero, wins: 0, losses: 0, otl: 0, shutouts: 0, shotsAgainst: 0, saves: 0, goalsAgainst: 0 }, t));
+      else skater.push(mkSkaterRow({ ...zero, goals: 0, assists: 0, points: 0, pim: 0, plusMinus: 0, shots: 0, hits: 0, blocks: 0 }, t));
     }
   }
 
@@ -130,11 +144,11 @@ export async function playerCareer(playerId: number): Promise<PlayerCareer> {
   return { isGoalie, skater, goalie, awards, totals, goalieTotals };
 }
 
-function mkSkaterRow(r: { season: string; league: string; isPlayoff: boolean; gp: number; goals: number; assists: number; points: number; pim: number; plusMinus: number; shots: number; hits: number; blocks: number }, t: { code: string | null; slug: string | null }): CareerSkaterRow {
-  return { season: r.season, league: r.league, isPlayoff: r.isPlayoff, teamCode: t.code, teamSlug: t.slug, gp: r.gp, goals: r.goals, assists: r.assists, points: r.points, pim: r.pim, plusMinus: r.plusMinus, shots: r.shots, hits: r.hits, blocks: r.blocks };
+function mkSkaterRow(r: { season: string; league: string; isPlayoff: boolean; gp: number; goals: number; assists: number; points: number; pim: number; plusMinus: number; shots: number; hits: number; blocks: number }, t: { code: string | null; slug: string | null; logo?: string | null }): CareerSkaterRow {
+  return { season: r.season, league: r.league, isPlayoff: r.isPlayoff, teamCode: t.code, teamSlug: t.slug, teamLogo: t.logo ?? null, gp: r.gp, goals: r.goals, assists: r.assists, points: r.points, pim: r.pim, plusMinus: r.plusMinus, shots: r.shots, hits: r.hits, blocks: r.blocks };
 }
-function mkGoalieRow(r: { season: string; league: string; isPlayoff: boolean; gp: number; wins: number; losses: number; otl: number; shutouts: number; shotsAgainst: number; saves: number; goalsAgainst: number }, t: { code: string | null; slug: string | null }): CareerGoalieRow {
-  return { season: r.season, league: r.league, isPlayoff: r.isPlayoff, teamCode: t.code, teamSlug: t.slug, gp: r.gp, wins: r.wins, losses: r.losses, otl: r.otl, shutouts: r.shutouts, shotsAgainst: r.shotsAgainst, saves: r.saves, goalsAgainst: r.goalsAgainst, svPct: r.shotsAgainst ? r.saves / r.shotsAgainst : 0, gaa: r.gp ? r.goalsAgainst / r.gp : 0 };
+function mkGoalieRow(r: { season: string; league: string; isPlayoff: boolean; gp: number; wins: number; losses: number; otl: number; shutouts: number; shotsAgainst: number; saves: number; goalsAgainst: number }, t: { code: string | null; slug: string | null; logo?: string | null }): CareerGoalieRow {
+  return { season: r.season, league: r.league, isPlayoff: r.isPlayoff, teamCode: t.code, teamSlug: t.slug, teamLogo: t.logo ?? null, gp: r.gp, wins: r.wins, losses: r.losses, otl: r.otl, shutouts: r.shutouts, shotsAgainst: r.shotsAgainst, saves: r.saves, goalsAgainst: r.goalsAgainst, svPct: r.shotsAgainst ? r.saves / r.shotsAgainst : 0, gaa: r.gp ? r.goalsAgainst / r.gp : 0 };
 }
 
 async function liveSkater(playerId: number, season: string, league: string, isPlayoff: boolean) {
