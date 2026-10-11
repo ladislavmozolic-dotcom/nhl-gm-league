@@ -6,6 +6,19 @@ import type { SimEvent } from "./events";
 export type LiveLine = { seq: number; period: number; seconds: number; teamId?: number; /** set when this line means a skater has left the game */ outPlayerId?: number; /** replaces the period/clock label (e.g. "SO") */ tag?: string; kind: "goal" | "penalty" | "save" | "note" | "period"; major: boolean; text: string };
 
 export const fmtClock = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+
+/**
+ * Game clock countdown (časomiera odpočítavajúca od 20:00 do 0:00, v predĺžení od 5:00 do 0:00).
+ * `elapsedSecondsInPeriod` are elapsed game seconds in the active period.
+ */
+export function fmtRemainingClock(elapsedSecondsInPeriod: number, period: number = 1, isPlayoff: boolean = false): string {
+  const periodDuration = period >= 4 && !isPlayoff ? 300 : 1200;
+  const remaining = Math.max(0, periodDuration - Math.floor(elapsedSecondsInPeriod));
+  const mins = Math.floor(remaining / 60);
+  const secs = (remaining % 60).toString().padStart(2, "0");
+  return `${mins}:${secs}`;
+}
+
 export const periodLabel = (p: number) => (p <= 3 ? `${p}${["st", "nd", "rd"][p - 1]}` : p === 4 ? "OT" : `${p - 3}OT`);
 
 type Meta = Record<string, unknown> | undefined;

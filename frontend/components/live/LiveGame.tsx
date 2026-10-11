@@ -7,7 +7,7 @@ import LiveBoard from "./LiveBoard";
 import CoachPanel from "./CoachPanel";
 import LiveRinkTracker from "./LiveRinkTracker";
 import LiveBoxscore, { type LiveGoalItem, type LivePenaltyItem } from "./LiveBoxscore";
-import { describeLiveEvents, fmtClock, periodLabel, type LiveLine } from "@/lib/sim/live-text";
+import { describeLiveEvents, fmtClock, fmtRemainingClock, periodLabel, type LiveLine } from "@/lib/sim/live-text";
 import type { SimEvent } from "@/lib/sim/events";
 import type { GoalieInfo } from "@/lib/sim/live";
 
@@ -162,7 +162,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
   const status = !view ? "Loading…" : view.status === "pending" ? `Puck drops in ${Math.max(0, Math.ceil(countdown / 1000))}s`
     : view.status === "final" ? (view.endedIn && view.endedIn !== "REG" ? `Final/${view.endedIn}` : "Final")
     : view.shootout ? `Shootout · ${view.shootout.away}–${view.shootout.home}`
-    : `${periodLabel(view.period)} · ${fmtClock(view.clock)}`;
+    : `${periodLabel(view.period)} · ${fmtRemainingClock(view.clock, view.period)}`;
   return (
     <div className="space-y-4 w-full">
       {/* 1. TOP TICKER: Live scoreboard / Tonight around the league */}
@@ -236,7 +236,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
           homeSog={view && view.status !== "pending" ? view.shots.home : 0}
           awaySog={view && view.status !== "pending" ? view.shots.away : 0}
           periodStr={view ? periodLabel(view.period) : "1. Tretina"}
-          clockStr={view ? fmtClock(view.clock) : "20:00"}
+          clockStr={view ? (view.status === "final" ? "0:00" : view.shootout ? "SO" : fmtRemainingClock(view.clock, view.period)) : "20:00"}
           isLive={view?.status === "live"}
           standaloneControls={false}
           events={view?.events ?? []}

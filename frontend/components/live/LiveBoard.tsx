@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePoll, useServerNow } from "./useLive";
+import { fmtRemainingClock } from "@/lib/sim/live-text";
 
 type Row = {
   gameId: number; league: string | null;
@@ -12,14 +13,13 @@ type Row = {
 };
 type Board = { now: number; live: { round: number; title: string; playoff: boolean; season: string; startsAt: number; status: "running" | "finished"; games: Row[] } | null };
 
-const clock = (s: number) => `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
 const per = (p: number) => (p <= 3 ? `${p}${["st", "nd", "rd"][p - 1]}` : p === 4 ? "OT" : `${p - 3}OT`);
 
 function statusText(r: Row) {
   if (r.status === "pending") return "Starting soon";
   if (r.status === "live" && r.shootout) return `Shootout ${r.shootout.away}–${r.shootout.home}`;
   if (r.status === "final") return r.endedIn && r.endedIn !== "REG" ? `Final/${r.endedIn}` : "Final";
-  return r.clock <= 0.5 && r.period > 1 ? `Start ${per(r.period)}` : `${per(r.period)} ${clock(r.clock)}`;
+  return r.clock <= 0.5 && r.period > 1 ? `Start ${per(r.period)}` : `${per(r.period)} ${fmtRemainingClock(r.clock, r.period)}`;
 }
 
 /** The live scoreboard — every game of tonight's round at once. Supports grid, vertical (sidebar) and horizontal (top ticker). */

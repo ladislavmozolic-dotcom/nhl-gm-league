@@ -189,11 +189,14 @@ export default function LiveRinkTracker({
   // Keep clock synced
   useEffect(() => {
     if (!standaloneControls && clockStr) {
+      if (clockStr === "SO" || clockStr === "Final") return;
       const parts = clockStr.split(":");
       if (parts.length === 2) {
-        const m = parseInt(parts[0], 10) || 0;
-        const s = parseInt(parts[1], 10) || 0;
-        setGameClockSeconds(m * 60 + s);
+        const m = parseInt(parts[0], 10);
+        const s = parseInt(parts[1], 10);
+        if (!isNaN(m) && !isNaN(s)) {
+          setGameClockSeconds(m * 60 + s);
+        }
       }
     }
   }, [clockStr, standaloneControls]);
@@ -1199,15 +1202,15 @@ export default function LiveRinkTracker({
       puck.reboundVy *= Math.pow(0.92, dt * 60);
     }
 
-    // Game Clock (only run mock clock in standalone sandbox)
-    if (standaloneControls) {
-      clockTimerRef.current += dt * simSpeed;
+    // Game Clock countdown (in standalone sandbox or live match)
+    if (standaloneControls || isLive) {
+      clockTimerRef.current += dt * (standaloneControls ? simSpeed : 1);
       if (clockTimerRef.current >= 1.0) {
         clockTimerRef.current = 0;
         setGameClockSeconds((sec) => Math.max(0, sec - 1));
       }
     }
-  }, [isPlaying, simSpeed, isShortenBench, isPullGoalie, playSound, addCommentary, triggerGoal, standaloneControls, awayTeamName, homeTeamName, switchForwardLine]);
+  }, [isPlaying, simSpeed, isShortenBench, isPullGoalie, playSound, addCommentary, triggerGoal, standaloneControls, isLive, awayTeamName, homeTeamName, switchForwardLine]);
 
   // ANIMATION LOOP
   useEffect(() => {
@@ -1413,7 +1416,7 @@ export default function LiveRinkTracker({
   const displayScoreHome = standaloneControls ? scoreHomeState : homeScore;
   const displaySogAway = standaloneControls ? sogAwayState : awaySog;
   const displaySogHome = standaloneControls ? sogHomeState : homeSog;
-  const displayClockStr = standaloneControls ? displayClock : (clockStr || "20:00");
+  const displayClockStr = (clockStr === "SO" || clockStr === "Final") ? clockStr : displayClock;
   const displayPeriodStr = standaloneControls ? periodStr : (periodStr || "1. Tretina");
   const displayXgAway = Math.max(0.05, displaySogAway * 0.075).toFixed(2);
   const displayXgHome = Math.max(0.05, displaySogHome * 0.075).toFixed(2);
