@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePoll, useServerNow } from "./useLive";
 import LiveBoard from "./LiveBoard";
 import CoachPanel from "./CoachPanel";
+import LiveRinkTracker from "./LiveRinkTracker";
 import { describeLiveEvents, fmtClock, periodLabel, type LiveLine } from "@/lib/sim/live-text";
 import type { SimEvent } from "@/lib/sim/events";
 import type { GoalieInfo } from "@/lib/sim/live";
@@ -57,6 +58,25 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
   const outIds = useMemo(() => [...new Set(lines.map((l) => l.outPlayerId).filter((x): x is number => x != null))], [lines]); // skaters who left this game
   const mine = coachTeams.map((t) => t.id);
 
+  const [showRink, setShowRink] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("v3_live_rink_enabled");
+      if (saved !== null) setShowRink(saved === "true");
+    } catch {}
+  }, []);
+
+  const toggleRink = () => {
+    setShowRink((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("v3_live_rink_enabled", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   if (data && "error" in data) {
     return (
       <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 text-slate-300">
@@ -78,7 +98,23 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4 text-xs uppercase tracking-wide">
             <span className={view?.status === "live" ? "text-red-400 font-bold" : "text-slate-500"}>{view?.status === "live" ? "● LIVE" : ""}</span>
-            <span className="text-slate-300 font-semibold text-sm normal-case tracking-normal">{status}</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleRink}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                  showRink
+                    ? "bg-sky-950 text-sky-300 border-sky-600 shadow-sm shadow-sky-900"
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+                }`}
+                title="Prepnúť vizuálne 2D klzisko (EHM štýl)"
+              >
+                <span>🏒 2D Klzisko:</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] ${showRink ? "bg-sky-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
+                  {showRink ? "ZAP" : "VYP"}
+                </span>
+              </button>
+              <span className="text-slate-300 font-semibold text-sm normal-case tracking-normal">{status}</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <TeamBlock logos={logos} t={away} score={view && view.status !== "pending" ? view.score.away : "–"} align="left" />
@@ -91,6 +127,23 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
             </div>
           )}
         </div>
+
+        {showRink && (
+          <LiveRinkTracker
+            homeTeamName={home.name}
+            awayTeamName={away.name}
+            homeLogoUrl={logos[home.id] || "/NHLlogos/new_jersey_devils.png"}
+            awayLogoUrl={logos[away.id] || "/NHLlogos/new_york_rangers.png"}
+            homeScore={view && view.status !== "pending" ? view.score.home : 0}
+            awayScore={view && view.status !== "pending" ? view.score.away : 0}
+            homeSog={view && view.status !== "pending" ? view.shots.home : 0}
+            awaySog={view && view.status !== "pending" ? view.shots.away : 0}
+            periodStr={view ? periodLabel(view.period) : "1. Tretina"}
+            clockStr={view ? fmtClock(view.clock) : "20:00"}
+            isLive={view?.status === "live"}
+            standaloneControls={false}
+          />
+        )}
 
         {coachTeams.map((t) => <CoachPanel key={t.id} gameId={gameId} teamId={t.id} teamName={t.name} over={view?.status === "final"} timeoutUsed={view?.timeoutUsed.includes(t.id) ?? false} outIds={outIds} goalies={view ? (view.goalies.home.teamId === t.id ? view.goalies.home : view.goalies.away) : undefined} />)}
 
