@@ -6,6 +6,7 @@ import { usePoll, useServerNow } from "./useLive";
 import LiveBoard from "./LiveBoard";
 import CoachPanel from "./CoachPanel";
 import LiveRinkTracker from "./LiveRinkTracker";
+import LiveBoxscore, { type LiveGoalItem, type LivePenaltyItem } from "./LiveBoxscore";
 import { describeLiveEvents, fmtClock, periodLabel, type LiveLine } from "@/lib/sim/live-text";
 import type { SimEvent } from "@/lib/sim/events";
 import type { GoalieInfo } from "@/lib/sim/live";
@@ -41,6 +42,7 @@ function TeamBlock({ logos, t, score, align }: { logos: Record<number, string>; 
 export default function LiveGame({ gameId, logos, home, away, coachTeams, finalHref }: Props) {
   const [since, setSince] = useState(-1);
   const [lines, setLines] = useState<LiveLine[]>([]);
+  const [eventsList, setEventsList] = useState<SimEvent[]>([]);
   const seen = useRef(new Set<number>());
   const { data, skewMs } = usePoll<View | { error: string }>(`/api/live/games/${gameId}?since=${since}`, 1500);
   const view = data && !("error" in data) ? data : null;
@@ -48,9 +50,13 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
 
   useEffect(() => {
     if (!view?.events.length) return;
-    const fresh = describeLiveEvents(view.events.filter((e) => !seen.current.has(e.seq)));
+    const freshEvents = view.events.filter((e) => !seen.current.has(e.seq));
     view.events.forEach((e) => seen.current.add(e.seq));
-    if (fresh.length) setLines((cur) => [...cur, ...fresh]);
+    if (freshEvents.length) {
+      setEventsList((cur) => [...cur, ...freshEvents]);
+      const freshLines = describeLiveEvents(freshEvents);
+      if (freshLines.length) setLines((cur) => [...cur, ...freshLines]);
+    }
     if (view.cursor > since) setSince(view.cursor);
   }, [view, since]);
 
@@ -59,11 +65,15 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
   const mine = coachTeams.map((t) => t.id);
 
   const [showRink, setShowRink] = useState(false);
+  const [showBoxscore, setShowBoxscore] = useState(true);
+  const [feedTab, setFeedTab] = useState<"pbp" | "boxscore">("pbp");
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("v3_live_rink_enabled");
-      if (saved !== null) setShowRink(saved === "true");
+      const savedRink = localStorage.getItem("v3_live_rink_enabled");
+      if (savedRink !== null) setShowRink(savedRink === "true");
+      const savedBox = localStorage.getItem("v3_live_boxscore_enabled");
+      if (savedBox !== null) setShowBoxscore(savedBox === "true");
     } catch {}
   }, []);
 
@@ -76,6 +86,67 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       return next;
     });
   };
+
+  const toggleBoxscore = () => {
+    setShowBoxscore((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("v3_live_boxscore_enabled", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Extract live goals & penalties from all accumulated events
+  const liveGoals = useMemo((): LiveGoalItem[] => {
+    return eventsList
+      .filter((e) => e.type === "GOAL" && !(e.meta as { so?: boolean } | undefined)?.so)
+      .map((e) => {
+        const meta = (e.meta || {}) as { emptyNet?: boolean; assistNames?: string[]; seasonGoal?: number };
+        return {
+          seq: e.seq,
+          period: e.period,
+          seconds: e.seconds,
+          teamId: e.teamId,
+          teamCode: e.teamCode,
+          scorerName: e.playerName || "Hráč",
+          strength: e.strength || "EV",
+          emptyNet: !!meta.emptyNet,
+          assists: meta.assistNames || [],
+          seasonGoal: meta.seasonGoal,
+        };
+      });
+  }, [eventsList]);
+
+  const livePenalties = useMemo((): LivePenaltyItem[] => {
+    return eventsList
+      .filter((e) => e.type === "PENALTY")
+      .map((e) => {
+        const meta = (e.meta || {}) as { penalty?: string; minutes?: number; severity?: string; givesPP?: boolean };
+        return {
+          seq: e.seq,
+          period: e.period,
+          seconds: e.seconds,
+          teamId: e.teamId,
+          teamCode: e.teamCode,
+          playerName: e.playerName || "Hráč",
+          penalty: meta.penalty || "Nedovolená hra",
+          minutes: meta.minutes ?? 2,
+          severity: meta.severity || "Minor",
+          givesPP: meta.givesPP ?? true,
+        };
+      });
+  }, [eventsList]);
+
+  const livePeriods = useMemo(() => {
+    const pSet = new Set<number>([1]);
+    if (view && view.period > 1) {
+      for (let i = 1; i <= view.period; i++) pSet.add(i);
+    }
+    liveGoals.forEach((g) => pSet.add(g.period));
+    livePenalties.forEach((p) => pSet.add(p.period));
+    return Array.from(pSet).sort((a, b) => a - b);
+  }, [view, liveGoals, livePenalties]);
 
   if (data && "error" in data) {
     return (
@@ -103,7 +174,24 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4 text-xs uppercase tracking-wide">
           <span className={view?.status === "live" ? "text-red-400 font-bold" : "text-slate-500"}>{view?.status === "live" ? "● LIVE" : ""}</span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap justify-end">
+            {/* Boxscore toggle button */}
+            <button
+              onClick={toggleBoxscore}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                showBoxscore
+                  ? "bg-emerald-950 text-emerald-300 border-emerald-600 shadow-sm shadow-emerald-900"
+                  : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+              }`}
+              title="Prepnúť zobrazenie Boxscore (góly a vylúčenia)"
+            >
+              <span>📊 Boxscore:</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] ${showBoxscore ? "bg-emerald-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
+                {showBoxscore ? "ZAP" : "VYP"}
+              </span>
+            </button>
+
+            {/* 2D Rink toggle button */}
             <button
               onClick={toggleRink}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
@@ -152,21 +240,79 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
         />
       )}
 
-      {/* 4. COACH PANEL */}
+      {/* 4. LIVE BOXSCORE CARD (GÓLY & VYLÚČENIA) */}
+      {showBoxscore && (
+        <LiveBoxscore
+          periods={livePeriods}
+          goals={liveGoals}
+          penalties={livePenalties}
+          home={home}
+          away={away}
+          logos={logos}
+        />
+      )}
+
+      {/* 5. COACH PANEL */}
       {coachTeams.map((t) => <CoachPanel key={t.id} gameId={gameId} teamId={t.id} teamName={t.name} over={view?.status === "final"} timeoutUsed={view?.timeoutUsed.includes(t.id) ?? false} outIds={outIds} goalies={view ? (view.goalies.home.teamId === t.id ? view.goalies.home : view.goalies.away) : undefined} />)}
 
-      {/* 5. PLAY-BY-PLAY */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-slate-800 bg-slate-800/30"><h2 className="text-sm font-bold uppercase tracking-wide text-slate-200">Play-by-play</h2></div>
-        <ul className="divide-y divide-slate-800/70 max-h-[28rem] overflow-y-auto">
-          {feed.length === 0 && <li className="px-4 py-6 text-sm text-slate-500">Waiting for the puck to drop…</li>}
-          {feed.map((l) => (
-            <li key={l.seq} className={`px-4 py-2 flex gap-3 text-sm ${l.kind === "goal" ? "bg-emerald-500/10" : l.kind === "penalty" ? "bg-amber-500/5" : ""}`}>
-              <span className="text-slate-500 tabular-nums w-16 shrink-0">{l.tag ?? `${periodLabel(l.period)} ${fmtClock(l.seconds)}`}</span>
-              <span className={l.major ? "font-semibold text-slate-100" : "text-slate-300"}>{l.text}</span>
-            </li>
-          ))}
-        </ul>
+      {/* 6. PLAY-BY-PLAY / BOXSCORE TABS */}
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+        <div className="px-4 py-2.5 border-b border-slate-800 bg-slate-800/40 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFeedTab("pbp")}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                feedTab === "pbp"
+                  ? "bg-sky-600 text-white shadow-sm shadow-sky-900"
+                  : "bg-slate-800 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <span>📝 Play-by-play</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/40 font-mono">
+                {feed.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setFeedTab("boxscore")}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                feedTab === "boxscore"
+                  ? "bg-sky-600 text-white shadow-sm shadow-sky-900"
+                  : "bg-slate-800 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <span>📊 Boxscore</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/40 font-mono">
+                {liveGoals.length}G · {livePenalties.length}P
+              </span>
+            </button>
+          </div>
+          <span className="text-xs text-slate-500 font-mono">
+            {feedTab === "pbp" ? "Živý textový prenos" : "Zápis gólov a trestov"}
+          </span>
+        </div>
+
+        {feedTab === "pbp" ? (
+          <ul className="divide-y divide-slate-800/70 max-h-[28rem] overflow-y-auto">
+            {feed.length === 0 && <li className="px-4 py-6 text-sm text-slate-500">Waiting for the puck to drop…</li>}
+            {feed.map((l) => (
+              <li key={l.seq} className={`px-4 py-2 flex gap-3 text-sm ${l.kind === "goal" ? "bg-emerald-500/10" : l.kind === "penalty" ? "bg-amber-500/5" : ""}`}>
+                <span className="text-slate-500 tabular-nums w-16 shrink-0">{l.tag ?? `${periodLabel(l.period)} ${fmtClock(l.seconds)}`}</span>
+                <span className={l.major ? "font-semibold text-slate-100" : "text-slate-300"}>{l.text}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="p-3 sm:p-4">
+            <LiveBoxscore
+              periods={livePeriods}
+              goals={liveGoals}
+              penalties={livePenalties}
+              home={home}
+              away={away}
+              logos={logos}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
