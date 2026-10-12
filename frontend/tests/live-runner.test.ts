@@ -165,9 +165,7 @@ test("a polling client with a cursor never misses an event, even though the engi
       if (full.length) seqCursor = full[full.length - 1].seq;
     }
     const all = g.snapshot(now + 60_000).events; // the full, final history
-    // the one event the engine back-dates by minutes: an abuse-of-official misconduct added after the 3rd period is played
-    const backDated = (e: (typeof all)[number]) => e.type === "PENALTY" && String((e.meta as { penalty?: string } | undefined)?.penalty).startsWith("Misconduct (Abuse");
-    const missing = all.filter((e) => !got.has(e.seq) && !backDated(e));
+    const missing = all.filter((e) => !got.has(e.seq));
     assert.equal(missing.length, 0, `seed ${seed}: the cursor skipped ${missing.map((e) => `${e.type}@${e.period}:${e.seconds}`).slice(0, 3).join(", ")}`);
     for (let i = 1; i < all.length; i++) assert.ok(eventAbs(all[i]) >= eventAbs(all[i - 1]), "history must be time-ordered");
     oldDesignLost += all.filter((e) => !gotOld.has(e.seq)).length;

@@ -3246,11 +3246,15 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     // the main fight/line-brawl path lives INSIDE simulatePeriodPossession's tick loop
     // (maybeStartFight, hooked to real stoppages) — genuinely live, so a fight-injury
     // benches the player for the REST of the same period too, not just the ones still to come.
+    // V3: scrums/donnybrooks/abuse-of-official are rolled BEFORE the period, like every other
+    // penalty, so they sit in the feed at their real time (a live viewer sees them when the clock
+    // gets there) and the players are really in the box. V2 keeps the old after-the-period roll.
+    if (st.v3Stoppages) generateHeatEvents(st, period);
     yield* periodGen(st, period);
     // scrums/donnybrooks/abuse-of-official stay a per-period post-hoc roll (rare
     // enough that the same-period residual this leaves is a non-issue); donnybrook
     // Fighting majors resolve their own injury inline.
-    generateHeatEvents(st, period);
+    if (!st.v3Stoppages) generateHeatEvents(st, period);
   }
 
   let winnerId: number;
