@@ -46,12 +46,11 @@ type PenE = { period: number; seconds: number; teamId: number; playerName: strin
 type PbpE = { period: number; seconds: number; time: string; teamId: number | null; kind: string; text: string; major: boolean };
 type ShootoutE = { round: number; teamId: number; teamCode: string | null; shooterName: string; shooterSlug: string | null; result: "goal" | "save" | "miss" };
 type InjuryRow = { period: number; seconds: number; teamId: number | null; playerName: string; playerSlug: string | null; part: string; mechanism: string; severity: string; days: number; byName: string | null };
-type RushRow = { period: number; seconds: number; teamId: number | null; kind: string; text: string };
 type SystemDials = { tempo?: string; forecheck?: string; puckStyle?: string; dZone?: string; preset?: string } | null;
 type Data = {
   id: number; endedIn: string; home: Side; away: Side; homeTeamId: number; awayTeamId: number;
   goals: GoalE[]; penalties: PenE[]; playByPlay: PbpE[]; shootout?: ShootoutE[];
-  injuries?: InjuryRow[]; rushes?: RushRow[]; homeSystem?: SystemDials; awaySystem?: SystemDials;
+  injuries?: InjuryRow[]; homeSystem?: SystemDials; awaySystem?: SystemDials;
   story?: { report: GameReport; flow: GameFlow } | null;
   attendance?: number | null; arena?: string | null; event?: { kind: string; title: string; venue: string | null } | null; officials?: { name: string; number: number | null; role: string }[]; gameDate?: string | Date | null;
   seriesId?: number | null; gameNum?: number | null; round?: number | null;
@@ -402,9 +401,9 @@ function PbpView({ data, full }: { data: Data; full: boolean }) {
           <h3 className="font-bold text-lg mb-2">{label(p)}</h3>
           <div className="space-y-0.5">
             {byPeriod.get(p)!.map((e, i) => (
-              <div key={i} className={`text-sm flex gap-3 ${e.kind === "goal" ? "text-amber-300 font-semibold" : e.kind === "fight" ? "text-red-400" : e.kind === "injury" ? "text-rose-400" : e.kind === "penalty" ? "text-orange-300" : e.kind === "change" ? "text-sky-500/70 italic" : "text-slate-300"}`}>
+              <div key={i} className={`text-sm flex gap-3 ${e.kind === "goal" ? "text-amber-300 font-semibold" : e.kind === "rush" ? "text-amber-200" : e.kind === "fight" ? "text-red-400" : e.kind === "injury" ? "text-rose-400" : e.kind === "penalty" ? "text-orange-300" : e.kind === "change" ? "text-sky-500/70 italic" : "text-slate-300"}`}>
                 <span className="tabular-nums text-slate-500 w-12 shrink-0">{e.time}</span>
-                <span>{e.text}{full && e.teamId != null && <span className="text-slate-600"> ({teamCode(e.teamId)})</span>}</span>
+                <span>{e.kind === "rush" && <span className="text-amber-400 mr-1" title="Odd-man rush">⚡</span>}{e.text}{full && e.teamId != null && <span className="text-slate-600"> ({teamCode(e.teamId)})</span>}</span>
               </div>
             ))}
           </div>
@@ -1045,23 +1044,6 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
                     {" · "}<span className={sevClass(inj.severity)}>{inj.severity}</span>
                     <span className="text-slate-500"> · out ~{inj.days}d</span>
                   </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ODD-MAN RUSHES (V3) — breakaways, 2-on-1s, 3-on-2s and penalty shots, in order */}
-          {data.rushes && data.rushes.length > 0 && (
-            <div className="bg-amber-950/20 border border-amber-900/40 rounded-xl overflow-hidden">
-              <div className="px-4 py-2 bg-amber-900/30 text-xs font-bold tracking-wide text-amber-300 uppercase flex items-center gap-2">
-                <span className="text-amber-500">⚡</span> Odd-man rushes
-              </div>
-              {data.rushes.map((r, i) => (
-                <div key={i} className="px-4 py-1.5 text-sm leading-snug border-t border-amber-900/20 flex items-baseline gap-2">
-                  <span className="text-slate-500 tabular-nums shrink-0">P{r.period} {mmss(r.seconds)}</span>
-                  <span className="text-slate-500 shrink-0">{r.teamId != null ? codeOf(r.teamId) : ""}</span>
-                  <span className="text-amber-300 text-xs uppercase shrink-0">{r.kind}</span>
-                  <span className="text-slate-300">{r.text}</span>
                 </div>
               ))}
             </div>
