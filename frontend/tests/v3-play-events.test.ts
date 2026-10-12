@@ -77,3 +77,22 @@ test("V3 fights are events with a winner, a story and the injury; the play-by-pl
   assert.ok(bouts > 8, `enough fights to say something (${bouts})`);
   assert.ok(hurt >= 1, "some fights end in an injury");
 });
+
+test("V3 long zone pressure is narrated, tired defences show up, V2 and pin:false have none", () => {
+  let pressure = 0, tired = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const r = run(seed, ENGINE_V3);
+    for (const e of count(r, "PRESSURE")) {
+      const m = e.meta as { seconds: number; against: string; tired: boolean };
+      assert.ok(m.seconds >= 20 && m.seconds < 200 && m.against, "pressure names the pinned team and how long");
+      const t = describeLiveEvent(e)!.text;
+      assert.ok(t.includes(String(m.seconds)) && t.includes(m.against) && t.includes("pinned"), t);
+      assert.ok(r.playByPlay.some((l) => l.kind === "pressure" && l.text === t), "same wording in the play-by-play");
+      pressure++; if (m.tired) tired++;
+    }
+    assert.equal(count(simulateGame(makeTeam(1, 60 + (seed % 9)), makeTeam(2, 62 + ((seed * 3) % 9)), { seed, engineVersion: ENGINE_V3, experimentalV3: { pin: false } }), "PRESSURE").length, 0);
+    assert.equal(count(run(seed, ENGINE_V2), "PRESSURE").length, 0);
+  }
+  assert.ok(pressure > 40, `a few pins a game (${pressure} in 40)`);
+  assert.ok(tired > 5, `some pins leave the defence gassed (${tired})`);
+});

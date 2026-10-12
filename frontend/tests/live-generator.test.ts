@@ -192,12 +192,15 @@ test("a healthy scratch can be dressed mid-game, and the skater he replaces keep
 });
 
 test("a goalie change swaps in the backup once, flows through the box score, and can't be repeated", () => {
-  for (const seed of [91, 92, 93]) {
+  let tested = 0;
+  for (const seed of [91, 92, 93, 94, 95, 96, 97, 98]) {
     const opts = { seed, engineVersion: ENGINE_V3, liveFeed: true };
     let asked = 0;
     const { result, stops } = drain(simulateGameLive(makeTeam(1, 62), makeTeam(2, 66), opts), (s) => (s.period >= 2 ? (asked++, { goalie: { home: true } }) : undefined));
     assert.ok(asked > 1, "the bench asks at every stoppage");
     const changes = result.events!.filter((e) => e.type === "GOALIE_CHANGE");
+    if (changes.length === 0 && result.home.backupGoalie?.started) continue; // the coach had already pulled his starter on his own — nothing left for the GM to swap
+    tested++;
     assert.equal(changes.length, 1, "exactly one swap");
     assert.equal(changes[0].teamId, 1);
     const box = result.home;
@@ -210,6 +213,7 @@ test("a goalie change swaps in the backup once, flows through the box score, and
     assert.equal(result.away.goalie.decision !== undefined, true);
     assert.ok(stops.some((s) => s.backupInTeamIds.includes(1)), "the stoppage feed reports the backup as in net");
   }
+  assert.ok(tested >= 3, `enough games where the GM's swap actually happens (${tested})`);
 });
 
 test("a goalie change with no backup dressed is ignored", () => {

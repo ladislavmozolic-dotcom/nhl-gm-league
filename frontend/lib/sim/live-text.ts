@@ -3,7 +3,7 @@
 
 import type { SimEvent } from "./events";
 import { fightText, type FightMeta } from "./fight-text";
-import { RUSH_LABEL, overGlassText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
+import { RUSH_LABEL, overGlassText, pressureText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 export type LiveLine = { seq: number; period: number; seconds: number; teamId?: number; /** set when this line means a skater has left the game */ outPlayerId?: number; /** replaces the period/clock label (e.g. "SO") */ tag?: string; kind: "goal" | "penalty" | "save" | "note" | "period"; major: boolean; text: string };
 
@@ -48,6 +48,7 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
       return { ...base, kind: "penalty", major: true, text: `${e.playerName} — ${mm?.penalty ?? "infraction"} (${mm?.minutes ?? 2} min, ${mm?.severity ?? "Minor"}).` };
     }
     case "EJECTION": return { ...base, outPlayerId: e.playerId, kind: "penalty", major: true, text: `${e.playerName ?? "?"} is ejected from the game.` };
+    case "PRESSURE": return { ...base, kind: "note", major: false, text: pressureText(m<{ seconds?: number; against?: string; tired?: boolean }>(e) ?? {}, e.teamCode) };
     case "HIT": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} (${who}) hits ${e.targetName ?? "the puck carrier"}.` };
     case "BLOCK": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} (${who}) blocks the shot${e.targetName ? ` by ${e.targetName}` : ""}.` };
     case "TAKEAWAY": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} (${who}) takes the puck away${e.targetName ? ` from ${e.targetName}` : ""}.` };

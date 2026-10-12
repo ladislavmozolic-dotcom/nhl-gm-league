@@ -37,6 +37,7 @@ export type EventType =
   | "KNOCK"             // shaken up — to the room for a few minutes
   | "RETURN"            // …and back on the bench
   | "GOALIE_CHANGE"     // a bench swaps its starter for the backup (called live; the automatic "shelled starter" pull stays silent)
+  | "PRESSURE"         // V3: a team has had the puck in the other team's end for a long time — meta: seconds, against, tired
   | "WHISTLE"           // V3: a named stoppage (offside, puck out of play, tie-up, hand pass, high stick) — meta: reason
   | "PENALTY_SHOT"      // V3: a foul on a clear breakaway — one shooter against the goalie, no clock
   | "RUSH"              // V3: a turnover became a breakaway / 2-on-1 / 3-on-2 the other way (meta: kind, why, outcome, support)

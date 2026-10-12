@@ -59,3 +59,9 @@ export function rushEndText(m: RushMeta, leadName: string): string | null {
     default: return null;
   }
 }
+
+/** "BOS has BUF pinned in its own end for 45 seconds — the BUF defenders are gassed and can't change." */
+export function pressureText(m: { seconds?: number; against?: string; tired?: boolean }, atk?: string | null): string {
+  const d = m.against ?? "the defenders";
+  return `${atk ?? "The attackers"} ${atk ? "has" : "have"} ${d} pinned in ${m.against ? "its" : "their"} own end for ${m.seconds ?? 20} seconds${m.tired ? ` — the ${d} defenders are gassed and can't change.` : "."}`;
+}

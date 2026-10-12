@@ -87,7 +87,7 @@ test("a change sent mid-game lands at the next stoppage the viewer hasn't reache
   });
   assert.equal(g.log.length, 1);
   assert.equal(g.log[0].teamId, 1);
-  assert.ok(g.log[0].absSeconds >= gameSecAt(clock, sentAt), "applied before the viewer got there");
+  assert.ok(g.log[0].absSeconds >= gameSecAt(clock, sentAt) - clock.gameSecPerSec, "applied before the viewer got there"); // (a whistle inside the last tick still counts)
   assert.ok(g.log[0].absSeconds - gameSecAt(clock, sentAt) < 240, "should land within a few minutes of game time");
   assert.equal(g.result!.homeSystem?.tempo, "fast");
   assert.equal(g.result!.awaySystem?.tempo, "balanced");
