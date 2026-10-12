@@ -47,6 +47,9 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
       return { ...base, kind: "penalty", major: true, text: `${e.playerName} — ${mm?.penalty ?? "infraction"} (${mm?.minutes ?? 2} min, ${mm?.severity ?? "Minor"}).` };
     }
     case "EJECTION": return { ...base, outPlayerId: e.playerId, kind: "penalty", major: true, text: `${e.playerName ?? "?"} is ejected from the game.` };
+    case "HIT": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} (${who}) hits ${e.targetName ?? "the puck carrier"}.` };
+    case "BLOCK": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} (${who}) blocks the shot${e.targetName ? ` by ${e.targetName}` : ""}.` };
+    case "TAKEAWAY": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} (${who}) takes the puck away${e.targetName ? ` from ${e.targetName}` : ""}.` };
     case "ICING": return { ...base, kind: "note", major: false, text: `Icing — ${who} can't change; the draw is in their end.` };
     case "DELAYED_PENALTY": return { ...base, kind: "note", major: false, text: `Delayed penalty — ${who} pulls the goalie for the extra attacker.` };
     case "COINCIDENTAL": {

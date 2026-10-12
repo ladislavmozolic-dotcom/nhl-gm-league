@@ -172,6 +172,7 @@ type SimState = {
   v3GarbageTime: boolean;            // V3 diagnostic feature flag
   v3ShooterForm: boolean;            // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
+  v3PlayEvents: boolean;             // V3: hits / blocks / takeaways happen in the play (at the real moment) instead of being sprinkled on after the game
   v3Stoppages: boolean;              // V3: generic whistles get a named cause (offside, puck out, tie-up…); delay of game is a D clearing it over the glass
   shooterGoalAt: Record<number, number>;     // V3: absolute game second of each skater's last goal
   shooterColdShots: Record<number, number>;  // V3: shots on goal since each skater's last goal this game
@@ -1640,6 +1641,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
   resolveCoincidentalPenalties(st, active, period, freshFromIdx);
   const base = (period - 1) * PERIOD_SECONDS;
   const shifts: Record<number, ShiftState> = { [home.id]: buildShifts(home), [away.id]: buildShifts(away) };
+  const hitMean: Record<number, number> | null = st.v3PlayEvents ? { [home.id]: teamHitMean(st, home), [away.id]: teamHitMean(st, away) } : null;
   const other = (t: SimTeam) => (t === home ? away : home);
 
   type St = "FACEOFF" | "PLAY";
@@ -2278,6 +2280,15 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // on ice, and never let it be undefined — an empty pool would otherwise crash.
     const dPool = onIceD(def).length ? onIceD(def) : def.defense.length ? def.defense : def.forwards;
     const dman = pickByAttr(rng, dPool, (s) => s.attrs.df ?? 50) ?? dPool[0] ?? carrier;
+    // V3: a hit is thrown in the play — by a defender on the man with the puck, at this very second
+    if (hitMean && rng.chance(hitMean[def.id] / HIT_DEF_TICKS)) {
+      const hp = onIceD(def).concat(onIceF(def));
+      const hitter = hp.length ? hp[rng.weighted(hp.map((x) => x.hitting * x.iceTime * physFactor(x.weight)))] : null;
+      if (hitter) {
+        st.lines[def.id][hitter.id].hits++; st.box[def.id].hits++;
+        st.sink.emit({ period, seconds: tick, type: "HIT", teamId: def.id, teamCode: def.code ?? undefined, playerId: hitter.id, playerName: hitter.name, targetId: carrier.id, targetName: carrier.name, zone: "OFF", sector: pickZone(rng, HIT_ZONES), importance: "NOTABLE" });
+      }
+    }
     // score-effect: the team in front eases off, the trailing team presses (catch-up → fewer blowouts)
     const catchUp = 1 - CFG.catchUpStrength * Math.max(-3, Math.min(3, margin));
     // team edge: the higher-overall club wins more battles and controls play, so
@@ -2315,7 +2326,9 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       const keep = Math.pow(ratio(atkSkill(puckHandle(carrier)), defSkill(puckWin(dman))), defFx.takeaway);
       if (!rng.chance(keep)) { // turnover — defenders take over in their own zone
         if (tryRush(carrierTeam, zone, "strip", carrier)) continue; // V3: lost it in the neutral zone / pinching D caught → odd-man rush the other way
+        const stripped = carrier;
         carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50)) ?? dman;
+        if (st.v3PlayEvents && rng.chance(TAKEAWAY_SHARE)) st.sink.emit({ period, seconds: tick, type: "TAKEAWAY", teamId: def.id, teamCode: def.code ?? undefined, playerId: carrier.id, playerName: carrier.name, targetId: stripped.id, targetName: stripped.name, zone: "OFF", sector: pickZone(rng, TAKE_ZONES), importance: "NOTABLE" });
         zone = "DEF"; setup = "carry"; press = 0; continue;
       }
     }
@@ -2393,7 +2406,13 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       // front, so it's blocked less (and isn't judged by the D's weak SC) — this
       // stops the diversion from leaking goals to blocks and keeps scoring neutral.
       const blockP = (pointShot ? 0.32 : 0.5 * ratio(defSkill(dman.attrs.df ?? 50), atkSkill(carrier.attrs.sc ?? 50))) * (R ? R.blockMult : 1);
-      if (rng.chance(st.v3BlockSkill ? blockP * v3BlockSkillMult(dman.blocking) : blockP)) { setup = "carry"; continue; } // blocked
+      if (rng.chance(st.v3BlockSkill ? blockP * v3BlockSkillMult(dman.blocking) : blockP)) { // blocked
+        if (st.v3PlayEvents) {
+          st.lines[def.id][dman.id].blocks++; st.box[def.id].blocks++;
+          st.sink.emit({ period, seconds: tick, type: "BLOCK", teamId: def.id, teamCode: def.code ?? undefined, playerId: dman.id, playerName: dman.name, targetId: carrier.id, targetName: carrier.name, zone: "OFF", sector: pickZone(rng, BLOCK_ZONES), importance: "NOTABLE" });
+        }
+        setup = "carry"; continue;
+      }
       // MISS — sails wide or off the iron, before it ever reaches the net (so it
       // does NOT count toward st.box[...].shots or xG — those stay SOG-only, exactly
       // as calibrated). A longer point shot misses more than an in-tight look; a
@@ -3028,6 +3047,20 @@ const BLOCK_ZONES: [string, number][] = [["SLOT", 35], ["POINT", 30], ["NET_FRON
 const TAKE_ZONES: [string, number][] = [["PERIMETER", 35], ["CIRCLE", 25], ["POINT", 20], ["SLOT", 10], ["NET_FRONT", 10]];
 const pickZone = (rng: RNG, table: [string, number][]) => table[rng.weighted(table.map((z) => z[1]))][0];
 
+/** Expected hits one club throws in a full game: league rate × its checking (ice-weighted) × the physical-coach factor. */
+function teamHitMean(st: SimState, team: SimTeam): number {
+  const roster = [...team.forwards, ...team.defense].filter((s) => !st.injured.has(s.id));
+  let hw = 0, wt = 0;
+  for (const r of roster) { hw += r.hitting * r.iceTime; wt += r.iceTime; }
+  const avgHit = wt ? hw / wt : 71;
+  const hitFactor = Math.max(0.78, Math.min(1.4, 1 + (avgHit - 71) / 60));
+  return LEAGUE.hitsPerTeam * (CFG.hitsPct / 100) * hitFactor * team.coachPhy;
+}
+/** V3 in-play hits: how many PLAY ticks a club spends defending in a game — turns the game mean into a per-tick chance. */
+const HIT_DEF_TICKS = 1790;
+/** V3 in-play takeaways: share of clean strips that are credited as a takeaway (target ≈ 7 a team). */
+const TAKEAWAY_SHARE = 0.09;
+
 function distributeCounting(st: SimState) {
   for (const team of [st.home, st.away]) {
     // exclude anyone hurt this game — he can't rack up a HIT/BLOCK/TAKEAWAY/MISS/
@@ -3075,7 +3108,8 @@ function distributeCounting(st: SimState) {
     // centred on the league-mean checking (~71 ice-weighted) so the average club
     // sits at ~21 hits and physical/finesse teams spread ~16–27.
     const hitFactor = Math.max(0.78, Math.min(1.4, 1 + (avgHit - 71) / 60));
-    const hits = st.rng.poisson(LEAGUE.hitsPerTeam * (CFG.hitsPct / 100) * hitFactor * team.coachPhy);
+    // (V3 play events: hits / blocks / takeaways already happened in the play — nothing to sprinkle on afterwards)
+    const hits = st.v3PlayEvents ? 0 : st.rng.poisson(LEAGUE.hitsPerTeam * (CFG.hitsPct / 100) * hitFactor * team.coachPhy);
     for (let i = 0; i < hits; i++) {
       // heavier bodies throw more of the hits (physicality)
       const { period, seconds, pool } = availableAt();
@@ -3084,7 +3118,7 @@ function distributeCounting(st: SimState) {
       emitAction("HIT", s, pickZone(st.rng, HIT_ZONES), undefined, { period, seconds });
     }
     // blocks (defense-heavy)
-    const blocks = st.rng.poisson(LEAGUE.blocksPerTeam);
+    const blocks = st.v3PlayEvents ? 0 : st.rng.poisson(LEAGUE.blocksPerTeam);
     for (let i = 0; i < blocks; i++) {
       const { period, seconds, pool } = availableAt();
       const s = pool[st.rng.weighted(pool.map((r) => r.blocking * r.iceTime * (r.isDefense ? 1.8 : 1)))];
@@ -3092,7 +3126,7 @@ function distributeCounting(st: SimState) {
       emitAction("BLOCK", s, pickZone(st.rng, BLOCK_ZONES), undefined, { period, seconds });
     }
     // takeaways (event-only, for the defensive map) — stick-checking, smart D/centres
-    const takeaways = st.rng.poisson(7); // ~7/team
+    const takeaways = st.v3PlayEvents ? 0 : st.rng.poisson(7); // ~7/team
     for (let i = 0; i < takeaways; i++) {
       const { period, seconds, pool } = availableAt();
       const s = pool[st.rng.weighted(pool.map((r) => ((r.attrs.df ?? 50) + (r.attrs.sk ?? 50)) * r.iceTime))];
@@ -3121,7 +3155,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 /**
@@ -3196,6 +3230,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3GarbageTime: isV3 && (opts.experimentalV3?.garbageTime ?? true),
     v3ShooterForm: isV3 && (opts.experimentalV3?.shooterForm ?? true),
     v3Stoppages: isV3 && (opts.experimentalV3?.stoppageRealism ?? CFG.v3StoppageRealism ?? false),
+    v3PlayEvents: isV3 && (opts.experimentalV3?.playEvents ?? true),
     v3Rush: isV3 && (opts.experimentalV3?.transitionRush ?? CFG.v3TransitionRush ?? false), // opt-in: Admin → Simulation (the other V3 flags default on)
     shooterGoalAt: {}, shooterColdShots: {},
     goalieStreak: {}, lastGoalAgainst: {},

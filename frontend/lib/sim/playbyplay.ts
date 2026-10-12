@@ -321,11 +321,11 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const label = m?.label ?? (m?.unit === "D" ? `D-pair ${m?.lineNo ?? ""}` : `Line ${m?.lineNo ?? ""}`);
         add(p, e.seconds, tId, "change", `${who} — ${label.trim()} on: ${(m?.names ?? []).join(", ")}.`);
       } else if (e.type === "HIT") {
-        add(p, e.seconds, tId, "hit", `${e.playerName ?? "?"} throws a hit in the ${(e.sector ?? "").toString().toLowerCase().replace(/_/g, " ") || "corner"}.`);
+        add(p, e.seconds, tId, "hit", `${e.playerName ?? "?"} ${e.targetName ? `hits ${e.targetName}` : "throws a hit"} in the ${(e.sector ?? "").toString().toLowerCase().replace(/_/g, " ") || "corner"}.`);
       } else if (e.type === "BLOCK") {
-        add(p, e.seconds, tId, "block", `${e.playerName ?? "?"} blocks a shot.`);
+        add(p, e.seconds, tId, "block", `${e.playerName ?? "?"} blocks ${e.targetName ? `the shot by ${e.targetName}` : "a shot"}.`);
       } else if (e.type === "TAKEAWAY") {
-        add(p, e.seconds, tId, "takeaway", `${e.playerName ?? "?"} strips the puck with a takeaway.`);
+        add(p, e.seconds, tId, "takeaway", `${e.playerName ?? "?"} strips the puck ${e.targetName ? `from ${e.targetName} ` : ""}with a takeaway.`);
       } else if (e.type === "REBOUND") {
         add(p, e.seconds, tId, "rebound", `${e.playerName ?? "?"} pounces on the rebound.`);
       } else if (e.type === "PP_START") {
