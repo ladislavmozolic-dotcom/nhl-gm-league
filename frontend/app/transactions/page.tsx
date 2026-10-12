@@ -18,6 +18,7 @@ export const TX_WHERE = {
     { message: { contains: "Awaiting response" } },
     { message: { contains: "was declined" } },
     { message: { contains: "was cancelled" } },
+    { message: { startsWith: "🔒 Integrity checkpoint" } }, // daily chain-head line: lives on /league/integrity
   ] },
 };
 
