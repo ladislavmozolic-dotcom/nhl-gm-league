@@ -29,12 +29,12 @@ const play = (seed: number, rush: boolean, extra: object = {}): GameResult =>
   simulateGame(makeTeam(1, 60 + (seed % 9)), makeTeam(2, 62 + ((seed * 3) % 9)), { seed, engineVersion: ENGINE_V3, experimentalV3: { transitionRush: rush }, ...extra });
 const withRush = (r: GameResult) => (r.events ?? []).filter((e) => e.type === "RUSH");
 
-test("rushes are opt-in: V3's default is untouched, V2 never rushes", () => {
+test("rushes follow the V3 default; turning the flag off removes them, V2 never rushes", () => {
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     const dflt = simulateGame(makeTeam(1, 62), makeTeam(2, 66), { seed, engineVersion: ENGINE_V3 });
     const off = simulateGame(makeTeam(1, 62), makeTeam(2, 66), { seed, engineVersion: ENGINE_V3, experimentalV3: { transitionRush: false } });
-    assert.ok(JSON.stringify(dflt) === JSON.stringify(off), `default V3 changed by the flag's existence (seed ${seed})`);
-    assert.equal(withRush(dflt).length, 0);
+    assert.equal(withRush(off).length, 0, "the flag off must remove every rush");
+    assert.ok(JSON.stringify(dflt) === JSON.stringify(simulateGame(makeTeam(1, 62), makeTeam(2, 66), { seed, engineVersion: ENGINE_V3, experimentalV3: { transitionRush: true } })), `default V3 should be rush-on (seed ${seed})`);
     const v2 = simulateGame(makeTeam(1, 62), makeTeam(2, 66), { seed, engineVersion: ENGINE_V2, experimentalV3: { transitionRush: true } });
     assert.equal(withRush(v2).length, 0, "V2 must never run the V3 rush logic");
   }
@@ -93,12 +93,12 @@ test("rushes and penalty shots are narrated in the play-by-play and the live fee
 
 const both = (seed: number): GameResult => simulateGame(makeTeam(1, 60 + (seed % 9)), makeTeam(2, 62 + ((seed * 3) % 9)), { seed, engineVersion: ENGINE_V3, experimentalV3: { transitionRush: true, stoppageRealism: true } });
 
-test("named stoppages are opt-in, leave default V3 untouched, and V2 never produces them", () => {
+test("named stoppages follow the V3 default; the flag off removes them, V2 never produces them", () => {
   for (const seed of [11, 12, 13]) {
     const dflt = simulateGame(makeTeam(1, 62), makeTeam(2, 66), { seed, engineVersion: ENGINE_V3 });
     const off = simulateGame(makeTeam(1, 62), makeTeam(2, 66), { seed, engineVersion: ENGINE_V3, experimentalV3: { stoppageRealism: false } });
-    assert.ok(JSON.stringify(dflt) === JSON.stringify(off), "the flag's existence must not change default V3");
-    assert.equal((dflt.events ?? []).filter((e) => e.type === "WHISTLE").length, 0);
+    assert.equal((off.events ?? []).filter((e) => e.type === "WHISTLE").length, 0, "the flag off must remove every named whistle");
+    assert.ok(JSON.stringify(dflt) === JSON.stringify(simulateGame(makeTeam(1, 62), makeTeam(2, 66), { seed, engineVersion: ENGINE_V3, experimentalV3: { stoppageRealism: true } })), "default V3 should be stoppage-realism-on");
     const v2 = simulateGame(makeTeam(1, 62), makeTeam(2, 66), { seed, engineVersion: ENGINE_V2, experimentalV3: { stoppageRealism: true } });
     assert.equal((v2.events ?? []).filter((e) => e.type === "WHISTLE").length, 0);
   }

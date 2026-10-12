@@ -204,7 +204,9 @@ test("a goalie change swaps in the backup once, flows through the box score, and
     assert.ok(box.backupGoalie && box.backupGoalie.started, "the backup is marked as having entered");
     assert.ok(box.backupGoalie!.decision != null && box.goalie.decision === null, "the decision goes to the goalie of record, the starter gets none");
     assert.ok(box.goalie.shotsAgainst > 0 && box.backupGoalie!.shotsAgainst > 0, "both goalies faced shots");
-    assert.equal(box.goalie.shotsAgainst + box.backupGoalie!.shotsAgainst, result.away.shots, "no shot against the home net is lost in the swap");
+    // an empty-net shot is the team's, never a goalie's (real NHL convention), so it doesn't count here
+    const emptyNetShots = result.events!.filter((e) => e.type === "SHOT" && e.teamId === 2 && (e.meta as { situation?: string } | undefined)?.situation === "EN_OPP").length;
+    assert.equal(box.goalie.shotsAgainst + box.backupGoalie!.shotsAgainst, result.away.shots - emptyNetShots, "no shot against the home net is lost in the swap");
     assert.equal(result.away.goalie.decision !== undefined, true);
     assert.ok(stops.some((s) => s.backupInTeamIds.includes(1)), "the stoppage feed reports the backup as in net");
   }

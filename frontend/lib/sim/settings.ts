@@ -288,7 +288,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   faWeightF: { sc: 0.42, pa: 0.38, df: 0.12, sk: 0.08 },
   faWeightD: { df: 0.40, pa: 0.30, sc: 0.20, sk: 0.10 },
   faWeightG: { ag: 0.34, sc: 0.30, rb: 0.26, hs: 0.10 },
-  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, liveMatchesEnabled: false, livePeriodSec: 300, liveIntermissionSec: 30, v3TransitionRush: false, v3StoppageRealism: false, intelligenceRollout: "full",
+  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, liveMatchesEnabled: false, livePeriodSec: 300, liveIntermissionSec: 30, v3TransitionRush: true, v3StoppageRealism: true, intelligenceRollout: "full",
   faLowballMaxBumpPct: 25, iceUnhappyPct: 80, iceWarnDays: 5, iceRequestDays: 20, resignLockDays: 10,
   finJerseyNet: 120, finJerseyScale: 40000, finApparelBase: 3200000, finOtherBase: 1400000,
   finTradeBoostPct: 60, finTradeBoostHalfLife: 21,
