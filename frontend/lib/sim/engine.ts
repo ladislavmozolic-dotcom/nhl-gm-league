@@ -172,6 +172,8 @@ type SimState = {
   v3GarbageTime: boolean;            // V3 diagnostic feature flag
   v3ShooterForm: boolean;            // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
+  v3Pace: boolean;                   // V3: the puck needs real time to cross a zone — no 2-second counter-attacks, no 'takeaway' right after a shot
+  v3FightStory: boolean;             // V3: a fight is an event with a winner, a description and who got hurt
   v3PlayEvents: boolean;             // V3: hits / blocks / takeaways happen in the play (at the real moment) instead of being sprinkled on after the game
   v3Stoppages: boolean;              // V3: generic whistles get a named cause (offside, puck out, tie-up…); delay of game is a D clearing it over the glass
   shooterGoalAt: Record<number, number>;     // V3: absolute game second of each skater's last goal
@@ -1035,6 +1037,21 @@ function maybeInjureFighter(st: SimState, team: SimTeam, fighter: SimSkater, per
   }
 }
 
+/** V3: the story of one bout — who won (fighting skill, strength, size, luck), how it looked, who got hurt. Penalties/injuries are done by the caller. */
+function fightStory(st: SimState, hTeam: SimTeam, h: SimSkater, a: SimSkater, period: number, at: number) {
+  if (!st.v3FightStory) return;
+  const power = (s: SimSkater) => (s.attrs.fg ?? 30) + 0.4 * (s.attrs.st ?? 50) + 0.25 * s.weight;
+  const d = power(h) - power(a) + (st.rng.next() - 0.5) * 40;
+  const edge = Math.min(1, Math.abs(d) / 40);
+  const kind = edge < 0.18 ? "draw" : edge < 0.55 ? "edge" : "decisive";
+  const hurt = [h, a].filter((x) => st.injuries.some((i) => i.playerId === x.id && i.mechanism === "Fight" && i.period === period && i.seconds === at));
+  st.sink.emit({
+    period, seconds: at, type: "FIGHT", teamId: hTeam.id, teamCode: hTeam.code ?? undefined,
+    playerId: h.id, playerName: h.name, targetId: a.id, targetName: a.name, importance: "NOTABLE",
+    meta: { kind, winnerId: kind === "draw" ? null : d > 0 ? h.id : a.id, style: st.rng.int(1000), hurtNames: hurt.map((x) => x.name) },
+  });
+}
+
 // ~4.7 organic FACEOFF-state stoppages/period, measured empirically (varies with
 // how much whistle-stopping play a game has) — ~14/game, the anchor for
 // converting the per-game fight probability below into a per-stoppage hazard.
@@ -1071,6 +1088,7 @@ function maybeStartFight(st: SimState, home: SimTeam, away: SimTeam, period: num
   addPenalty(st, away, a, period, tick, "Fighting", 5, "Major", false);
   maybeInjureFighter(st, home, h, period, tick);
   maybeInjureFighter(st, away, a, period, tick);
+  fightStory(st, home, h, a, period, tick);
 
   // line brawl: a second simultaneous bout + roughing minors + a misconduct (far likelier in a rivalry)
   if (active(home).length && active(away).length && st.rng.chance(st.rivalry ? 0.4 : 0.12)) {
@@ -1081,6 +1099,7 @@ function maybeStartFight(st: SimState, home: SimTeam, away: SimTeam, period: num
     addPenalty(st, away, a2, period, tick, "Roughing", 2, "Minor", false);
     maybeInjureFighter(st, home, h2, period, tick);
     maybeInjureFighter(st, away, a2, period, tick);
+    fightStory(st, home, h2, a2, period, tick);
     const instigator = st.rng.chance(0.5) ? home : away;
     addPenalty(st, instigator, instigator.id === home.id ? h : a, period, tick,
       "Misconduct", 10, "Misconduct", false);
@@ -1129,6 +1148,7 @@ function generateHeatEvents(st: SimState, period: number) {
       addPenalty(st, st.away, af, period, at, "Fighting", 5, "Major", false);
       maybeInjureFighter(st, st.home, hf, period, at);
       maybeInjureFighter(st, st.away, af, period, at);
+      fightStory(st, st.home, hf, af, period, at);
     }
     for (let k = 0; k < 2; k++) {
       addPenalty(st, st.home, scrummer(st.home), period, at, "Roughing", 2, "Minor", false);
@@ -1652,6 +1672,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
   let zone: "DEF" | "NEU" | "OFF" = "NEU"; // relative to carrierTeam
   let setup: "carry" | "pass" | "rebound" = "carry"; // how the current look arose → shot danger
   let creator: SimSkater | null = null; // who set the current look up (the passer / the rebound's shooter) → primary assist
+  let zoneSince = 0, lastZone: "DEF" | "NEU" | "OFF" = "NEU", lastCT: SimTeam = home, possSince = 0, lastShotTick = -99; // V3 pace: when the puck arrived in this zone / this team got it / the last shot attempt
   let press = 0; // consecutive shots in one sustained possession → screening/rebound pressure
   let faceoffPressure: { teamId: number; until: number } | null = null;
 
@@ -1916,7 +1937,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       targetId: giver?.id, targetName: giver?.name, zone: "OFF", importance: "NOTABLE",
       meta: { kind, why, outcome, support: others.slice(0, 2).map((s) => s.name), ...extra },
     });
-    const giveBack = (to: SimSkater) => { carrierTeam = oldTeam; carrier = to; zone = "NEU"; setup = "carry"; press = 0; };
+    const giveBack = (to: SimSkater) => { carrierTeam = oldTeam; carrier = to; zone = st.v3Pace ? "DEF" : "NEU"; setup = "carry"; press = 0; };
     carrierTeam = newTeam; carrier = lead; zone = "OFF"; press = 0; setup = "carry"; creator = null;
     if (kind === "BREAKAWAY") {
       // a defender may still catch him from behind — occasionally with a foul, rarely a penalty shot
@@ -2248,7 +2269,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
         ? { teamId: carrierTeam.id, until: tick + 10 } : null;
       if (foZone != null) { const fe = st.sink.all(); const last = fe[fe.length - 1]; if (last?.type === "FACEOFF") last.zone = zone; }
       foZone = null; noChange[home.id] = false; noChange[away.id] = false;
-      state = "PLAY"; setup = "carry"; press = 0;
+      state = "PLAY"; setup = "carry"; press = 0; zoneSince = tick; possSince = tick; lastCT = carrierTeam; lastZone = zone;
       continue;
     }
 
@@ -2263,6 +2284,10 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       else { st.box[carrierTeam.id].nzTime++; st.box[opp.id].nzTime++; }
     }
     const def = other(carrierTeam);
+    if (st.v3Pace) {
+      if (carrierTeam !== lastCT) { possSince = tick; zoneSince = tick; lastCT = carrierTeam; lastZone = zone; }
+      else if (zone !== lastZone) { zoneSince = tick; lastZone = zone; }
+    }
     const isHome = carrierTeam === home;
     const margin = st.box[carrierTeam.id].goals - st.box[def.id].goals;
     const tOff = tacticsMult(carrierTeam, margin), tDef = tacticsMult(def, -margin);
@@ -2328,7 +2353,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
         if (tryRush(carrierTeam, zone, "strip", carrier)) continue; // V3: lost it in the neutral zone / pinching D caught → odd-man rush the other way
         const stripped = carrier;
         carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.df ?? 50) + (s.attrs.pa ?? 50)) ?? dman;
-        if (st.v3PlayEvents && rng.chance(TAKEAWAY_SHARE)) st.sink.emit({ period, seconds: tick, type: "TAKEAWAY", teamId: def.id, teamCode: def.code ?? undefined, playerId: carrier.id, playerName: carrier.name, targetId: stripped.id, targetName: stripped.name, zone: "OFF", sector: pickZone(rng, TAKE_ZONES), importance: "NOTABLE" });
+        if (st.v3PlayEvents && (!st.v3Pace || (tick - possSince >= 3 && tick - lastShotTick >= 6)) && rng.chance(TAKEAWAY_SHARE)) st.sink.emit({ period, seconds: tick, type: "TAKEAWAY", teamId: def.id, teamCode: def.code ?? undefined, playerId: carrier.id, playerName: carrier.name, targetId: stripped.id, targetName: stripped.name, zone: "OFF", sector: pickZone(rng, TAKE_ZONES), importance: "NOTABLE" });
         zone = "DEF"; setup = "carry"; press = 0; continue;
       }
     }
@@ -2350,7 +2375,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     }
     // 2) advance the puck toward the offensive zone (zone entry: SK+PH vs DF+SK)
     if (zone !== "OFF") {
-      if (rng.chance(0.28)) {
+      if (rng.chance(st.v3Pace ? (tick - zoneSince >= PACE_TUNING.dwell ? PACE_TUNING.advance : 0) : 0.28)) {
         const gap = 0.6 * (dman.attrs.df ?? 50) + 0.4 * (dman.attrs.sk ?? 50);
         if (rng.chance(ratio(atkSkill(puckHandle(carrier)), defSkill(gap)))) {
           // a real, live ZONE_ENTRY — NEU->OFF only (matches the real-hockey stat:
@@ -2382,7 +2407,9 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
     const armUp = delayedFor === carrierTeam.id ? 1.2 : 1;
     const crowd = carrierTeam === home ? st.crowdMult : 1;
-    if (!rushCtx && !rng.chance(0.29 * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd * (st.v3Rush ? RUSH_TUNING.gate : 1))) continue;
+    if (st.v3Pace && !rushCtx && tick - zoneSince < PACE_TUNING.shotDwell) continue; // just arrived in the zone — nobody shoots in the first two seconds
+    if (!rushCtx && !rng.chance(0.29 * (st.v3Pace ? PACE_TUNING.shotBoost : 1) * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd * (st.v3Rush ? RUSH_TUNING.gate : 1))) continue;
+    lastShotTick = tick;
     const R = rushCtx; rushCtx = null; // V3: a rush shot is taken now, whatever the ordinary shot dice say
     // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
     // the puck back to the point for a D one-timer instead — this is how D rack up
@@ -3059,7 +3086,9 @@ function teamHitMean(st: SimState, team: SimTeam): number {
 /** V3 in-play hits: how many PLAY ticks a club spends defending in a game — turns the game mean into a per-tick chance. */
 const HIT_DEF_TICKS = 1790;
 /** V3 in-play takeaways: share of clean strips that are credited as a takeaway (target ≈ 7 a team). */
-const TAKEAWAY_SHARE = 0.09;
+const TAKEAWAY_SHARE = 0.17;
+/** V3 pace: the earliest a puck may leave a zone / get a first shot after arriving, with the chances raised so the AVERAGE time stays what it was (the old geometric dice let a puck cross two zones in 2 s). */
+export const PACE_TUNING = { dwell: 2, advance: 0.6, shotDwell: 2, shotBoost: 1.24 };
 
 function distributeCounting(st: SimState) {
   for (const team of [st.home, st.away]) {
@@ -3155,7 +3184,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
 };
 
 /**
@@ -3230,6 +3259,8 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3GarbageTime: isV3 && (opts.experimentalV3?.garbageTime ?? true),
     v3ShooterForm: isV3 && (opts.experimentalV3?.shooterForm ?? true),
     v3Stoppages: isV3 && (opts.experimentalV3?.stoppageRealism ?? CFG.v3StoppageRealism ?? false),
+    v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),
+    v3FightStory: isV3 && (opts.experimentalV3?.fightStory ?? true),
     v3PlayEvents: isV3 && (opts.experimentalV3?.playEvents ?? true),
     v3Rush: isV3 && (opts.experimentalV3?.transitionRush ?? CFG.v3TransitionRush ?? false), // opt-in: Admin → Simulation (the other V3 flags default on)
     shooterGoalAt: {}, shooterColdShots: {},

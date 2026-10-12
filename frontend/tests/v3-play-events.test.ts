@@ -53,3 +53,27 @@ test("V2 keeps its after-the-game hit/block/takeaway sprinkling (no target), V3 
     }
   }
 });
+
+test("V3 fights are events with a winner, a story and the injury; the play-by-play and the live feed tell the same bout", () => {
+  let bouts = 0, hurt = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const r = simulateGame(makeTeam(1, 64), makeTeam(2, 66), { seed, engineVersion: ENGINE_V3, rivalry: true });
+    const fights = count(r, "FIGHT");
+    const majors = (r.events ?? []).filter((e) => e.type === "PENALTY" && (e.meta as { penalty?: string } | undefined)?.penalty === "Fighting").length;
+    assert.equal(fights.length * 2, majors, "every bout is two fighting majors");
+    const lines = r.playByPlay.filter((l) => l.kind === "fight");
+    assert.equal(lines.length, fights.length);
+    for (const f of fights) {
+      const m = f.meta as { winnerId: number | null; hurtNames: string[] };
+      assert.ok(m.winnerId === null || m.winnerId === f.playerId || m.winnerId === f.targetId, "the winner is one of the two");
+      const live = describeLiveEvent(f)!.text;
+      assert.ok(live.includes(f.playerName!) && live.includes(f.targetName!) && live.includes("5-minute majors"));
+      assert.ok(lines.some((l) => l.text === live), "play-by-play and live feed use the same wording");
+      for (const n of m.hurtNames) assert.ok(live.includes(`${n} is hurt in the fight`));
+      hurt += m.hurtNames.length; bouts++;
+    }
+    assert.equal(count(simulateGame(makeTeam(1, 64), makeTeam(2, 66), { seed, engineVersion: ENGINE_V2, rivalry: true }), "FIGHT").length, 0, "V2 keeps the old fight line");
+  }
+  assert.ok(bouts > 8, `enough fights to say something (${bouts})`);
+  assert.ok(hurt >= 1, "some fights end in an injury");
+});

@@ -2,6 +2,7 @@
 // (no engine imports) — wording mirrors lib/sim/playbyplay.ts so live and the final report read alike.
 
 import type { SimEvent } from "./events";
+import { fightText, type FightMeta } from "./fight-text";
 import { RUSH_LABEL, overGlassText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 export type LiveLine = { seq: number; period: number; seconds: number; teamId?: number; /** set when this line means a skater has left the game */ outPlayerId?: number; /** replaces the period/clock label (e.g. "SO") */ tag?: string; kind: "goal" | "penalty" | "save" | "note" | "period"; major: boolean; text: string };
@@ -67,7 +68,7 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
     case "KNOCK": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} is shaken up and heads to the room.` };
     case "RETURN": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} is back on the bench.` };
     case "INJURY": return { ...base, outPlayerId: e.playerId, kind: "note", major: true, text: `${e.playerName ?? "?"} is injured and will not return.` };
-    case "FIGHT": return { ...base, kind: "penalty", major: true, text: `Fight: ${e.playerName ?? "?"}${e.targetName ? ` versus ${e.targetName}` : ""}.` };
+    case "FIGHT": return { ...base, kind: "penalty", major: true, text: fightText((e.meta ?? {}) as FightMeta, e.playerName ?? "?", e.targetName ?? "his opponent", e.playerId) };
     case "RUSH": {
       const mm = (e.meta ?? {}) as RushMeta;
       const start = rushStartText(mm, e.playerName ?? "?", e.targetName);

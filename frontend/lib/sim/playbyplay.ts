@@ -5,6 +5,7 @@
 // offsides, misses) is still RNG colour. Without an event stream (volume model),
 // it falls back to the legacy post-hoc reconstruction.
 
+import { fightText, type FightMeta } from "./fight-text";
 import { RNG } from "./rng";
 import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } from "./types";
 import type { SimEvent } from "./events";
@@ -348,8 +349,10 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
     }
 
     // fights (pair the two Fighting majors)
+    const fightEvents = stream.filter((x) => x.period === p && x.type === "FIGHT");
     const fights = stream.filter((x) => x.period === p && x.type === "PENALTY" && (x.meta as { penalty?: string } | undefined)?.penalty === "Fighting");
-    for (let i = 0; i + 1 < fights.length; i += 2) {
+    if (fightEvents.length) for (const f of fightEvents) add(p, f.seconds, null, "fight", fightText((f.meta ?? {}) as FightMeta, f.playerName ?? "?", f.targetName ?? "his opponent", f.playerId), true);
+    else for (let i = 0; i + 1 < fights.length; i += 2) {
       add(p, fights[i].seconds, null, "fight", `Fight: ${fights[i].playerName} versus ${fights[i + 1].playerName}. Both receive 5-minute majors.`, true);
     }
     // injuries
