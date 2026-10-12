@@ -131,6 +131,7 @@ import { computeStandings } from "@/lib/sim/standings";
 import { skaterTotals, goalieTotals } from "@/lib/stats-server";
 import { loadTeamLines } from "@/lib/sim/lines";
 import { livePlayerOverall } from "@/lib/player-overall";
+import { rushStartText, rushEndText, RUSH_LABEL, type RushMeta } from "@/lib/sim/rush-text";
 
 import type { TeamTactics } from "@/lib/sim/tactics";
 
@@ -693,6 +694,21 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     };
   });
 
+  // V3 odd-man rushes and penalty shots (importance NOTABLE+ so they are persisted) — one broadcast line each
+  const rushEvents = await prisma.gameEvent.findMany({
+    where: { gameId: game.id, type: { in: ["RUSH", "PENALTY_SHOT"] } }, orderBy: [{ period: "asc" }, { seconds: "asc" }],
+  });
+  const rushIds = [...new Set(rushEvents.flatMap((e) => [e.playerId, e.targetId]).filter((x): x is number => x != null))];
+  const rushPlayers = rushIds.length ? await prisma.player.findMany({ where: { id: { in: rushIds } }, select: { id: true, name: true } }) : [];
+  const rushName = new Map(rushPlayers.map((p) => [p.id, cleanName(p.name)]));
+  const rushes = rushEvents.map((e) => {
+    const m = (e.meta ?? {}) as RushMeta & { why?: string };
+    const lead = e.playerId != null ? (rushName.get(e.playerId) ?? "?") : "?";
+    if (e.type === "PENALTY_SHOT") return { period: e.period, seconds: e.seconds, teamId: e.teamId, kind: "PENALTY SHOT", text: `Penalty shot — ${lead}${m.why ? ` (${m.why})` : ""}.` };
+    const end = rushEndText(m, lead);
+    return { period: e.period, seconds: e.seconds, teamId: e.teamId, kind: RUSH_LABEL[m.kind ?? ""] ?? "rush", text: `${rushStartText(m, lead, e.targetId != null ? rushName.get(e.targetId) : undefined)}${end ? ` ${end}` : ""}` };
+  });
+
   // High-danger shot map: every GOAL (always persisted, importance HIGHLIGHT) plus
   // every high-danger non-scoring SHOT (importance NOTABLE only when hd — most
   // ordinary shots are MINOR and never make it into GameEvent, so this is NOT the
@@ -786,6 +802,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       playerName: cleanName(p.playerName), type: p.type, minutes: p.minutes, severity: p.severity, givesPP: p.givesPP, offsetting: p.offsetting,
     })),
     injuries,
+    rushes,
     story,
     homeSystem: (game.homeSystem as Record<string, string> | null) ?? null,
     awaySystem: (game.awaySystem as Record<string, string> | null) ?? null,
