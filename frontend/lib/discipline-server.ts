@@ -22,7 +22,7 @@ import { REGULAR_SEASON } from "./phase";
 import { loadSettings } from "./sim/settings";
 import { cleanName } from "./playerName";
 import { money } from "./finance";
-import { suspensionSalaryToBank, playerFineToBank } from "./league-bank-server";
+import { suspensionSalaryToBank, playerFineToBank, getBank, postEntry, moveTeamBank } from "./league-bank-server";
 import { severeInfraction } from "./sim/infractions";
 
 const VIOLENT = ["Boarding", "Cross-checking", "Elbowing", "Charging", "Checking to the head", "Slew-footing", "Kneeing", "Slashing", "High-sticking", "Roughing", "Spearing", "Butt-ending", "Clipping"];
@@ -155,7 +155,7 @@ export async function reviewGames(gameIds: number[]): Promise<{ suspensions: num
         const fine = Math.round((2000 + rng.next() * (FINE_MAX - 2000)) / 100) * 100;
         await prisma.suspension.create({ data: { season: REGULAR_SEASON, playerId, playerName: name, teamId: org, gameId: g.id, incident, kind: "FINE", fine, status: "SERVED" } });
         await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ Player Safety: ${name} fined $${fine.toLocaleString("en-US")} (maximum allowed under the CBA) — ${list[0].text}.` } }).catch(() => {});
-        await notifyClub(org, `⚖️ Player Safety fined ${name} $${fine.toLocaleString("en-US")} for ${list[0].text}. No games — he's available tonight.`);
+        await notifyClub(org, `⚖️ Player Safety fined ${name} $${fine.toLocaleString("en-US")} for ${list[0].text}. No games — he's available tonight. You can appeal the fine within ${APPEAL_HOURS} hours on the Player Safety page.`);
         await playerFineToBank(org, fine, `${name} fined — ${list[0].text}`);
         fines++;
         continue;
@@ -212,21 +212,23 @@ export async function serveSuspensions(gameIds: number[], before: Date): Promise
 
 export async function appealSuspension(id: number, teamId: number, text: string): Promise<void> {
   const s = await prisma.suspension.findUnique({ where: { id } });
-  if (!s || s.kind !== "SUSPENSION") throw new Error("No such suspension.");
+  if (!s) throw new Error("No such ruling.");
   if (s.teamId !== teamId) throw new Error("Only the player's club can appeal.");
-  if (s.appealStatus) throw new Error("This suspension has already been appealed.");
-  if (s.status !== "ACTIVE") throw new Error("The suspension has already been served.");
+  if (s.appealStatus) throw new Error("This ruling has already been appealed.");
+  if (s.kind === "SUSPENSION" && s.status !== "ACTIVE") throw new Error("The suspension has already been served.");
+  if (s.kind === "FINE" && s.fine <= 0) throw new Error("Nothing to appeal.");
   if (Date.now() - s.createdAt.getTime() > APPEAL_HOURS * 3600000) throw new Error(`Appeals must be filed within ${APPEAL_HOURS} hours.`);
   const body = text.trim().slice(0, 1500);
   if (body.length < 10) throw new Error("Tell the commissioner why (a sentence or two).");
   await prisma.suspension.update({ where: { id }, data: { appealStatus: "PENDING", appealText: body, appealAt: new Date() } });
-  await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ ${s.playerName}'s club has appealed his ${s.games}-game suspension to the commissioner.` } }).catch(() => {});
+  await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ ${s.playerName}'s club has appealed his ${s.kind === "FINE" ? `$${s.fine.toLocaleString("en-US")} fine` : `${s.games}-game suspension`} to the commissioner.` } }).catch(() => {});
 }
 
 /** Commissioner: uphold / reduce (to `games`) / overturn a suspension — on appeal or on his own. */
 export async function ruleOnSuspension(id: number, decision: "UPHELD" | "REDUCED" | "OVERTURNED", games: number | null, note: string): Promise<void> {
   const s = await prisma.suspension.findUnique({ where: { id } });
-  if (!s || s.kind !== "SUSPENSION") throw new Error("No such suspension.");
+  if (!s) throw new Error("No such ruling.");
+  if (s.kind === "FINE") return ruleOnFine(s, decision, games, note);
   const pl = await prisma.player.findUnique({ where: { id: s.playerId }, select: { capHit: true } });
   const days = await seasonDays(s.season);
   let newGames = s.games;
@@ -243,6 +245,32 @@ export async function ruleOnSuspension(id: number, decision: "UPHELD" | "REDUCED
   const verdict = decision === "UPHELD" ? `upheld (${s.games} games)` : decision === "REDUCED" ? `reduced from ${s.games} to ${newGames} games` : "overturned";
   await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ Commissioner: ${s.playerName}'s suspension ${verdict}.${note.trim() ? ` "${note.trim().slice(0, 200)}"` : ""}` } }).catch(() => {});
   await notifyClub(s.teamId, `⚖️ The commissioner has ${verdict} ${s.playerName}'s suspension.${note.trim() ? ` Note: ${note.trim()}` : ""}`);
+}
+
+/** Fine appeal: `amount` is the new (lower) fine in dollars; the difference is refunded from the league bank. */
+async function ruleOnFine(s: { id: number; teamId: number | null; playerName: string; fine: number; status: string }, decision: "UPHELD" | "REDUCED" | "OVERTURNED", amount: number | null, note: string): Promise<void> {
+  let newFine = s.fine;
+  if (decision === "OVERTURNED") newFine = 0;
+  if (decision === "REDUCED") { if (amount == null || amount < 1 || amount >= s.fine) throw new Error(`Reduce the fine to between $1 and $${s.fine - 1}.`); newFine = Math.round(amount); }
+  await prisma.suspension.update({ where: { id: s.id }, data: { fine: newFine, appealStatus: decision, appealNote: note.trim().slice(0, 1000) || null, appealDecidedAt: new Date(), ...(decision === "OVERTURNED" ? { status: "OVERTURNED" } : {}) } });
+  const refund = s.fine - newFine;
+  if (refund > 0 && s.teamId) {
+    const bank = await getBank();
+    if (bank.suspensionToBank) { await postEntry({ kind: "REFUND", amount: -refund, teamId: s.teamId, note: `${s.playerName} — fine appeal ${decision.toLowerCase()}` }); await moveTeamBank(s.teamId, refund); }
+  }
+  const verdict = decision === "UPHELD" ? `upheld ($${s.fine.toLocaleString("en-US")})` : decision === "REDUCED" ? `reduced from $${s.fine.toLocaleString("en-US")} to $${newFine.toLocaleString("en-US")}` : "waived";
+  await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ Commissioner: ${s.playerName}'s fine ${verdict}.${note.trim() ? ` "${note.trim().slice(0, 200)}"` : ""}` } }).catch(() => {});
+  await notifyClub(s.teamId, `⚖️ The commissioner has ${verdict} ${s.playerName}'s fine.${note.trim() ? ` Note: ${note.trim()}` : ""}${refund > 0 ? ` $${refund.toLocaleString("en-US")} was returned to your bank.` : ""}`);
+}
+
+/** Pending appeals — drives the badge on the admin hub. */
+export async function pendingAppealCount(): Promise<number> {
+  return prisma.suspension.count({ where: { appealStatus: "PENDING" } });
+}
+
+/** A club's own rulings (newest first) for the GM panel. */
+export async function clubRulings(teamId: number, season = REGULAR_SEASON) {
+  return prisma.suspension.findMany({ where: { season, teamId }, orderBy: { createdAt: "desc" } });
 }
 
 /** Commissioner: a supplementary-discipline ruling of his own (suspension or fine). */

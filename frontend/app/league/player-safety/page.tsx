@@ -1,7 +1,7 @@
 import { PageHeader, Card } from "@/components/ui";
 import { SEVERE_INFRACTIONS } from "@/lib/sim/infractions";
 import { getTeamSession, isAdmin } from "@/lib/auth";
-import { disciplineList, APPEAL_HOURS } from "@/lib/discipline-server";
+import { disciplineList, clubRulings, APPEAL_HOURS } from "@/lib/discipline-server";
 import { SuspensionItem } from "@/components/SuspensionList";
 
 export const dynamic = "force-dynamic";
@@ -9,12 +9,19 @@ export const dynamic = "force-dynamic";
 export default async function PlayerSafetyPage() {
   const [rows, myTeamId, admin] = await Promise.all([disciplineList(), getTeamSession(), isAdmin()]);
   const now = new Date().getTime();
+  const mine = myTeamId != null ? await clubRulings(myTeamId) : [];
+  const myOpen = mine.filter((r) => (r.kind === "FINE" ? r.fine > 0 : r.status === "ACTIVE") && !r.appealStatus && now - r.createdAt.getTime() <= APPEAL_HOURS * 3600000);
   const active = rows.filter((r) => r.kind === "SUSPENSION" && r.status === "ACTIVE");
   const rest = rows.filter((r) => !active.includes(r));
   const games = rows.filter((r) => r.kind === "SUSPENSION" && r.status !== "OVERTURNED").reduce((t, r) => t + r.games, 0);
   return (
     <div className="space-y-6 py-2">
       <PageHeader title="⚖️ Player Safety" subtitle={`${rows.filter((r) => r.kind === "SUSPENSION").length} suspensions (${games} games) · ${rows.filter((r) => r.kind === "FINE").length} fines this season`} />
+      {myTeamId != null && mine.length > 0 && (
+        <Card title={`🏒 My club (${mine.length})${myOpen.length ? ` · ${myOpen.length} can be appealed` : ""}`} accent="text-amber-400">
+          <ul className="divide-y divide-slate-800/70">{rows.filter((r) => r.teamId === myTeamId).map((r) => <SuspensionItem key={r.id} now={now} r={r} myTeamId={myTeamId} admin={admin} />)}</ul>
+        </Card>
+      )}
       <Card title="How it works" accent="text-slate-400">
         <p className="text-sm text-slate-400">After every night&apos;s games the Department of Player Safety reviews game misconducts, majors for violent infractions (boarding, cross-checking, elbowing…) and hits that injure an opponent. Repeat offenders (a suspension within 18 months) are punished harder. A suspended player doesn&apos;t dress and serves in his NHL club&apos;s games; he forfeits salary per the CBA (first offence: 1/days-in-season per game, repeat offender: 1/82) — the club keeps that money. His GM can appeal to the commissioner within {APPEAL_HOURS} hours; the player serves while the appeal is heard.</p>
       </Card>

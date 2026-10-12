@@ -4,6 +4,7 @@ import { getLang } from "@/lib/lang-server";
 import { t as tt } from "@/lib/i18n";
 import { isAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { pendingAppealCount } from "@/lib/discipline-server";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,7 @@ export default async function AdminPage() {
   if (!(await isAdmin())) redirect("/"); // commissioner only
   const lang = await getLang();
   const T = (k: string) => tt(lang, k);
+  const appeals = await pendingAppealCount();
   return (
     <div className="mx-auto max-w-6xl px-4 py-2 space-y-8">
       <PageHeader title="Admin Panel" subtitle={T("admin.subtitle")} />
@@ -87,7 +89,7 @@ export default async function AdminPage() {
             {g.items.map((c) => (
               <Link key={c.href} href={c.href}
                 className="group block bg-slate-900/70 border border-slate-800 rounded-xl p-4 hover:border-blue-500/60 hover:bg-slate-900 transition-colors">
-                <div className="font-semibold text-sm mb-1 group-hover:text-white">{c.title}</div>
+                <div className="font-semibold text-sm mb-1 group-hover:text-white">{c.title}{c.href === "/admin/discipline" && appeals > 0 && <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-black">{appeals} appeal{appeals === 1 ? "" : "s"}</span>}</div>
                 <div className="text-[12px] text-slate-400 leading-snug">{T(c.descKey) || c.descKey}</div>
               </Link>
             ))}

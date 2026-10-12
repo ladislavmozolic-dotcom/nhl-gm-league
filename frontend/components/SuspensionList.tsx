@@ -9,7 +9,7 @@ const when = (d: Date) => d.toLocaleString("en-GB", { timeZone: "Europe/Bratisla
 
 /** One ruling card — shared by the public Player Safety page and the admin console. */
 export function SuspensionItem({ r, myTeamId, admin, now }: { r: Row; myTeamId: number | null; admin: boolean; now: number }) {
-  const canAppeal = r.kind === "SUSPENSION" && r.status === "ACTIVE" && !r.appealStatus && myTeamId != null && myTeamId === r.teamId && now - r.createdAt.getTime() <= APPEAL_HOURS * 3600000;
+  const canAppeal = (r.kind === "FINE" ? r.fine > 0 : r.status === "ACTIVE") && !r.appealStatus && myTeamId != null && myTeamId === r.teamId && now - r.createdAt.getTime() <= APPEAL_HOURS * 3600000;
   const badge = r.kind === "FINE" ? { t: `Fined $${r.fine.toLocaleString("en-US")}`, c: "bg-slate-700 text-slate-200" }
     : r.status === "OVERTURNED" ? { t: "Overturned", c: "bg-emerald-800/60 text-emerald-200" }
     : r.status === "SERVED" ? { t: `${r.games} game${r.games === 1 ? "" : "s"} · served`, c: "bg-slate-700 text-slate-300" }
@@ -36,6 +36,7 @@ export function SuspensionItem({ r, myTeamId, admin, now }: { r: Row; myTeamId: 
       )}
       {canAppeal && <div className="mt-2"><AppealForm id={r.id} /></div>}
       {admin && r.kind === "SUSPENSION" && r.status !== "OVERTURNED" && (r.appealStatus === "PENDING" || r.status === "ACTIVE") && <RulingForm id={r.id} games={r.games} />}
+      {admin && r.kind === "FINE" && r.status !== "OVERTURNED" && r.appealStatus === "PENDING" && <RulingForm id={r.id} games={r.fine} fine />}
     </li>
   );
 }
