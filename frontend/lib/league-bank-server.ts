@@ -67,11 +67,16 @@ export async function playerFineToBank(teamId: number | null, amount: number, no
 }
 
 type Counts = { F: number; D: number; G: number };
-async function sideCheck(teamId: number, rosterType: "NHL" | "AHL"): Promise<{ total: number; counts: Counts }> {
-  const rows = await prisma.player.findMany({ where: { teamId, rosterType }, select: { position: true, isGoalie: true, scratched: true, suspendedGames: true } });
+/** Suspension state AS OF a game: `atGame` = players who sat out that very game but are no longer suspended now
+ *  (the review after the sim already counted it toward their ban); `newlyIssued` = players banned by a ruling made
+ *  AFTER that game (they played it — the ban only bites the next one). Without it the live `suspendedGames` is used. */
+export type SuspensionAsOf = { atGame: Set<number>; newlyIssued: Set<number> };
+
+async function sideCheck(teamId: number, rosterType: "NHL" | "AHL", asOf?: SuspensionAsOf): Promise<{ total: number; counts: Counts }> {
+  const rows = await prisma.player.findMany({ where: { teamId, rosterType }, select: { id: true, position: true, isGoalie: true, scratched: true, suspendedGames: true } });
   const counts: Counts = { F: 0, D: 0, G: 0 };
   // a suspended player neither dresses nor counts toward the roster limit
-  const eligible = rows.filter((p) => !(p.suspendedGames > 0));
+  const eligible = rows.filter((p) => !((p.suspendedGames > 0 && !asOf?.newlyIssued.has(p.id)) || asOf?.atGame.has(p.id)));
   for (const p of eligible) if (!p.scratched) counts[posGroup(p.position, p.isGoalie)]++;
   return { total: eligible.length, counts };
 }
@@ -81,9 +86,9 @@ const fmt = (c: Counts) => `${c.F}F/${c.D}D/${c.G}G`;
 export type RosterProblem = { nhl: string | null; ahl: string | null };
 
 /** Why (if at all) a club's NHL / AHL roster breaks the league criteria. */
-export async function rosterProblems(teamId: number, affiliateId: number | null): Promise<RosterProblem> {
-  const nhl = await sideCheck(teamId, "NHL");
-  const ahl = affiliateId ? await sideCheck(affiliateId, "AHL") : null;
+export async function rosterProblems(teamId: number, affiliateId: number | null, asOf?: SuspensionAsOf): Promise<RosterProblem> {
+  const nhl = await sideCheck(teamId, "NHL", asOf);
+  const ahl = affiliateId ? await sideCheck(affiliateId, "AHL", asOf) : null;
   const nhlWhy: string[] = [];
   if (nhl.total > ROSTER_LIMITS.proMax) nhlWhy.push(`${nhl.total} players (max ${ROSTER_LIMITS.proMax})`);
   if (offLines(nhl.counts)) nhlWhy.push(`dressed ${fmt(nhl.counts)}, need ${fmt(DRESS_TARGET)}`);
@@ -151,11 +156,33 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
   const dayStart = new Date(`${day}T00:00:00Z`);
   const dayGames = await prisma.game.findMany({
     where: { gameDate: { gte: dayStart, lt: new Date(dayStart.getTime() + 86_400_000) } },
-    select: { league: true, homeTeamId: true, awayTeamId: true },
+    select: { league: true, homeTeamId: true, awayTeamId: true, playedAt: true },
   });
   const nhlPlayed = new Set<number>();
   const ahlTeamsPlayed = new Set<number>();
   for (const g of dayGames) for (const id of [g.homeTeamId, g.awayTeamId]) (g.league === "AHL" ? ahlTeamsPlayed : nhlPlayed).add(id);
+  // When each NHL club's game was played — suspensions are judged as of that moment (a ruling made right
+  // after the game doesn't retroactively unseat a player who dressed; a ban just served frees him only now).
+  const gameAt = new Map<number, number>();
+  for (const g of dayGames) if (g.league !== "AHL" && g.playedAt) for (const id of [g.homeTeamId, g.awayTeamId]) gameAt.set(id, Math.min(gameAt.get(id) ?? Infinity, g.playedAt.getTime()));
+  const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+  const susp = await prisma.suspension.findMany({
+    where: { kind: "SUSPENSION", OR: [{ status: "ACTIVE" }, { lastServedAt: { gte: dayStart, lt: dayEnd } }] },
+    select: { playerId: true, teamId: true, status: true, createdAt: true, lastServedAt: true },
+  });
+  const asOfFor = (clubId: number): SuspensionAsOf => {
+    const cut = gameAt.get(clubId);
+    const atGame = new Set<number>(), newlyIssued = new Set<number>(), activeBefore = new Set<number>();
+    if (cut != null) for (const s of susp) {
+      if (s.teamId !== clubId) continue;
+      const before = s.createdAt.getTime() < cut;
+      if (before && s.status === "ACTIVE") activeBefore.add(s.playerId);
+      if (before && s.lastServedAt && s.lastServedAt >= dayStart && s.lastServedAt < dayEnd) atGame.add(s.playerId);
+      if (!before && s.status === "ACTIVE") newlyIssued.add(s.playerId);
+    }
+    for (const id of activeBefore) newlyIssued.delete(id); // also serving an older ban → still out
+    return { atGame, newlyIssued };
+  };
   const ahlParentsPlayed = new Set<number>();
   if (ahlTeamsPlayed.size) {
     const aff = await prisma.team.findMany({ where: { id: { in: [...ahlTeamsPlayed] } }, select: { parentTeamId: true } });
@@ -166,7 +193,7 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
     if (!bank.finesForAiClubs && !t.passwordHash) continue; // AI-run club: nobody to fine
     const playedNhl = nhlPlayed.has(t.id), playedAhl = ahlParentsPlayed.has(t.id);
     if (!playedNhl && !playedAhl) continue; // no game today → no fines of any kind
-    const problems = await rosterProblems(t.id, t.affiliateTeams[0]?.id ?? null);
+    const problems = await rosterProblems(t.id, t.affiliateTeams[0]?.id ?? null, asOfFor(t.id));
     const charge = async (kind: string, amount: number, why: string) => {
       if (amount <= 0) return false;
       const booked = await postEntry({ kind, amount, teamId: t.id, day, note: why, dedupeKey: `${kind}:${t.id}:${day}` });

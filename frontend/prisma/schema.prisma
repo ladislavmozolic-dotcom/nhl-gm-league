@@ -1853,6 +1853,7 @@ model Suspension {
   appealAt        DateTime?
   appealNote      String?
   appealDecidedAt DateTime?
+  lastServedAt    DateTime? // when a game last counted toward it (roster compliance must judge the lineup AS OF that game)
   createdAt       DateTime  @default(now())
 
   @@index([playerId])

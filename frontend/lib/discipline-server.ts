@@ -198,7 +198,7 @@ export async function serveSuspensions(gameIds: number[], before: Date): Promise
     const take = Math.min(avail, s.games - s.gamesServed);
     usedBy.set(s.playerId, (usedBy.get(s.playerId) ?? 0) + take);
     const gamesServed = s.gamesServed + take;
-    await prisma.suspension.update({ where: { id: s.id }, data: { gamesServed, ...(gamesServed >= s.games ? { status: "SERVED" } : {}) } });
+    await prisma.suspension.update({ where: { id: s.id }, data: { gamesServed, lastServedAt: new Date(), ...(gamesServed >= s.games ? { status: "SERVED" } : {}) } });
     touched.add(s.playerId);
     served += take;
   }
