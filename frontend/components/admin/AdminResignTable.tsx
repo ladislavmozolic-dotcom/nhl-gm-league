@@ -14,6 +14,10 @@ export type ResignRowData = ResignPlayerData & {
   tradeRequested?: boolean;
   iceWarnedAt?: Date | string | null;
   promiseWarnGame?: number | null;
+  /** term of his standing club offer + the term window he allowed when it was made (from the negotiation log) */
+  lastOfferYears?: number | null;
+  lastOfferMinYears?: number | null;
+  lastOfferMaxYears?: number | null;
 };
 
 const fmtM = (c: number | null | undefined) => {
@@ -152,6 +156,11 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                 const postOs = p.cbaStatus === "RFA" && !p.franchiseTag && p.rfaOsUsed;
                 const roundCap = p.cbaStatus === "RFA" && !p.franchiseTag ? (postOs ? null : 1) : 2;
 
+                // the standing offer's term vs the years he allowed — a failed offer is often a term problem
+                const termOutside =
+                  p.lastOfferYears != null && p.lastOfferMinYears != null && p.lastOfferMaxYears != null &&
+                  (p.lastOfferYears < p.lastOfferMinYears || p.lastOfferYears > p.lastOfferMaxYears);
+
                 // Gap calculation
                 let gapText = null;
                 let gapColor = "text-slate-400";
@@ -165,6 +174,8 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                     gapText = `+${fmtM(diff)} (+${diffPct}%)`;
                     gapColor = "text-emerald-400";
                   }
+                  // an offer above his counter that still failed was a term problem — don't paint it as a win
+                  if (termOutside && diff >= 0) gapColor = "text-slate-500";
                 }
 
                 return (
@@ -293,9 +304,18 @@ export default function AdminResignTable({ rows }: { rows: ResignRowData[] }) {
                       {p.resignOfferSalary ? (
                         <div>
                           <span className="font-bold text-slate-200">
-                            {fmtM(p.resignOfferSalary)}
+                            {fmtM(p.resignOfferSalary)}{p.lastOfferYears ? ` × ${p.lastOfferYears}r` : ""}
                           </span>
-                          <span className="text-[10px] text-slate-500 block">last offer</span>
+                          {termOutside ? (
+                            <span
+                              className="text-[10px] font-semibold block text-rose-300"
+                              title="The offer's term was outside the years he accepts — that, not the money, is why it failed."
+                            >
+                              ⚠ term outside {p.lastOfferMinYears}–{p.lastOfferMaxYears}r
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 block">last offer</span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-slate-600">—</span>

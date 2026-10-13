@@ -138,6 +138,16 @@ export default async function AdminAgentPage() {
     lowballRows.map((l) => [`${l.playerId}_${l.teamId}`, l.bump])
   );
 
+  // The term of each player's standing club offer + the term window he allowed at that moment, from
+  // the negotiation log — the table must show WHY an offer failed (money OR a term outside his range).
+  const offerLogs = await prisma.negotiationLog.findMany({
+    where: { playerId: { in: resigns.map((p) => p.id) }, kind: "OFFER", offerSalary: { not: null } },
+    orderBy: { id: "desc" },
+    select: { playerId: true, offerSalary: true, offerYears: true, askMinYears: true, askMaxYears: true },
+  });
+  const logsByPlayer = new Map<number, typeof offerLogs>();
+  for (const l of offerLogs) logsByPlayer.set(l.playerId, [...(logsByPlayer.get(l.playerId) ?? []), l]);
+
   // Deep AI valuation evaluation for each player
   const resignRows: ResignRowData[] = await Promise.all(
     resigns.map(async (p) => {
@@ -166,6 +176,9 @@ export default async function AdminAgentPage() {
         }
       }
 
+      const logs = logsByPlayer.get(p.id) ?? [];
+      const standing = logs.find((l) => l.offerSalary === p.resignOfferSalary) ?? logs[0] ?? null;
+
       return {
         id: p.id,
         name: p.name,
@@ -182,6 +195,9 @@ export default async function AdminAgentPage() {
         resignStatus: p.resignStatus,
         resignRound: p.resignRound,
         resignOfferSalary: p.resignOfferSalary,
+        lastOfferYears: standing?.offerYears ?? null,
+        lastOfferMinYears: standing?.askMinYears ?? null,
+        lastOfferMaxYears: standing?.askMaxYears ?? null,
         resignOfferAt: p.resignOfferAt,
         resignCounterSalary: p.resignCounterSalary,
         resignCounterYears: p.resignCounterYears,
