@@ -304,7 +304,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   disciplineEnabled: true, disciplinePct: 100, retireMinGames: 300,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,
-  conSlope: 0.03, b2bFatigue: 0.885,
+  conSlope: 0.045, b2bFatigue: 0.885,
   gameVariancePct: 108, nightSigmaGoalie: 0.11, nightSigmaOff: 0.07,
   parityPct: 100,
   conShotsLow1: 23, conShotsLow2: 32, conShotsHigh1: 27, conShotsHigh2: 34,
