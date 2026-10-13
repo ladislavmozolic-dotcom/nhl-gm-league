@@ -1,9 +1,10 @@
 import Link from "next/link";
 import BackLink from "@/components/BackLink";
 import { prisma } from "../../../lib/prisma";
-import PlayerAvatar from "@/components/playerAvatar";
-import { cleanName } from "@/lib/playerName";
-import { PageHeader, Card, StatTile, SectionTitle } from "@/components/ui";
+import { isLoggedIn } from "@/lib/auth";
+import { livePlayerOverall } from "@/lib/player-overall";
+import { groupRoster, RosterSection } from "@/components/TeamRosterTable";
+import { PageHeader, Card, StatTile } from "@/components/ui";
 
 export default async function AhlTeamDetailPage({
   params,
@@ -22,9 +23,8 @@ export default async function AhlTeamDetailPage({
       // this teamId (schema requires one) but must never show as an active AHL player.
       players: {
         where: { rosterType: "AHL" },
-        orderBy: {
-          name: "asc",
-        },
+        orderBy: { overall: "desc" },
+        include: { goalieRating: true },
       },
     },
   });
@@ -37,10 +37,8 @@ export default async function AhlTeamDetailPage({
     );
   }
 
-  const isFwd = (p: any) => !p.isGoalie && (p.position?.includes("C") || p.position?.includes("W") || p.position?.includes("F"));
-  const forwards = team.players.filter(isFwd);
-  const defense = team.players.filter((p) => !p.isGoalie && !isFwd(p) && p.position?.includes("D"));
-  const goalies = team.players.filter((p) => p.isGoalie);
+  const loggedIn = await isLoggedIn();
+  const { forwards, defense, goalies } = groupRoster(team.players.map((p) => ({ ...p, overall: livePlayerOverall(p) })));
   const avgAge = team.players.length > 0
     ? (team.players.reduce((s, p) => s + (p.age || 0), 0) / team.players.length).toFixed(1)
     : "0";
@@ -87,52 +85,11 @@ export default async function AhlTeamDetailPage({
 
       {/* ROSTER */}
       <div className="space-y-6">
-        {forwards.length > 0 && <RosterSection title="Forwards" players={forwards} />}
-        {defense.length > 0 && <RosterSection title="Defensemen" players={defense} />}
-        {goalies.length > 0 && <RosterSection title="Goalies" players={goalies} />}
+        {forwards.length > 0 && <RosterSection title="Forwards" players={forwards} accent="text-emerald-300" farm hideAttrs={!loggedIn} />}
+        {defense.length > 0 && <RosterSection title="Defensemen" players={defense} accent="text-emerald-300" farm hideAttrs={!loggedIn} />}
+        {goalies.length > 0 && <RosterSection title="Goalies" players={goalies} accent="text-emerald-300" farm hideAttrs={!loggedIn} />}
         {team.players.length === 0 && <Card><p className="text-slate-500 text-center py-8">No players on roster</p></Card>}
       </div>
-    </div>
-  );
-}
-
-function RosterSection({ title, players }: { title: string; players: any[] }) {
-  return (
-    <div>
-      <SectionTitle count={players.length} accent="text-emerald-300/80">{title}</SectionTitle>
-      <Card bodyClassName="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-500 text-[10px] uppercase tracking-wider bg-slate-800/30">
-                <th className="px-3 py-3 text-left font-medium min-w-[160px]">Player</th>
-                <th className="px-3 py-3 text-center font-medium w-14">Pos</th>
-                <th className="px-3 py-3 text-center font-medium w-12">#</th>
-                <th className="px-3 py-3 text-center font-medium w-12">Age</th>
-                <th className="px-3 py-3 text-center font-medium w-12">OVR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {players.map((player) => (
-                <tr key={player.id} className="border-b border-slate-800/40 hover:bg-slate-800/30 transition-colors last:border-0">
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <PlayerAvatar src={player.photoUrl} alt={player.name} size={32} />
-                      <Link href={`/players/${player.slug}`} className="font-medium text-sm hover:text-emerald-300 transition-colors truncate block">{cleanName(player.name)}</Link>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 text-center text-slate-400">{player.position}</td>
-                  <td className="px-3 py-2.5 text-center text-slate-400 tabular-nums">{player.number ? `#${player.number}` : "—"}</td>
-                  <td className="px-3 py-2.5 text-center text-slate-400 tabular-nums">{player.age || "—"}</td>
-                  <td className="px-3 py-2.5 text-center">
-                    <span className={`font-bold ${(player.overall || 0) >= 80 ? "text-green-400" : (player.overall || 0) >= 70 ? "text-emerald-300" : (player.overall || 0) >= 60 ? "text-yellow-400" : "text-slate-400"}`}>{player.overall || "—"}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
     </div>
   );
 }
