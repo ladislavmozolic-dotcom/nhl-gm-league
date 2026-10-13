@@ -8,7 +8,7 @@ import { CURRENT_SEASON_START, ageAsOfJune30 } from "./finance";
 import {
   faPosGroup, skaterMarket, goalieMarket, anchorFromPool, buildDemand, percentile, availabilityFactor, isDepthSlot,
   slotForRank, slotToLine, desiredDeployment, deploymentDemand, offerUtility, offerAcceptable, clauseDiscount, termPremium, lowballTier,
-  NO_PROMISE_PREMIUM, type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
+  NO_PROMISE_PREMIUM, MAX_TERM, type MarketRow, type Demand, type FaPos, type Contention, type Deployment, type Desired, type LineSlot,
   type FWeights, type DWeights, type GWeights,
 } from "./free-agency";
 
@@ -646,6 +646,7 @@ export type TeamAsk = {
   lowballBump: number; // >1 when this club insulted him with a lowball earlier (his ask to THEM is up)
   elite: number; // elite-ladder price (0 = not elite)
   ladder: Record<number, number> | null; // commissioner hand-set price per term (Admin → FA Tuning / Demand Watch)
+  cheapCapped: boolean; // his term window was cut to ≤ 2 yr because his price is a cheap one (lifted when the club pays well above it)
 };
 
 // ---- lowball memory --------------------------------------------------------
@@ -773,7 +774,8 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
     if (rf < 1) base = { ...base, salary: Math.max(775_000, round50k(base.salary * rf)), floorSalary: Math.max(775_000, round50k(base.floorSalary * rf)) };
   }
   // a cheap deal (≤ $1.5M) is a short one: he won't lock in a low salary beyond 2 years
-  if (base.floorSalary <= CHEAP_DEAL_MAX) base = { ...base, years: Math.min(base.years, 2), maxYears: Math.min(base.maxYears, 2), minYears: Math.min(base.minYears, 2) };
+  const cheapCapped = base.floorSalary <= CHEAP_DEAL_MAX;
+  if (cheapCapped) base = { ...base, years: Math.min(base.years, 2), maxYears: Math.min(base.maxYears, 2), minYears: Math.min(base.minYears, 2) };
   const desired = desiredDeployment(grp, line, p.df, slot === "XD" || slot === "XF");
   // projected ask = the club gives him the role he projects into, plus the ST he wants
   const projDeploy: Deployment = { line, pp: desired.wantPP, pk: desired.wantPK };
@@ -800,7 +802,7 @@ export async function teamAsk(playerId: number, teamId: number, pool?: MarketRow
     const sal = Math.min(maxSalary, round50k(ladder[ask.years] * bump));
     ask = { ...ask, salary: sal, floorSalary: Math.max(775_000, Math.min(sal, round50k(sal * gap))) };
   }
-  return { grp, base, slot, line, contention: ctx.contention, churn: ctx.churn, desired, ask, age: dealAge, lowballBump: bump, elite, ladder };
+  return { grp, base, slot, line, contention: ctx.contention, churn: ctx.churn, desired, ask, age: dealAge, lowballBump: bump, elite, ladder, cheapCapped };
 }
 
 /** Asks from this up ignore the promised role entirely (price = Demand Watch value). */
@@ -831,6 +833,13 @@ export async function evaluateTeamOffer(
   raw = roleFree
     ? { ...info.ask } // whole demand incl. term window — a worse promised role doesn't shorten it either
     : { ...raw, salary: Math.max(raw.salary, info.ask.salary), floorSalary: Math.max(raw.floorSalary, info.ask.floorSalary) };
+  // The cheap-deal term cap (≤ 2 yr) protects a player from locking in a LOW salary. A club that pays well
+  // above it (salary over the cap) is not asking for that: any term up to the league cap is open, priced by
+  // the term premium as usual (a young depth player still charges steeply per extra year).
+  if (info.cheapCapped && salary > CHEAP_DEAL_MAX) {
+    const roleGap = Math.max(0, deploy.line - info.desired.line);
+    raw = { ...raw, maxYears: Math.max(raw.maxYears, Math.max(1, MAX_TERM - roleGap)) };
+  }
   // granting a clause lets him sign for less — discount his floor + headline ask.
   // EXCEPT when the club promises him a worse role than he wants: then he wants to
   // be free to move on, so a no-trade clause is worth nothing to him.
