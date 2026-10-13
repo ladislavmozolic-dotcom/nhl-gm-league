@@ -125,7 +125,7 @@ export default function RosterMover({
     proScratched = of("pro-scratched"),
     farm = of("farm"),
     farmScratched = of("farm-scratched");
-  const nhlRoster = rows.filter((r) => isNhlSide(r.side));
+  const nhlRoster = rows.filter((r) => isNhlSide(r.side) && !((r.suspendedGames ?? 0) > 0)); // suspended players don't count toward the 23
   const goalies = (l: Player[]) => l.filter((p) => p.isGoalie).length;
   const proSkaters = pro.length - goalies(pro);
   const farmSkaters = farm.length - goalies(farm);

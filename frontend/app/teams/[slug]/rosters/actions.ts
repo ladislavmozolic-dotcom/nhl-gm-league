@@ -39,7 +39,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const isAhlOnly = (id: number) => { const p = byId.get(id)!; return (p.capHit ?? 0) === 100_000; };
   for (const m of valid) if (isNhlSide(m.side) && isAhlOnly(m.id)) m.side = "farm";
 
-  const nhlRoster = valid.filter((m) => isNhlSide(m.side)); // dressed + scratched → cap + 23-limit
+  const nhlRoster = valid.filter((m) => isNhlSide(m.side) && !(byId.get(m.id)!.suspendedGames > 0)); // dressed + scratched → cap + 23-limit (suspended players don't count)
   const pro = valid.filter((m) => m.side === "pro");
   const goalies = (list: MoveRow[]) => list.filter((m) => byId.get(m.id)!.isGoalie).length;
 

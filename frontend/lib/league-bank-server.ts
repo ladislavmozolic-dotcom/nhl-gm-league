@@ -68,10 +68,12 @@ export async function playerFineToBank(teamId: number | null, amount: number, no
 
 type Counts = { F: number; D: number; G: number };
 async function sideCheck(teamId: number, rosterType: "NHL" | "AHL"): Promise<{ total: number; counts: Counts }> {
-  const rows = await prisma.player.findMany({ where: { teamId, rosterType }, select: { position: true, isGoalie: true, scratched: true } });
+  const rows = await prisma.player.findMany({ where: { teamId, rosterType }, select: { position: true, isGoalie: true, scratched: true, suspendedGames: true } });
   const counts: Counts = { F: 0, D: 0, G: 0 };
-  for (const p of rows) if (!p.scratched) counts[posGroup(p.position, p.isGoalie)]++;
-  return { total: rows.length, counts };
+  // a suspended player neither dresses nor counts toward the roster limit
+  const eligible = rows.filter((p) => !(p.suspendedGames > 0));
+  for (const p of eligible) if (!p.scratched) counts[posGroup(p.position, p.isGoalie)]++;
+  return { total: eligible.length, counts };
 }
 const offLines = (c: Counts) => c.F !== DRESS_TARGET.F || c.D !== DRESS_TARGET.D || c.G !== DRESS_TARGET.G;
 const fmt = (c: Counts) => `${c.F}F/${c.D}D/${c.G}G`;

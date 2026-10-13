@@ -65,7 +65,7 @@ async function rosterSizeFinding(): Promise<CommissionerFinding> {
   const orgTeamIds = [...nhlTeams.map((t) => t.id), ...affiliates.map((a) => a.id)];
   const players = await prisma.player.findMany({
     where: { teamId: { in: orgTeamIds }, rosterType: { in: ["NHL", "AHL"] } },
-    select: { teamId: true, rosterType: true, scratched: true, isGoalie: true },
+    select: { teamId: true, rosterType: true, scratched: true, isGoalie: true, suspendedGames: true },
   });
   const byTeam = new Map<number, typeof players>();
   for (const p of players) { const arr = byTeam.get(p.teamId) ?? []; arr.push(p); byTeam.set(p.teamId, arr); }
@@ -73,7 +73,7 @@ async function rosterSizeFinding(): Promise<CommissionerFinding> {
   const rows: FindingRow[] = [];
   for (const t of nhlTeams) {
     const affiliate = affiliateByParent.get(t.id);
-    const pro = byTeam.get(t.id) ?? [];
+    const pro = (byTeam.get(t.id) ?? []).filter((p) => !(p.suspendedGames > 0)); // suspended players don't count toward the 23
     const farm = affiliate ? (byTeam.get(affiliate.id) ?? []) : [];
     const proCount = pro.length;
     const farmActiveCount = farm.filter((p) => !p.scratched).length;
