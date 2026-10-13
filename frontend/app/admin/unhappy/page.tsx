@@ -16,7 +16,7 @@ export default async function UnhappyPlayersPage() {
         <UnhappyPlayersTable data={data} />
       </Card>
       <p className="text-xs text-slate-600">
-        A player turns unhappy when his average ice time over the club&apos;s last {10} games is below {data.pct}% of what his projected role gets on his own club. Each unhappy day adds one to the count:
+        A player turns unhappy when his average ice time over the club&apos;s last 20 games (judged only once he has 15 with the club) is below {data.pct}% of what his projected role gets on his own club. Each unhappy day adds one to the count:
         at {data.warnDays} his agent warns the GM, at {data.requestDays} he requests a trade. Games missed through injury don&apos;t count. “Right now” = the same check run live without changing anything; “Clear” wipes the count, warnings and an ice-time/promise trade request.
       </p>
     </div>

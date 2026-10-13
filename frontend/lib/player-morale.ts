@@ -9,7 +9,8 @@
 //
 // "What he deserves" is self-calibrating — no hard-coded minutes: a player whose
 // talent projects onto the 2nd line is compared with the average ice time of HIS
-// team's 2nd-line tier (forwards ranked 4-6 by TOI) over the club's last 10 games.
+// team's 2nd-line tier (forwards ranked 4-6 by TOI) over the club's last 20 games
+// (nobody is judged before he has 15 games with the club).
 // A healthy scratch counts as 0:00. Goalies compare their share of starts.
 
 import { prisma } from "./prisma";
@@ -20,11 +21,11 @@ import { slotLabel, type LineSlot } from "./free-agency";
 import { REGULAR_SEASON } from "./phase";
 import { cleanName } from "./playerName";
 
-const WINDOW = 10;               // the club's last N regular-season games
+const WINDOW = 20;               // the club's last N regular-season games
 const SETTLE_DAYS = 14;          // just traded / signed → give him two weeks to settle
 const MORALE_DROP_PER_DAY = 1.5; // each unhappy day
 const MORALE_FLOOR = 25;
-const MIN_GAMES = 5;             // games with THIS club inside the window before he's judged
+const MIN_GAMES = 15;            // games with THIS club inside the window before he's judged (a short sample is mostly noise)
 const MIN_GAMES_G = 10;          // goalie starts are lumpy — need the full window
 const GOALIE_SHARE: Record<number, number> = { 1: 0.65, 2: 0.25 };
 // tier of TOI ranks each line maps to (1-based ranks within F / D)

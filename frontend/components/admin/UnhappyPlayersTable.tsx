@@ -55,6 +55,11 @@ export default function UnhappyPlayersTable({ data: initial }: { data: UnhappyDa
       <div className="flex flex-wrap items-center gap-2 p-3 border-b border-slate-800">
         {tab("all", "All")}{tab("warned", "Warned")}{tab("trade", "Trade request")}{tab("ok", "Fine today")}
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Player or team…" className="ml-auto bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 w-44" />
+        {data.rows.length > 0 && (
+          <button type="button" disabled={pending} onClick={() => clear(data.rows.map((r) => r.id), `ALL ${data.rows.length} listed players`)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-50">
+            Clear everyone ({data.rows.length})
+          </button>
+        )}
         {okIds.length > 0 && (
           <button type="button" disabled={pending} onClick={() => clear(okIds, `${okIds.length} players who are fine by today's check`)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/80 hover:bg-emerald-500 text-white disabled:opacity-50">
             Clear all “fine today” ({okIds.length})
