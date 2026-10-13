@@ -2288,7 +2288,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       else { st.box[carrierTeam.id].nzTime++; st.box[opp.id].nzTime++; }
     }
     const def = other(carrierTeam);
-    if (st.v3Pace) {
+    if (st.v3Pace || st.v3Pin) {
       if (carrierTeam !== lastCT) { possSince = tick; zoneSince = tick; lastCT = carrierTeam; lastZone = zone; }
       else if (zone !== lastZone) { zoneSince = tick; lastZone = zone; }
     }
@@ -2298,7 +2298,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       if (stage > pinStage) {
         pinStage = stage;
         const dSh = shifts[def.id];
-        st.sink.emit({ period, seconds: tick, type: "PRESSURE", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, targetId: def.id, importance: "NOTABLE", meta: { seconds: dur, against: def.code ?? def.name, tired: Math.max(dSh.fElapsed, dSh.dElapsed) >= 45 } });
+        st.sink.emit({ period, seconds: tick, type: "PRESSURE", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, targetId: def.id, importance: "NOTABLE", meta: { seconds: dur, against: def.code ?? def.name, tired: Math.max(dSh.fElapsed, dSh.dElapsed) >= 60 } });
       }
     }
     const isHome = carrierTeam === home;
@@ -2420,6 +2420,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
     const armUp = delayedFor === carrierTeam.id ? 1.2 : 1;
     const crowd = carrierTeam === home ? st.crowdMult : 1;
+    if (st.v3Pace && !rushCtx && setup !== "rebound" && tick - lastShotTick < PACE_TUNING.shotGap) continue; // a blocked / missed shot is not re-shot a second later
     if (st.v3Pace && !rushCtx && tick - zoneSince < PACE_TUNING.shotDwell) continue; // just arrived in the zone — nobody shoots in the first two seconds
     if (!rushCtx && !rng.chance(0.29 * (st.v3Pace ? PACE_TUNING.shotBoost : 1) * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * (st.v3Pin ? PIN_TUNING.base * (1 + PIN_TUNING.shots * Math.min(1, (tick - zoneSince) / 40)) : 1) * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd * (st.v3Rush ? RUSH_TUNING.gate : 1))) continue;
     lastShotTick = tick;
@@ -3112,7 +3113,7 @@ const TAKEAWAY_SHARE = 0.17;
 /** V3 pace: the earliest a puck may leave a zone / get a first shot after arriving, with the chances raised so the AVERAGE time stays what it was (the old geometric dice let a puck cross two zones in 2 s). */
 /** V3 pin: after `hold` s of the puck in their zone a team can't change (until `maxShift` s); a gassed defence concedes (`conv`); long possessions shoot more (`shots`); `base` keeps league shots where they were. */
 export const PIN_TUNING = { hold: 6, maxShift: 100, conv: 0.35, shots: 0.25, base: 0.80, keep: 0.25, tire: 0.8, dur: 0.6 };
-export const PACE_TUNING = { dwell: 2, advance: 0.6, shotDwell: 2, shotBoost: 1.24 };
+export const PACE_TUNING = { dwell: 2, advance: 0.6, shotDwell: 2, shotGap: 3, shotBoost: 1.78 };
 
 function distributeCounting(st: SimState) {
   for (const team of [st.home, st.away]) {
