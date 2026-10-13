@@ -95,7 +95,24 @@ export async function checkIceTimeMorale(opts: { dryRun?: boolean; season?: stri
     for (const a of apps) { const t = gDate.get(a.gameId) ?? 0; if (!firstApp.has(a.playerId) || t < firstApp.get(a.playerId)!) firstApp.set(a.playerId, t); }
     const windowDates = await prisma.game.findMany({ where: { id: { in: gameIds } }, select: { id: true, gameDate: true } });
     const wDate = new Map(windowDates.map((g) => [g.id, g.gameDate?.getTime() ?? 0]));
-    const memberGames = (pid: number) => { const f = firstApp.get(pid); return f == null ? 0 : gameIds.filter((id) => (wDate.get(id) ?? 0) >= f).length; };
+    // games he dressed in, and the injuries he suffered (INJURY events) — a game missed while hurt is
+    // NOT a snub: it must neither count as 0:00 of ice time nor as a game he was "given" (Byram: hurt
+    // for two games, then 22 min a night, read as 14:50 because the two missed games were averaged in)
+    const playedIn = new Map<number, Set<number>>();
+    for (const a of apps) { if (!playedIn.has(a.playerId)) playedIn.set(a.playerId, new Set()); playedIn.get(a.playerId)!.add(a.gameId); }
+    const injEvents = roster.length
+      ? await prisma.gameEvent.findMany({ where: { type: "INJURY", playerId: { in: roster.map((p) => p.id) }, game: { season, league: "NHL" } }, select: { playerId: true, game: { select: { gameDate: true } } } })
+      : [];
+    const injDates = new Map<number, number[]>();
+    for (const e of injEvents) { if (e.playerId != null && e.game?.gameDate) injDates.set(e.playerId, [...(injDates.get(e.playerId) ?? []), e.game.gameDate.getTime()]); }
+    const excusedMiss = (pid: number, gameId: number) => {
+      if (playedIn.get(pid)?.has(gameId)) return false;
+      const gt = wDate.get(gameId) ?? 0;
+      const apDates = [...(playedIn.get(pid) ?? [])].map((id) => gDate.get(id) ?? 0);
+      // hurt in a game before this one and not back on the ice in between → out injured
+      return (injDates.get(pid) ?? []).some((de) => de <= gt && !apDates.some((ad) => ad > de && ad < gt));
+    };
+    const memberGames = (pid: number) => { const f = firstApp.get(pid); return f == null ? 0 : gameIds.filter((id) => (wDate.get(id) ?? 0) >= f && !excusedMiss(pid, id)).length; };
     const startsBy = new Map(gkStarts.map((r) => [r.playerId, r._count._all]));
     const skaters = roster.filter((p) => !p.isGoalie);
     const isD = (pos: string | null) => (pos ?? "").toUpperCase().startsWith("D");
