@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isAdmin, getTeamSession } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { sendWelcomeEmail } from "@/lib/email";
+import { clearTeamChat } from "@/lib/im/cleanup";
 
 async function adminName(): Promise<string> {
   const id = await getTeamSession();
@@ -41,6 +42,7 @@ export async function approveJoinRequest(formData: FormData) {
       data: { status: "rejected", decidedBy: who, decidedAt: new Date() },
     }),
   ]);
+  await clearTeamChat(req.teamId); // new GM starts with a clean chat
   revalidatePath("/admin/join-requests");
   revalidatePath("/", "layout");
   // best-effort welcome mail — never let a provider hiccup block the approval itself
@@ -73,6 +75,7 @@ export async function removeGmAction(formData: FormData) {
     where: { id: teamId },
     data: { sessionVersion: { increment: 1 }, passwordHash: null, gmFirstName: null, gmLastName: null, gmNickname: null, gmEmail: null, lastLoginAt: null },
   });
+  await clearTeamChat(teamId); // old GM's chats are removed with the seat
   revalidatePath("/admin/join-requests");
   revalidatePath("/league");
   revalidatePath("/", "layout");

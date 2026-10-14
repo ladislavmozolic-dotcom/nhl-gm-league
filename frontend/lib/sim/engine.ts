@@ -171,6 +171,7 @@ type SimState = {
   v3ShootoutDuel: boolean;           // V3 diagnostic feature flag
   v3GarbageTime: boolean;            // V3 diagnostic feature flag
   v3ShooterForm: boolean;            // V3 diagnostic feature flag
+  v3LateTieCaution: boolean;         // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
   v3Pin: boolean;                    // V3: a team pinned in its own end can't change, tires, and gets scored on more
   v3Pace: boolean;                   // V3: the puck needs real time to cross a zone — no 2-second counter-attacks, no 'takeaway' right after a shot
@@ -1552,6 +1553,11 @@ export function v3GarbageTimeShotMult(period: number, marginForTeam: number): nu
   return 1;
 }
 
+/** In the final three minutes of a 5v5 tie, both benches value the standings point. */
+export function v3LateTieShotMult(period: number, secondsIntoPeriod: number, marginForTeam: number): number {
+  if (period !== 3 || marginForTeam !== 0 || PERIOD_SECONDS - secondsIntoPeriod > 180) return 1;
+  return 0.75;
+}
 // Per-line deployment tactic → {of, df} multipliers around 1.0. Neutral CK1/DF2/OF2
 // gives exactly 1.0; an offensive line (high OF) presses harder, a checking/defensive
 // line (high DF) suppresses. Effect ~±8%, so a good line still needs the players.
@@ -2414,7 +2420,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // of always reaching the net, so the upstream rate is boosted to keep the actual
     // on-goal (SOG) rate the calibration is tuned against unchanged.
     const lateShell = lateShellShotMult(period, tick, margin)
-      * (st.v3GarbageTime ? v3GarbageTimeShotMult(period, margin) : 1);
+      * (st.v3GarbageTime ? v3GarbageTimeShotMult(period, margin) : 1)
+      * (st.v3LateTieCaution && curStr[home.id] === "EV" && curStr[away.id] === "EV" ? v3LateTieShotMult(period, tick, margin) : 1);
     const faceoffSetPlay = faceoffPressure?.teamId === carrierTeam.id && tick < faceoffPressure.until ? 1.06 : 1;
     const adaptAtk = adapt(carrierTeam, margin).shots, adaptDef = adapt(def, -margin).allow;
     const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
@@ -3209,7 +3216,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean };
+  experimentalV3?: { pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3283,6 +3290,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3ShootoutDuel: isV3 && (opts.experimentalV3?.shootoutDuel ?? true),
     v3GarbageTime: isV3 && (opts.experimentalV3?.garbageTime ?? true),
     v3ShooterForm: isV3 && (opts.experimentalV3?.shooterForm ?? true),
+    v3LateTieCaution: isV3 && (opts.experimentalV3?.lateTieCaution ?? true),
     v3Stoppages: isV3 && (opts.experimentalV3?.stoppageRealism ?? CFG.v3StoppageRealism ?? false),
     v3Pin: isV3 && (opts.experimentalV3?.pin ?? true),
     v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),

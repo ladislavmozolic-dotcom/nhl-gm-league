@@ -2171,6 +2171,7 @@ model ImMessage {
   body        String
   replyToId   Int?
   imageUrl    String? // attached picture / GIF (uploaded under /uploads/chat or a Giphy URL)
+  editedAt    DateTime? // set when the author edits the text
   kind        String    @default("user") // "user" | "system" (group events: created / added / removed / left / renamed)
   deletedAt   DateTime? // soft delete (author or moderator) — body is hidden from clients
   deletedById Int?
@@ -2194,6 +2195,7 @@ model ImRead {
   roomId     Int
   teamId     Int
   lastReadId Int     @default(0)
+  clearedId  Int     @default(0) // "delete conversation" for me: messages up to this id are hidden from me only
   room       ImRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@id([roomId, teamId])

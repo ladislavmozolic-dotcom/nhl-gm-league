@@ -5,7 +5,7 @@ import { EmojiPicker, GifPicker, Lightbox, isBigEmoji, prepareImage, uploadImage
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null; avatarUrl: string | null };
-type Msg = { kind: string; imageUrl: string | null; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
+type Msg = { kind: string; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
 type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
 type Boot = { me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null; gif: boolean };
 
@@ -145,6 +145,15 @@ export default function ChatApp() {
           return next;
         });
       });
+      es.addEventListener("edited", (e) => {
+        const list = JSON.parse((e as MessageEvent).data) as Msg[];
+        setMsgs((cur) => {
+          const next = { ...cur };
+          for (const m of list) if (next[m.roomId]) next[m.roomId] = next[m.roomId].map((x) => (x.id === m.id ? { ...x, body: m.body, edited: true } : x));
+          return next;
+        });
+        setBoot((b) => b && { ...b, rooms: b.rooms.map((r) => (r.last && list.some((m) => m.id === r.last!.id) ? { ...r, last: { ...r.last, body: list.find((m) => m.id === r.last!.id)!.body } } : r)) });
+      });
       es.addEventListener("reads", (e) => {
         const rs = JSON.parse((e as MessageEvent).data) as { roomId: number; teamId: number; lastReadId: number }[];
         setReads((p) => { const n = { ...p }; rs.forEach((r) => (n[r.roomId] = { ...(n[r.roomId] ?? {}), [r.teamId]: r.lastReadId })); return n; });
@@ -234,6 +243,7 @@ export default function ChatApp() {
             title={activeRoom ? roomTitle(activeRoom) : teamMap.get(pendingDm ?? 0)?.name ?? ""}
             onBack={() => { setActive(null); setPendingDm(null); }}
             onGroupChanged={async (left) => { await load(); if (left) setActive(null); }}
+            onCleared={async (roomId) => { setMsgs((c) => { const n = { ...c }; delete n[roomId]; return n; }); setActive(null); await load(); }}
             onSent={async (roomId, m) => {
               if (active == null) { await load(); setPendingDm(null); setActive(roomId); setMsgs((c) => ({ ...c, [roomId]: [m] })); }
               else setMsgs((c) => (c[roomId]?.some((x) => x.id === m.id) ? c : { ...c, [roomId]: [...(c[roomId] ?? []), m] }));
@@ -280,11 +290,14 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 
 function Thread(props: {
   boot: Boot; teamMap: Map<number, TeamLite>; room: Room | null; dmTeamId: number | null; messages: Msg[] | null;
-  reads: Record<number, number>; title: string; onBack: () => void; onSent: (roomId: number, m: Msg) => void; onGroupChanged: (left: boolean) => Promise<void>;
+  reads: Record<number, number>; title: string; onBack: () => void; onSent: (roomId: number, m: Msg) => void; onGroupChanged: (left: boolean) => Promise<void>; onCleared: (roomId: number) => Promise<void>;
 }) {
-  const { boot, teamMap, room, dmTeamId, messages, reads, title, onBack, onSent, onGroupChanged } = props;
+  const { boot, teamMap, room, dmTeamId, messages, reads, title, onBack, onSent, onGroupChanged, onCleared } = props;
   const [info, setInfo] = useState(false);
   const [tray, setTray] = useState<null | "emoji" | "gif">(null);
+  const [editing, setEditing] = useState<Msg | null>(null);
+  const [head, setHead] = useState(false);
+  const [flash, setFlash] = useState<number | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -312,6 +325,13 @@ function Thread(props: {
     const body = imageUrl ? "" : text.trim();
     if ((!body && !imageUrl) || sending) return;
     setSending(true); setError("");
+    if (editing) {
+      const er = await fetch("/api/im/edit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editing.id, body }) });
+      setSending(false);
+      if (!er.ok) { setError(er.status === 400 ? "Správu už nejde upraviť (starsia ako 48 h)." : "Úprava zlyhala."); return; }
+      setEditing(null); setText("");
+      return;
+    }
     const r = await fetch("/api/im/send", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...(room ? { roomId: room.id } : { toTeamId: dmTeamId }), body, imageUrl, replyToId: reply?.id }),
@@ -331,6 +351,22 @@ function Thread(props: {
     if (!url) { setError("Obrázok sa nepodarilo nahrať (PNG/JPG/WEBP/GIF, max 8 MB)."); return; }
     await send(url);
   }
+
+  function startEdit(m: Msg) { setMenu(null); setReply(null); setEditing(m); setText(m.body); setTray(null); requestAnimationFrame(() => taRef.current?.focus()); }
+  function cancelEdit() { setEditing(null); setText(""); }
+  async function clearChat() {
+    setHead(false);
+    if (!room || !confirm(room.kind === "group" ? "Vymazať históriu skupiny len u teba? Ostatní ju budú mať ďalej." : "Vymazať túto konverzáciu len u teba? Druhý GM ju bude mať ďalej.")) return;
+    await fetch("/api/im/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomId: room.id }) });
+    await onCleared(room.id);
+  }
+  function jumpTo(id: number) {
+    const el = document.getElementById(`msg-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    setFlash(id); setTimeout(() => setFlash(null), 1400);
+  }
+  const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
 
   function insertEmoji(e: string) {
     const ta = taRef.current;
@@ -354,6 +390,7 @@ function Thread(props: {
           {room && room.kind !== "dm" ? <RoomIcon r={room} size={40} /> : <Logo t={other} size={40} />}
           <div className="min-w-0"><div className="font-semibold truncate">{title}</div><div className="text-xs text-slate-500 truncate">{isLeague ? "Verejný kanál celej ligy" : isGroup ? `${room!.members.length} členov · ${room!.members.map((id) => teamMap.get(id)?.code).filter(Boolean).join(", ")}` : other?.gmNickname ?? "Súkromná konverzácia"}</div></div>
         </button>
+        {room && room.kind !== "league" && <button onClick={() => setHead(true)} aria-label="Menu" className="w-10 h-10 text-xl text-slate-400">⋮</button>}
       </header>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 bg-slate-950">
@@ -372,13 +409,15 @@ function Thread(props: {
               {m.kind === "system" ? (
                 <div className="text-center my-2"><span className="text-[11px] text-slate-400 bg-slate-800/60 rounded-full px-3 py-1 inline-block max-w-[90%]">{m.body}</span></div>
               ) : (
-              <div className={`flex gap-2 ${mine ? "justify-end" : "justify-start"}`}>
+              <div id={`msg-${m.id}`} className={`group flex gap-2 items-center rounded-xl transition-colors duration-500 ${flash === m.id ? "bg-blue-500/20" : ""} ${mine ? "justify-end" : "justify-start"}`}
+                onTouchStart={(e) => { swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, id: m.id }; }}
+                onTouchEnd={(e) => { const s0 = swipe.current; swipe.current = null; if (!s0 || m.deleted) return; const dx = e.changedTouches[0].clientX - s0.x, dy = Math.abs(e.changedTouches[0].clientY - s0.y); if (dx > 70 && dy < 40) { setReply(m); setEditing(null); taRef.current?.focus(); } }}>
                 {multi && !mine && (showName ? <Logo t={t} size={28} /> : <div className="w-7 shrink-0" />)}
                 <button onClick={() => !m.deleted && setMenu(m)}
                   className={`max-w-[80%] text-left rounded-2xl px-3 py-2 ${mine ? "bg-blue-600 rounded-br-md" : "bg-slate-800 rounded-bl-md"} ${m.deleted ? "opacity-60 italic" : ""}`}>
                   {showName && <div className="text-[11px] font-semibold text-blue-300 mb-0.5">{t?.gmNickname ?? t?.code ?? "GM"} · {t?.code}</div>}
                   {m.replyTo && !m.deleted && (
-                    <div className="border-l-2 border-white/40 pl-2 mb-1 text-xs opacity-80">
+                    <div onClick={(e) => { e.stopPropagation(); jumpTo(m.replyTo!.id); }} className="border-l-2 border-white/40 pl-2 mb-1 text-xs opacity-80 cursor-pointer">
                       <div className="font-semibold">{m.replyTo.fromTeamId === boot.me.id ? "Ty" : teamMap.get(m.replyTo.fromTeamId)?.code}</div>
                       <div className="line-clamp-2">{m.replyTo.body || "📷"}</div>
                     </div>
@@ -389,9 +428,10 @@ function Thread(props: {
                   )}
                   {(m.deleted || m.body) && <div className={`whitespace-pre-wrap break-words ${!m.deleted && isBigEmoji(m.body) ? "text-5xl leading-tight" : "text-[15px]"}`}>{m.deleted ? "🚫 Správa bola odstránená" : m.body}</div>}
                   <div className="text-[10px] opacity-60 text-right mt-0.5">
-                    {hm(m.at)}{mine && !isLeague && !m.deleted && <span className={allRead(m) ? "text-sky-300 opacity-100" : ""}> {allRead(m) ? "✓✓" : "✓"}</span>}
+                    {m.edited && !m.deleted && <span>upravené · </span>}{hm(m.at)}{mine && !isLeague && !m.deleted && <span className={allRead(m) ? "text-sky-300 opacity-100" : ""}> {allRead(m) ? "✓✓" : "✓"}</span>}
                   </div>
                 </button>
+                {!m.deleted && <button onClick={() => { setReply(m); setEditing(null); taRef.current?.focus(); }} aria-label="Odpovedať" className={`shrink-0 w-7 h-7 rounded-full text-sm text-slate-500 hover:text-white hover:bg-slate-800 opacity-40 group-hover:opacity-100 ${mine ? "order-first" : ""}`}>↩︎</button>}
               </div>
               )}
             </div>
@@ -401,6 +441,12 @@ function Thread(props: {
       </div>
 
       {error && <div className="bg-red-500/10 text-red-300 text-sm px-4 py-2">{error}</div>}
+      {editing && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 border-t border-slate-800 text-sm">
+          <div className="flex-1 min-w-0 border-l-2 border-amber-500 pl-2"><div className="text-xs text-amber-300">Úprava správy</div><div className="truncate text-slate-400">{editing.body}</div></div>
+          <button onClick={cancelEdit} className="text-slate-400">✕</button>
+        </div>
+      )}
       {reply && (
         <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 border-t border-slate-800 text-sm">
           <div className="flex-1 min-w-0 border-l-2 border-blue-500 pl-2"><div className="text-xs text-blue-300">Odpoveď</div><div className="truncate text-slate-400">{reply.body}</div></div>
@@ -426,6 +472,12 @@ function Thread(props: {
         </div>
       ) : <div className="p-4 text-center text-sm text-amber-300 bg-slate-900 border-t border-slate-800">Komisár ti dočasne zakázal písať do ligového kanála.</div>}
 
+      {head && room && (
+        <Sheet title={title} onClose={() => setHead(false)}>
+          {isGroup && <button onClick={() => { setHead(false); setInfo(true); }} className="w-full text-left px-5 py-3 hover:bg-slate-800">👥 Členovia a nastavenia skupiny</button>}
+          <button onClick={clearChat} className="w-full text-left px-5 py-3 hover:bg-slate-800 text-red-400">🗑 {isGroup ? "Vymazať históriu (len u mňa)" : "Vymazať konverzáciu (len u mňa)"}</button>
+        </Sheet>
+      )}
       {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
       {info && room && <GroupInfo boot={boot} teamMap={teamMap} room={room} onClose={() => setInfo(false)} onChanged={onGroupChanged} />}
       {menu && (
@@ -437,7 +489,8 @@ function Thread(props: {
               {audience.length > readBy(menu).length && <div><span className="text-slate-500">✓ Ešte nečítali:</span> <span className="text-slate-400">{audience.filter((t) => !readBy(menu).includes(t)).map((t) => teamMap.get(t)?.code).join(", ")}</span></div>}
             </div>
           )}
-          <button onClick={() => { setReply(menu); setMenu(null); }} className="w-full text-left px-5 py-3 hover:bg-slate-800">↩︎ Odpovedať</button>
+          <button onClick={() => { setReply(menu); setEditing(null); setMenu(null); requestAnimationFrame(() => taRef.current?.focus()); }} className="w-full text-left px-5 py-3 hover:bg-slate-800">↩︎ Odpovedať (citovať)</button>
+          {menu.fromTeamId === boot.me.id && menu.body && <button onClick={() => startEdit(menu)} className="w-full text-left px-5 py-3 hover:bg-slate-800">✏️ Upraviť</button>}
           <button onClick={() => { void navigator.clipboard?.writeText(menu.body); setMenu(null); }} className="w-full text-left px-5 py-3 hover:bg-slate-800">⧉ Kopírovať</button>
           {(menu.fromTeamId === boot.me.id || (isLeague && boot.admin)) && (
             <button onClick={() => del(menu)} className="w-full text-left px-5 py-3 hover:bg-slate-800 text-red-400">🗑 {menu.fromTeamId === boot.me.id ? "Odstrániť" : "Odstrániť (moderácia)"}</button>

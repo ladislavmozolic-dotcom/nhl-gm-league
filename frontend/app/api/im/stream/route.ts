@@ -16,6 +16,7 @@ export async function GET(req: Request) {
   let cursor = Number(req.headers.get("last-event-id") || new URL(req.url).searchParams.get("after")) || 0;
   if (!cursor) cursor = (await prisma.imMessage.findFirst({ orderBy: { id: "desc" }, select: { id: true } }))?.id ?? 0;
   let delCursor = new Date();
+  let editCursor = new Date();
   const peerSeen = new Map<string, number>(); // "roomId:teamId" -> that member's lastReadId, last value sent
 
   const stream = new ReadableStream({
@@ -36,6 +37,11 @@ export async function GET(req: Request) {
             delCursor = new Date(Math.max(...dels.map((d) => d.deletedAt!.getTime())));
             send(`event: deleted\ndata: ${JSON.stringify(dels.map((d) => ({ id: d.id, roomId: d.roomId })))}\n\n`);
           } else send(": ping\n\n");
+          const eds = await prisma.imMessage.findMany({ where: { roomId: { in: rooms }, editedAt: { gt: editCursor }, deletedAt: null } });
+          if (eds.length) {
+            editCursor = new Date(Math.max(...eds.map((d) => d.editedAt!.getTime())));
+            send(`event: edited\ndata: ${JSON.stringify(await wire(eds))}\n\n`);
+          }
           // peers' read position in my DMs → drives the ✓✓ ticks
           const dmRooms = await prisma.imRoom.findMany({ where: { id: { in: rooms }, kind: { in: ["dm", "group"] } }, select: { id: true } });
           const rr = await prisma.imRead.findMany({ where: { roomId: { in: dmRooms.map((r) => r.id) }, teamId: { not: me } } });

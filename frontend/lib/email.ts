@@ -7,6 +7,7 @@ import { prisma } from "./prisma";
 
 const FROM = "Ultimate NHL <noreply@unhl.eu>";
 const SITE_URL = "https://unhl.eu";
+const CHAT_URL = process.env.CHAT_ORIGIN || "https://chat.unhl.eu"; // standalone league chat app
 
 let client: Resend | null = null;
 function resend(): Resend | null {
@@ -30,7 +31,7 @@ export async function sendWelcomeEmail(opts: { to: string; gmName: string; teamN
   const accent = site?.accentColor ?? "#60a5fa";
   const loginUrl = `${SITE_URL}/teams/${opts.teamSlug}/login`;
 
-  const html = welcomeHtml({ ...opts, leagueName, accent, logoUrl, loginUrl });
+  const html = welcomeHtml({ ...opts, leagueName, accent, logoUrl, loginUrl, chatUrl: `${CHAT_URL}/chat/install` });
   const text = `Welcome to ${leagueName}! 🏒
 
 Hi ${opts.gmName},
@@ -38,6 +39,11 @@ Hi ${opts.gmName},
 We are glad you joined our league as the GM of ${opts.teamName}, and we hope you will enjoy it here.
 
 So you do not miss anything important, we recommend signing in at least once a day at ${SITE_URL.replace("https://", "")}, where you will find everything relevant about your team, games, news and what is happening in the league.
+
+UNHL CHAT — OUR OWN LEAGUE CHAT APP
+We have our own chat app, built into the league: private messages between GMs, group chats, a shared league channel, photos, GIFs and push notifications. Open it here and add it to your phone's home screen like any other app (step-by-step guide included):
+${CHAT_URL}/chat/install
+Sign in there with the same email/nickname and password as on the site. When a GM changes, the old GM's private chats are removed — you always start with a clean chat.
 
 COMMUNICATION VIA VIBER
 For everyday communication between managers we use Viber, where we have a shared league chat. We discuss current information, games, deals between managers and various league news there. So please:
@@ -62,8 +68,8 @@ ${SITE_URL.replace("https://", "")}`;
   }
 }
 
-function welcomeHtml(opts: { gmName: string; teamName: string; leagueName: string; accent: string; logoUrl: string | null; loginUrl: string }): string {
-  const { gmName, teamName, leagueName, accent, logoUrl, loginUrl } = opts;
+function welcomeHtml(opts: { gmName: string; teamName: string; leagueName: string; accent: string; logoUrl: string | null; loginUrl: string; chatUrl: string }): string {
+  const { gmName, teamName, leagueName, accent, logoUrl, loginUrl, chatUrl } = opts;
   const domain = SITE_URL.replace("https://", "");
   return `<!doctype html>
 <html>
@@ -94,6 +100,24 @@ function welcomeHtml(opts: { gmName: string; teamName: string; leagueName: strin
               <a href="${loginUrl}" style="display:inline-block;padding:13px 30px;color:#0a1628;font-size:14px;font-weight:700;text-decoration:none;">Sign in →</a>
             </td></tr>
           </table>
+
+          <div style="background:#131f35;border:1px solid #1e293b;border-radius:12px;padding:20px 22px;margin:0 0 16px;">
+            <p style="color:${accent};font-size:13px;font-weight:800;letter-spacing:0.3px;margin:0 0 10px;">💬 UNHL CHAT — OUR OWN LEAGUE CHAT APP</p>
+            <p style="color:#cbd5e1;font-size:13.5px;line-height:1.6;margin:0 0 12px;">
+              We have our own chat built into the league: private messages between GMs, group chats, a shared league channel,
+              photos, GIFs and push notifications. Add it to your phone's home screen like any other app —
+              the page below has a QR code and a short step-by-step guide for iPhone and Android.
+            </p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
+              <tr><td style="background:#7c4ddb;border-radius:10px;">
+                <a href="${chatUrl}" style="display:inline-block;padding:11px 24px;color:#ffffff;font-size:13.5px;font-weight:700;text-decoration:none;">Get UNHL Chat →</a>
+              </td></tr>
+            </table>
+            <p style="color:#94a3b8;font-size:12.5px;line-height:1.6;margin:0;">
+              Sign in there with the same email/nickname and password as on the site.
+              When a GM changes, the previous GM's private chats are removed — you always start with a clean chat.
+            </p>
+          </div>
 
           <div style="background:#131f35;border:1px solid #1e293b;border-radius:12px;padding:20px 22px;margin:0 0 16px;">
             <p style="color:${accent};font-size:13px;font-weight:800;letter-spacing:0.3px;margin:0 0 10px;">📱 COMMUNICATION VIA VIBER</p>

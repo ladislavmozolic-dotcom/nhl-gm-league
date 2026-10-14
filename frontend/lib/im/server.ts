@@ -48,11 +48,11 @@ export async function isMuted(teamId: number): Promise<boolean> {
 }
 
 export type WireMessage = {
-  kind: string; imageUrl: string | null; id: number; roomId: number; fromTeamId: number; body: string; at: string;
+  kind: string; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string;
   replyTo: { id: number; fromTeamId: number; body: string } | null; deleted: boolean;
 };
 
-export async function wire(rows: { id: number; roomId: number; fromTeamId: number; body: string; createdAt: Date; replyToId: number | null; deletedAt: Date | null; kind: string; imageUrl: string | null }[]): Promise<WireMessage[]> {
+export async function wire(rows: { id: number; roomId: number; fromTeamId: number; body: string; createdAt: Date; replyToId: number | null; deletedAt: Date | null; kind: string; imageUrl: string | null; editedAt: Date | null }[]): Promise<WireMessage[]> {
   const replyIds = [...new Set(rows.map((r) => r.replyToId).filter((x): x is number => x != null))];
   const replies = replyIds.length
     ? await prisma.imMessage.findMany({ where: { id: { in: replyIds } }, select: { id: true, fromTeamId: true, body: true, deletedAt: true } })
@@ -61,7 +61,7 @@ export async function wire(rows: { id: number; roomId: number; fromTeamId: numbe
   return rows.map((r) => {
     const rp = r.replyToId != null ? rm.get(r.replyToId) : null;
     return {
-      kind: r.kind, imageUrl: r.deletedAt ? null : r.imageUrl, id: r.id, roomId: r.roomId, fromTeamId: r.fromTeamId,
+      kind: r.kind, imageUrl: r.deletedAt ? null : r.imageUrl, edited: !!r.editedAt && !r.deletedAt, id: r.id, roomId: r.roomId, fromTeamId: r.fromTeamId,
       body: r.deletedAt ? "" : r.body, deleted: !!r.deletedAt, at: r.createdAt.toISOString(),
       replyTo: rp ? { id: rp.id, fromTeamId: rp.fromTeamId, body: rp.deletedAt ? "" : rp.body.slice(0, 140) } : null,
     };
@@ -107,3 +107,15 @@ const OWN = /^\/uploads\/chat\/[a-f0-9]{16}\.(png|jpg|webp|gif)$/;
 const GIPHY = /^https:\/\/media[0-9]*\.giphy\.com\/media\/[A-Za-z0-9_\-\/\.]+\.(gif|webp|mp4)(\?[A-Za-z0-9_=&\-\.]*)?$/;
 export const isOwnImage = (u: unknown): u is string => typeof u === "string" && OWN.test(u);
 export const isAttachableImage = (u: unknown): u is string => typeof u === "string" && (OWN.test(u) || GIPHY.test(u));
+
+/** Leave a group (also used when a GM seat is wiped): system line, hand over ownership, drop empty groups. */
+export async function leaveGroup(roomId: number, teamId: number) {
+  const room = await prisma.imRoom.findUnique({ where: { id: roomId }, include: { members: true } });
+  if (!room || room.kind !== "group" || !room.members.some((m) => m.teamId === teamId)) return;
+  const L = await teamLabels([teamId]);
+  await systemMessage(roomId, teamId, `${L.get(teamId)} opustil skupinu`); // while still a member so the others see it
+  await prisma.imMember.delete({ where: { roomId_teamId: { roomId, teamId } } });
+  const rest = room.members.filter((m) => m.teamId !== teamId).sort((a, c) => a.joinedAt.getTime() - c.joinedAt.getTime());
+  if (!rest.length) await prisma.imRoom.delete({ where: { id: roomId } });
+  else if (room.createdById === teamId) await prisma.imRoom.update({ where: { id: roomId }, data: { createdById: rest[0].teamId } });
+}

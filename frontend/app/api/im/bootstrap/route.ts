@@ -25,10 +25,12 @@ export async function GET() {
   const rooms = await prisma.imRoom.findMany({ where: { id: { in: roomIds } }, select: { id: true, kind: true, dmKey: true, name: true, imageUrl: true, createdById: true, members: { select: { teamId: true } } } });
   const reads = await prisma.imRead.findMany({ where: { teamId: me, roomId: { in: roomIds } } });
   const readMap = new Map(reads.map((r) => [r.roomId, r.lastReadId]));
+  const clearedMap = new Map(reads.map((r) => [r.roomId, r.clearedId]));
 
   const out = await Promise.all(rooms.map(async (r) => {
-    const last = await prisma.imMessage.findFirst({ where: { roomId: r.id }, orderBy: { id: "desc" } });
-    const unread = await prisma.imMessage.count({ where: { roomId: r.id, id: { gt: readMap.get(r.id) ?? 0 }, fromTeamId: { not: me }, deletedAt: null, kind: "user" } });
+    const cleared = clearedMap.get(r.id) ?? 0;
+    const last = await prisma.imMessage.findFirst({ where: { roomId: r.id, id: { gt: cleared } }, orderBy: { id: "desc" } });
+    const unread = await prisma.imMessage.count({ where: { roomId: r.id, id: { gt: Math.max(readMap.get(r.id) ?? 0, cleared) }, fromTeamId: { not: me }, deletedAt: null, kind: "user" } });
     let otherTeamId: number | null = null;
     if (r.kind === "dm" && r.dmKey) otherTeamId = r.dmKey.split("-").map(Number).find((x) => x !== me) ?? null;
     const lastW = last ? (await wire([last]))[0] : null;

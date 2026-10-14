@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
-import { chatEnabled, isOwnImage, systemMessage, teamLabels } from "@/lib/im/server";
+import { chatEnabled, isOwnImage, leaveGroup, systemMessage, teamLabels } from "@/lib/im/server";
 
 export const dynamic = "force-dynamic";
 const MAX_MEMBERS = 40;
@@ -40,11 +40,7 @@ export async function PATCH(req: Request) {
 
   const L = await teamLabels([me, ...(b.add ?? []), ...(b.remove ? [b.remove] : [])]);
   if (b.leave) {
-    await systemMessage(room.id, me, `${L.get(me)} opustil skupinu`); // written while still a member so remaining members see it
-    await prisma.imMember.delete({ where: { roomId_teamId: { roomId: room.id, teamId: me } } });
-    const rest = room.members.filter((m) => m.teamId !== me).sort((a, c) => a.joinedAt.getTime() - c.joinedAt.getTime());
-    if (!rest.length) await prisma.imRoom.delete({ where: { id: room.id } });
-    else if (owner) await prisma.imRoom.update({ where: { id: room.id }, data: { createdById: rest[0].teamId } });
+    await leaveGroup(room.id, me);
     return NextResponse.json({ ok: true });
   }
   if (!owner) return NextResponse.json({ error: "owner-only" }, { status: 403 });
