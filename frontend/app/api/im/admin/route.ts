@@ -15,9 +15,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  const b = (await req.json().catch(() => ({}))) as { action?: string; enabled?: boolean; image?: string | null; teamId?: number; hours?: number; reason?: string };
+  const b = (await req.json().catch(() => ({}))) as { action?: string; enabled?: boolean; image?: string | null; name?: string; teamId?: number; hours?: number; reason?: string };
   if (b.action === "enable") {
     await prisma.imSettings.upsert({ where: { id: 1 }, update: { enabled: !!b.enabled }, create: { id: 1, enabled: !!b.enabled } });
+  } else if (b.action === "leagueName") {
+    await prisma.imRoom.update({ where: { id: await leagueRoomId() }, data: { name: (b.name ?? "").trim().slice(0, 40) || null } });
   } else if (b.action === "leagueImage" && (b.image === null || isOwnImage(b.image))) {
     await prisma.imRoom.update({ where: { id: await leagueRoomId() }, data: { imageUrl: b.image } });
   } else if (b.action === "mute" && b.teamId) {

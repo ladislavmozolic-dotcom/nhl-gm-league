@@ -185,7 +185,7 @@ export default function ChatApp() {
     return (b.last?.id ?? 0) - (a.last?.id ?? 0);
   }).filter((r) => r.kind === "league" || r.last);
 
-  const roomTitle = (r: Room) => (r.kind === "league" ? "# Liga" : r.kind === "group" ? r.name ?? "Skupina" : teamMap.get(r.otherTeamId ?? 0)?.name ?? "GM");
+  const roomTitle = (r: Room) => (r.kind === "league" ? r.name || "# Liga" : r.kind === "group" ? r.name ?? "Skupina" : teamMap.get(r.otherTeamId ?? 0)?.name ?? "GM");
   const activeRoom = boot.rooms.find((r) => r.id === active) ?? null;
   const showThread = active != null || pendingDm != null;
 
@@ -451,17 +451,17 @@ function Thread(props: {
           {uploading && <div className="px-4 pt-2 text-xs text-slate-400">Nahrávam obrázok…</div>}
           <div className="flex items-end gap-1.5 p-3">
             <button onClick={() => setTray(tray === "emoji" ? null : "emoji")} aria-label="Emoji" className={`w-10 h-11 text-2xl ${tray === "emoji" ? "text-blue-400" : "text-slate-400"}`}>☺︎</button>
-            <button onClick={() => fileRef.current?.click()} aria-label="Fotka" className="w-10 h-11 text-xl text-slate-400">🖼</button>
-            {boot.gif && <button onClick={() => setTray(tray === "gif" ? null : "gif")} aria-label="GIF" className={`h-11 px-1.5 text-xs font-bold ${tray === "gif" ? "text-blue-400" : "text-slate-400"}`}>GIF</button>}
+            <button onClick={() => { if (fileRef.current) fileRef.current.accept = "image/png,image/jpeg,image/webp,image/gif"; fileRef.current?.click(); }} aria-label="Fotka" className="w-10 h-11 text-xl text-slate-400">🖼</button>
+            {<button onClick={() => setTray(tray === "gif" ? null : "gif")} aria-label="GIF" className={`h-11 px-1.5 text-xs font-bold ${tray === "gif" ? "text-blue-400" : "text-slate-400"}`}>GIF</button>}
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void sendFile(f); }} />
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; e.target.accept = "image/png,image/jpeg,image/webp,image/gif"; if (f) void sendFile(f); }} />
             <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} placeholder="Správa" onFocus={() => setTray(null)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(pointer:fine)").matches) { e.preventDefault(); void send(); } }}
               className="flex-1 min-w-0 resize-none max-h-32 rounded-2xl bg-slate-800 px-4 py-2.5 text-base outline-none" />
             <button onClick={() => send()} disabled={!text.trim() || sending} className="w-11 h-11 rounded-full bg-blue-600 disabled:opacity-40 text-lg" aria-label="Odoslať">➤</button>
           </div>
           {tray === "emoji" && <div className="border-t border-slate-800"><EmojiPicker onPick={insertEmoji} /></div>}
-          {tray === "gif" && <div className="border-t border-slate-800 pt-3 max-h-[50vh] overflow-y-auto"><GifPicker onPick={(u) => void send(u)} /></div>}
+          {tray === "gif" && <div className="border-t border-slate-800 pt-3 max-h-[50vh] overflow-y-auto"><GifPicker search={boot.gif} roomId={room?.id ?? null} onPick={(u) => void send(u)} onUpload={() => { if (fileRef.current) { fileRef.current.accept = "image/gif"; fileRef.current.click(); } }} /></div>}
         </div>
       ) : <div className="p-4 text-center text-sm text-amber-300 bg-slate-900 border-t border-slate-800">Komisár ti dočasne zakázal písať do ligového kanála.</div>}
 
@@ -642,11 +642,12 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
   const other = room.otherTeamId ? teamMap.get(room.otherTeamId) : null;
   const owner = isGroup && room.createdById === boot.me.id;
   const canPic = owner || (isLeague && boot.admin);
+  const canName = canPic; // group founder, or the commissioner for the league channel
   const [info, setInfo] = useState<InfoData | null>(null);
   const [view, setView] = useState<null | "media" | "gif" | "links">(null);
   const [items, setItems] = useState<MediaItem[] | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
-  const [name, setName] = useState(room.name ?? "");
+  const [name, setName] = useState(room.name ?? (isLeague ? "# Liga" : ""));
   const [editName, setEditName] = useState(false);
   const [adding, setAdding] = useState(false);
   const [sel, setSel] = useState<Set<number>>(new Set());
@@ -669,6 +670,10 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
   async function setPicture(url: string | null) {
     if (isLeague) { await fetch("/api/im/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "leagueImage", image: url }) }); await onChanged(false); }
     else await patch({ image: url });
+  }
+  async function saveName() {
+    if (isLeague) { await fetch("/api/im/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "leagueName", name: name.trim() === "# Liga" ? "" : name }) }); await onChanged(false); }
+    else await patch({ rename: name });
   }
   async function pickFile(f: File) {
     setBusy(true); setErr("");
@@ -729,21 +734,23 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
               )}
               <input ref={pic} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void pickFile(f); }} />
               <div className="absolute inset-x-0 bottom-0 px-5 pb-4 flex items-center gap-2">
-                {editName && owner ? (
+                {editName && canName ? (
                   <>
-                    <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus className="flex-1 min-w-0 rounded-lg bg-black/60 px-3 py-2 text-white outline-none" />
-                    <button onClick={async () => { await patch({ rename: name }); setEditName(false); }} disabled={!name.trim()} className="rounded-lg bg-blue-600 disabled:opacity-40 px-3 py-2 text-sm">Uložiť</button>
+                    <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus placeholder="Názov chatu" className="flex-1 min-w-0 rounded-lg bg-black/60 px-3 py-2 text-white outline-none"
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+                    <button onClick={async () => { await saveName(); setEditName(false); }} disabled={!isLeague && !name.trim()} className="rounded-lg bg-blue-600 disabled:opacity-40 px-3 py-2 text-sm">Uložiť</button>
+                    <button onClick={() => { setEditName(false); setName(room.name ?? (isLeague ? "# Liga" : "")); }} className="rounded-lg bg-black/50 px-3 py-2 text-sm text-white">Zrušiť</button>
                   </>
                 ) : (
                   <>
-                    <h2 className="flex-1 min-w-0 truncate text-xl font-semibold text-white">{isLeague ? "# Liga" : title}</h2>
-                    {owner && <button onClick={() => setEditName(true)} aria-label="Premenovať" className="text-white/80 text-lg">✎</button>}
+                    <h2 className="flex-1 min-w-0 truncate text-xl font-semibold text-white">{title}</h2>
+                    {canName && <button onClick={() => setEditName(true)} className="shrink-0 rounded-full bg-black/55 hover:bg-black/70 px-3 py-1.5 text-xs font-medium text-white">✎ Zmeniť názov</button>}
                   </>
                 )}
               </div>
             </div>
             {err && <div className="bg-red-500/10 text-red-300 text-sm px-5 py-2">{err}</div>}
-            {!canPic && (isGroup || isLeague) && <p className="px-5 pt-3 text-xs text-slate-500">{isLeague ? "Obrázok ligového kanála mení komisár." : "Názov a obrázok skupiny mení jej zakladateľ."}</p>}
+            {!canPic && (isGroup || isLeague) && <p className="px-5 pt-3 text-xs text-slate-500">{isLeague ? "Názov a obrázok ligového kanála mení komisár." : "Názov a obrázok skupiny mení jej zakladateľ."}</p>}
 
             {/* media */}
             <div className="px-5 pt-5 pb-3 flex items-center">

@@ -34,35 +34,57 @@ export function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
       const [{ Picker }, data] = await Promise.all([import("emoji-mart"), import("@emoji-mart/data")]);
       if (!alive || !host.current) return;
       host.current.innerHTML = "";
+      const btn = 40;
+      const perLine = Math.max(8, Math.min(32, Math.floor((host.current.clientWidth - 24) / btn)));
       const picker = new Picker({
         data: data.default, theme: "dark", locale: "en", previewPosition: "none", skinTonePosition: "search",
-        navPosition: "bottom", perLine: 8, maxFrequentRows: 2, emojiButtonSize: 38, emojiSize: 26,
+        navPosition: "bottom", perLine, maxFrequentRows: 2, emojiButtonSize: btn, emojiSize: 26,
         onEmojiSelect: (e: { native: string }) => onPick(e.native),
       });
       host.current.appendChild(picker as unknown as Node);
     })();
     return () => { alive = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  return <div ref={host} className="flex justify-center [&_em-emoji-picker]:max-w-full [&_em-emoji-picker]:h-[360px]" />;
+  return <div ref={host} className="w-full [&_em-emoji-picker]:w-full [&_em-emoji-picker]:max-w-none [&_em-emoji-picker]:h-[380px]" />;
 }
 
 type Gif = { id: string; preview: string; url: string };
-export function GifPicker({ onPick }: { onPick: (url: string) => void }) {
+export function GifPicker({ onPick, search, roomId, onUpload }: { onPick: (url: string) => void; search: boolean; roomId: number | null; onUpload: () => void }) {
   const [q, setQ] = useState("");
   const [gifs, setGifs] = useState<Gif[] | null>(null);
+  const [own, setOwn] = useState<string[] | null>(null);
+  // no Giphy key on the server → show the GIFs already shared in this chat (resend) + upload from device
   useEffect(() => {
+    if (search || !roomId) { setOwn([]); return; }
+    void fetch(`/api/im/info?roomId=${roomId}&list=gif`).then((r) => r.ok ? r.json() : { items: [] }).then((j) => setOwn([...new Set((j.items as { url: string }[]).map((i) => i.url))].slice(0, 60)));
+  }, [search, roomId]);
+  useEffect(() => {
+    if (!search) return;
     const t = setTimeout(async () => {
       const r = await fetch(`/api/im/gif?q=${encodeURIComponent(q)}`);
       setGifs(r.ok ? (await r.json()).gifs : []);
     }, q ? 350 : 0);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [q, search]);
+  if (!search) {
+    return (
+      <div className="px-4 pb-3">
+        <button onClick={onUpload} className="w-full rounded-xl bg-blue-600 hover:bg-blue-500 py-2.5 text-sm font-medium mb-3">⬆︎ Nahrať GIF zo zariadenia</button>
+        {own == null && <p className="text-center text-slate-500 text-sm py-4">Načítavam…</p>}
+        {own && own.length > 0 && <div className="text-xs text-slate-500 mb-2">GIFy z tohto chatu — ťukni a pošli znova</div>}
+        <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+          {own?.map((u) => <button key={u} onClick={() => onPick(u)} className="aspect-square overflow-hidden rounded-lg bg-slate-800"><img src={u} alt="" loading="lazy" className="w-full h-full object-cover" /></button>)}
+        </div>
+        {own?.length === 0 && <p className="text-center text-slate-500 text-xs py-3">Vyhľadávanie GIFov (GIPHY) sa zapne po nastavení kľúča na serveri. Zatiaľ môžeš nahrať vlastný GIF.</p>}
+      </div>
+    );
+  }
   return (
     <div className="px-4 pb-2">
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Hľadať GIF (napr. gól, party)" className="w-full rounded-xl bg-slate-800 px-4 py-2.5 text-base outline-none mb-3" />
       {gifs == null && <p className="text-center text-slate-500 text-sm py-6">Načítavam…</p>}
       {gifs?.length === 0 && <p className="text-center text-slate-500 text-sm py-6">Nič sa nenašlo</p>}
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
         {gifs?.map((g) => <button key={g.id} onClick={() => onPick(g.url)} className="aspect-square overflow-hidden rounded-lg bg-slate-800"><img src={g.preview} alt="" loading="lazy" className="w-full h-full object-cover" /></button>)}
       </div>
       <p className="text-[10px] text-slate-600 text-right mt-2">Powered by GIPHY</p>
