@@ -29,7 +29,7 @@ interface Team {
 // mobile accordion can recurse into either without caring which one it got.
 type NavNode = { key?: string; label: string; href: string; mega?: boolean; children?: NavNode[] };
 
-export default function MegaMenu({ gm, items, lang = "en", light = false, hideForum = false }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number; chatOn?: boolean; chatUnread?: number } | null; items?: MenuItem[]; lang?: Lang; light?: boolean; hideForum?: boolean }) {
+export default function MegaMenu({ gm, items, lang = "en", light = false, hideForum = false }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number; chatOn?: boolean; chatUnread?: number; chatUrl?: string } | null; items?: MenuItem[]; lang?: Lang; light?: boolean; hideForum?: boolean }) {
   const menuItems = items ?? DEFAULT_MENU;
   const tr = (k: string) => t(lang, k);
 
@@ -392,7 +392,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
                         {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
                       </Link>
                       {gm.chatOn && (
-                        <a href="/chat" className={`flex items-center justify-between px-3 py-1.5 text-sm ${gmPanelText}`}>
+                        <a href={gm.chatUrl ?? "/chat"} className={`flex items-center justify-between px-3 py-1.5 text-sm ${gmPanelText}`}>
                           <span>💬 Chat</span>
                           {(gm.chatUnread ?? 0) > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.chatUnread}</span>}
                         </a>
@@ -510,7 +510,7 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
               {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
             </Link>
             {gm.chatOn && (
-              <a href="/chat" className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
+              <a href={gm.chatUrl ?? "/chat"} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
                 💬 Chat
                 {(gm.chatUnread ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.chatUnread}</span>}
               </a>

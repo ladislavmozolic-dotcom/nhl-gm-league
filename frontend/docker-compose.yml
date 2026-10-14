@@ -37,6 +37,7 @@ services:
       ALERT_EMAIL: ${ALERT_EMAIL:-}       # ops alerts (pre-sim integrity check) — see scripts/ops
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}    # UNHL Chat web push (empty = push disabled)
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      CHAT_ORIGIN: ${CHAT_ORIGIN:-}   # e.g. https://chat.unhl.eu — standalone chat origin (empty = chat stays at /chat on the main site)
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@unhl.eu}
     volumes:
       - uploads:/app/public/uploads   # persist admin-uploaded logos/wordmarks

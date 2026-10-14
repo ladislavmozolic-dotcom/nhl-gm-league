@@ -8,7 +8,8 @@ export const metadata: Metadata = { title: "UNHL Chat — inštalácia", icons: 
 export default async function InstallPage() {
   const b = await loadBranding();
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://unhl.eu";
-  const qr = await QRCode.toString(`${base}/chat`, { type: "svg", margin: 1, width: 220, color: { dark: "#0f172a", light: "#ffffff" } });
+  const chatBase = process.env.CHAT_ORIGIN ?? base;
+  const qr = await QRCode.toString(`${chatBase}/chat`, { type: "svg", margin: 1, width: 220, color: { dark: "#0f172a", light: "#ffffff" } });
   const step = "flex gap-3 items-start";
   const num = "w-7 h-7 shrink-0 rounded-full bg-blue-600 text-sm font-bold flex items-center justify-center";
   return (
@@ -21,7 +22,7 @@ export default async function InstallPage() {
         </div>
 
         <div className="rounded-2xl bg-white p-3 w-fit mx-auto" dangerouslySetInnerHTML={{ __html: qr }} />
-        <p className="text-center text-xs text-slate-500">Naskenuj telefónom, alebo otvor <b className="text-slate-300">{base.replace("https://", "")}/chat</b></p>
+        <p className="text-center text-xs text-slate-500">Naskenuj telefónom, alebo otvor <b className="text-slate-300">{chatBase.replace("https://", "")}/chat</b></p>
 
         <section className="rounded-2xl bg-slate-900 p-5 space-y-3">
           <h2 className="font-semibold">📱 iPhone (Safari)</h2>
@@ -43,7 +44,7 @@ export default async function InstallPage() {
           <p className="text-sm text-slate-300">V Chrome alebo Edge klikni na ikonu inštalácie v adresnom riadku a chat sa otvorí vo vlastnom okne.</p>
         </section>
 
-        <a href="/chat" className="block text-center rounded-xl bg-blue-600 hover:bg-blue-500 py-3 font-medium">Otvoriť chat</a>
+        <a href={`${chatBase}/chat`} className="block text-center rounded-xl bg-blue-600 hover:bg-blue-500 py-3 font-medium">Otvoriť chat</a>
       </div>
     </div>
   );

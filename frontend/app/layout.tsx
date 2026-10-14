@@ -90,7 +90,7 @@ export default async function RootLayout({
                OR m."roomId" IN (SELECT "roomId" FROM "ImMember" WHERE "teamId" = ${teamId}))
       `.catch(() => [{ n: BigInt(0) }]))[0]?.n ?? 0)
     : 0;
-  const gm = t ? { nickname: t.gmNickname || t.gm || "GM", slug: t.slug, admin: t.isAdmin, pendingJoins, unreadDm, forumNew, chatOn: !!chatOn, chatUnread } : null;
+  const gm = t ? { nickname: t.gmNickname || t.gm || "GM", slug: t.slug, admin: t.isAdmin, pendingJoins, unreadDm, forumNew, chatOn: !!chatOn, chatUnread, chatUrl: process.env.CHAT_ORIGIN ? `${process.env.CHAT_ORIGIN}/chat` : "/chat" } : null;
   const site = await loadSiteConfig();
   const branding = site.branding;
   const nhlTeams = await prisma.team.findMany({
