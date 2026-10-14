@@ -52,6 +52,9 @@ export async function POST(req: Request) {
     title = `# League · ${who}`;
     targets = (await prisma.imPushSub.findMany({ where: { teamId: { not: me } }, select: { teamId: true }, distinct: ["teamId"] })).map((s) => s.teamId);
   }
+  const mutedRows = await prisma.imRead.findMany({ where: { roomId, muted: true, teamId: { in: targets } }, select: { teamId: true } });
+  const mutedSet = new Set(mutedRows.map((r) => r.teamId));
+  targets = targets.filter((t) => !mutedSet.has(t));
   void pushToTeams(targets, { title, body: body ? body.slice(0, 140) : /\.gif/i.test(imageUrl ?? "") ? "GIF" : "📷 Fotka", url: "/chat", tag: `room-${roomId}` }).catch(() => {});
   void leagueRoomId;
   return NextResponse.json({ ok: true, roomId, message: (await wire([msg]))[0] });

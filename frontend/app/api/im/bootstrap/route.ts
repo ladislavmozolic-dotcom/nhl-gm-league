@@ -26,6 +26,7 @@ export async function GET() {
   const reads = await prisma.imRead.findMany({ where: { teamId: me, roomId: { in: roomIds } } });
   const readMap = new Map(reads.map((r) => [r.roomId, r.lastReadId]));
   const clearedMap = new Map(reads.map((r) => [r.roomId, r.clearedId]));
+  const mutedMap = new Map(reads.map((r) => [r.roomId, r.muted]));
 
   const out = await Promise.all(rooms.map(async (r) => {
     const cleared = clearedMap.get(r.id) ?? 0;
@@ -34,7 +35,7 @@ export async function GET() {
     let otherTeamId: number | null = null;
     if (r.kind === "dm" && r.dmKey) otherTeamId = r.dmKey.split("-").map(Number).find((x) => x !== me) ?? null;
     const lastW = last ? (await wire([last]))[0] : null;
-    return { id: r.id, kind: r.kind, otherTeamId, unread, last: lastW, name: r.name, imageUrl: r.imageUrl, createdById: r.createdById, members: r.members.map((m) => m.teamId) };
+    return { muted: mutedMap.get(r.id) ?? false, id: r.id, kind: r.kind, otherTeamId, unread, last: lastW, name: r.name, imageUrl: r.imageUrl, createdById: r.createdById, members: r.members.map((m) => m.teamId) };
   }));
   return NextResponse.json({
     me: meTeam ? withAv(meTeam) : meTeam, admin, enabled, muted: await isMuted(me), leagueRoomId: league, teams: teams.map(withAv), rooms: out,
