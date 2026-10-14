@@ -273,6 +273,22 @@ export default function ChatApp() {
     if (totalUnread) nav.setAppBadge?.(totalUnread).catch(() => {}); else nav.clearAppBadge?.().catch(() => {});
   }, [totalUnread]);
 
+  // Back navigation like Viber: opening a thread adds a history entry, so the phone's back gesture/button
+  // (iOS edge swipe, Android back, browser back) returns to the chat list instead of leaving the app.
+  const threadPushed = useRef(false);
+  useEffect(() => {
+    const open = active != null || pendingDm != null;
+    if (open && !threadPushed.current) { history.pushState({ chatThread: true }, ""); threadPushed.current = true; }
+    if (!open && threadPushed.current) { threadPushed.current = false; if (history.state?.chatThread) history.back(); }
+  }, [active, pendingDm]);
+  useEffect(() => {
+    const h = () => { threadPushed.current = false; setActive(null); setPendingDm(null); };
+    window.addEventListener("popstate", h);
+    return () => window.removeEventListener("popstate", h);
+  }, []);
+  const goBack = () => { if (threadPushed.current && history.state?.chatThread) history.back(); else { setActive(null); setPendingDm(null); } };
+  const backSwipe = useRef<{ x: number; y: number; ok: boolean } | null>(null);
+
   // removed from / left the open group → back to the list
   useEffect(() => { if (boot && active != null && !boot.rooms.some((r) => r.id === active)) setActive(null); }, [boot, active]);
 
@@ -336,7 +352,14 @@ export default function ChatApp() {
       </aside>
 
       {/* RIGHT — thread */}
-      <section className={`${showThread ? "flex" : "hidden md:flex"} flex-1 min-w-0 min-h-0 flex-col`}>
+      <section className={`${showThread ? "flex" : "hidden md:flex"} flex-1 min-w-0 min-h-0 flex-col`}
+        onTouchStart={(e) => { const t = e.touches[0]; backSwipe.current = { x: t.clientX, y: t.clientY, ok: t.clientX >= 24 && !(e.target as HTMLElement).closest('.select-text,textarea,input,[role="slider"],em-emoji-picker,audio') }; }}
+        onTouchEnd={(e) => {
+          const b = backSwipe.current; backSwipe.current = null;
+          if (!b?.ok || !showThread || window.innerWidth >= 768) return;
+          const t = e.changedTouches[0];
+          if (t.clientX - b.x > 80 && Math.abs(t.clientY - b.y) < 50) goBack(); // swipe right → back to the list
+        }}>
         {showThread ? (
           <Thread
             key={active ?? `dm-${pendingDm}`}
@@ -345,7 +368,7 @@ export default function ChatApp() {
             messages={active != null ? msgs[active] ?? null : []}
             reads={active != null ? reads[active] ?? {} : {}}
             title={activeRoom ? roomTitle(activeRoom) : teamMap.get(pendingDm ?? 0)?.name ?? ""}
-            onBack={() => { setActive(null); setPendingDm(null); }}
+            onBack={goBack}
             pinTick={active != null && pinSig.roomId === active ? pinSig.n : 0}
             missed={active != null && openUnread.roomId === active ? openUnread : null}
             onReactions={(messageId, roomId, reactions) => setMsgs((c) => (c[roomId] ? { ...c, [roomId]: c[roomId].map((x) => (x.id === messageId ? { ...x, reactions } : x)) } : c))}
@@ -637,7 +660,7 @@ function Thread(props: {
                 <div className="text-center my-2"><span className="text-[11px] text-slate-400 bg-slate-800/60 rounded-full px-3 py-1 inline-block max-w-[90%]">{m.body}</span></div>
               ) : (
               <div id={`msg-${m.id}`} className={`group flex gap-2 items-center rounded-xl transition-colors duration-500 ${flash === m.id ? "bg-blue-500/20" : ""} ${mine ? "justify-end" : "justify-start"}`}
-                onTouchStart={(e) => { swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, id: m.id }; }}
+                onTouchStart={(e) => { swipe.current = (e.target as HTMLElement).closest(".select-text") ? { x: e.touches[0].clientX, y: e.touches[0].clientY, id: m.id } : null; }}
                 onTouchEnd={(e) => { const s0 = swipe.current; swipe.current = null; if (!s0 || m.deleted) return; const dx = e.changedTouches[0].clientX - s0.x, dy = Math.abs(e.changedTouches[0].clientY - s0.y); if (dx > 70 && dy < 40) { setReply(m); setEditing(null); taRef.current?.focus(); } }}>
                 {multi && !mine && (showName ? <Logo t={t} size={28} /> : <div className="w-7 shrink-0" />)}
                 <div role="button" tabIndex={0} onClick={() => { if (m.deleted || window.getSelection()?.toString()) return; if (window.matchMedia("(pointer: coarse)").matches) setMenu(m); }}
