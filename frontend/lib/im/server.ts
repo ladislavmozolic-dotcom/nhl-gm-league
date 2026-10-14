@@ -1,6 +1,7 @@
 // UNHL Chat — server helpers. Standalone from the older Messages (DmMessage) system.
 import { prisma } from "@/lib/prisma";
 import webpush from "web-push";
+import type { ImMessage } from "@prisma/client";
 
 export const MAX_LEN = 2000;
 
@@ -47,21 +48,34 @@ export async function isMuted(teamId: number): Promise<boolean> {
   return true;
 }
 
+export type PollWire = { id: number; question: string; multi: boolean; closed: boolean; options: { id: number; text: string; voters: number[] }[] };
 export type WireMessage = {
-  kind: string; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string;
+  kind: string; imageUrl: string | null; file: { url: string; name: string; size: number } | null; pinned: boolean; poll: PollWire | null;
+  edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string;
   replyTo: { id: number; fromTeamId: number; body: string } | null; deleted: boolean;
 };
 
-export async function wire(rows: { id: number; roomId: number; fromTeamId: number; body: string; createdAt: Date; replyToId: number | null; deletedAt: Date | null; kind: string; imageUrl: string | null; editedAt: Date | null }[]): Promise<WireMessage[]> {
+type PollRow = { id: number; question: string; multi: boolean; closed: boolean; options: { id: number; text: string; order: number; votes: { teamId: number }[] }[] };
+export function pollWire(p: PollRow): PollWire {
+  return { id: p.id, question: p.question, multi: p.multi, closed: p.closed, options: [...p.options].sort((a, b) => a.order - b.order).map((o) => ({ id: o.id, text: o.text, voters: o.votes.map((v) => v.teamId) })) };
+}
+export const pollInclude = { options: { include: { votes: { select: { teamId: true } } } } } as const;
+
+export async function wire(rows: ImMessage[]): Promise<WireMessage[]> {
   const replyIds = [...new Set(rows.map((r) => r.replyToId).filter((x): x is number => x != null))];
   const replies = replyIds.length
     ? await prisma.imMessage.findMany({ where: { id: { in: replyIds } }, select: { id: true, fromTeamId: true, body: true, deletedAt: true } })
     : [];
   const rm = new Map(replies.map((r) => [r.id, r]));
+  const pollIds = rows.filter((r) => r.kind === "poll" && !r.deletedAt).map((r) => r.id);
+  const polls = pollIds.length ? await prisma.imPoll.findMany({ where: { messageId: { in: pollIds } }, include: pollInclude }) : [];
+  const pm = new Map(polls.map((p) => [p.messageId, pollWire(p)]));
   return rows.map((r) => {
     const rp = r.replyToId != null ? rm.get(r.replyToId) : null;
     return {
       kind: r.kind, imageUrl: r.deletedAt ? null : r.imageUrl, edited: !!r.editedAt && !r.deletedAt, id: r.id, roomId: r.roomId, fromTeamId: r.fromTeamId,
+      file: !r.deletedAt && r.fileUrl ? { url: r.fileUrl, name: r.fileName ?? "súbor", size: r.fileSize ?? 0 } : null,
+      pinned: !!r.pinnedAt && !r.deletedAt, poll: pm.get(r.id) ?? null,
       body: r.deletedAt ? "" : r.body, deleted: !!r.deletedAt, at: r.createdAt.toISOString(),
       replyTo: rp ? { id: rp.id, fromTeamId: rp.fromTeamId, body: rp.deletedAt ? "" : rp.body.slice(0, 140) } : null,
     };
@@ -119,3 +133,6 @@ export async function leaveGroup(roomId: number, teamId: number) {
   if (!rest.length) await prisma.imRoom.delete({ where: { id: roomId } });
   else if (room.createdById === teamId) await prisma.imRoom.update({ where: { id: roomId }, data: { createdById: rest[0].teamId } });
 }
+
+const FILE_RE = /^\/uploads\/chat\/files\/[a-f0-9]{16}\.(pdf|docx?|xlsx?|pptx?|csv|txt|zip)$/;
+export const isOwnFile = (u: unknown): u is string => typeof u === "string" && FILE_RE.test(u);

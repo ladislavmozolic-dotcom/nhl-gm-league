@@ -2156,6 +2156,7 @@ model ImRoom {
   dmKey         String?     @unique // "<lowTeamId>-<highTeamId>" for a dm room
   name          String? // group name
   imageUrl      String? // custom chat picture (group / league channel)
+  pinsAt        DateTime? // last time the pinned list changed (drives live refresh)
   createdById   Int? // group owner (can rename / add / remove members)
   members       ImMember[]
   createdAt     DateTime    @default(now())
@@ -2170,6 +2171,12 @@ model ImMessage {
   fromTeamId  Int
   body        String
   replyToId   Int?
+  fileUrl     String? // attached document (PDF / Office / CSV / TXT / ZIP) under /uploads/chat/files
+  fileName    String? // original file name, for display
+  fileSize    Int?
+  pinnedAt    DateTime? // pinned to the top of the chat
+  pinnedById  Int?
+  poll        ImPoll?
   imageUrl    String? // attached picture / GIF (uploaded under /uploads/chat or a Giphy URL)
   editedAt    DateTime? // set when the author edits the text
   kind        String    @default("user") // "user" | "system" (group events: created / added / removed / left / renamed)
@@ -2189,6 +2196,40 @@ model ImMember {
 
   @@id([roomId, teamId])
   @@index([teamId])
+}
+
+model ImPoll {
+  id        Int            @id @default(autoincrement())
+  messageId Int            @unique
+  question  String
+  multi     Boolean        @default(false) // several answers allowed
+  closed    Boolean        @default(false)
+  updatedAt DateTime       @default(now()) // bumped on every vote → live refresh
+  message   ImMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  options   ImPollOption[]
+  votes     ImPollVote[]
+}
+
+model ImPollOption {
+  id     Int          @id @default(autoincrement())
+  pollId Int
+  text   String
+  order  Int          @default(0)
+  poll   ImPoll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes  ImPollVote[]
+
+  @@index([pollId])
+}
+
+model ImPollVote {
+  pollId   Int
+  optionId Int
+  teamId   Int
+  poll     ImPoll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option   ImPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@id([optionId, teamId])
+  @@index([pollId])
 }
 
 model ImRead {

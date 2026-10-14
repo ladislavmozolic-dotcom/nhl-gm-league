@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
-import { chatEnabled, myRoomIds, wire } from "@/lib/im/server";
+import { chatEnabled, myRoomIds, pollInclude, pollWire, wire } from "@/lib/im/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,6 +17,8 @@ export async function GET(req: Request) {
   if (!cursor) cursor = (await prisma.imMessage.findFirst({ orderBy: { id: "desc" }, select: { id: true } }))?.id ?? 0;
   let delCursor = new Date();
   let editCursor = new Date();
+  let pollCursor = new Date();
+  let pinCursor = new Date();
   const peerSeen = new Map<string, number>(); // "roomId:teamId" -> that member's lastReadId, last value sent
 
   const stream = new ReadableStream({
@@ -41,6 +43,16 @@ export async function GET(req: Request) {
           if (eds.length) {
             editCursor = new Date(Math.max(...eds.map((d) => d.editedAt!.getTime())));
             send(`event: edited\ndata: ${JSON.stringify(await wire(eds))}\n\n`);
+          }
+          const pls = await prisma.imPoll.findMany({ where: { updatedAt: { gt: pollCursor }, message: { roomId: { in: rooms }, deletedAt: null } }, include: { ...pollInclude, message: { select: { roomId: true } } } });
+          if (pls.length) {
+            pollCursor = new Date(Math.max(...pls.map((p) => p.updatedAt.getTime())));
+            send(`event: polls\ndata: ${JSON.stringify(pls.map((p) => ({ messageId: p.messageId, roomId: p.message.roomId, poll: pollWire(p) })))}\n\n`);
+          }
+          const pr = await prisma.imRoom.findMany({ where: { id: { in: rooms }, pinsAt: { gt: pinCursor } }, select: { id: true, pinsAt: true } });
+          if (pr.length) {
+            pinCursor = new Date(Math.max(...pr.map((r) => r.pinsAt!.getTime())));
+            send(`event: pins\ndata: ${JSON.stringify(pr.map((r) => ({ roomId: r.id })))}\n\n`);
           }
           // peers' read position in my DMs → drives the ✓✓ ticks
           const dmRooms = await prisma.imRoom.findMany({ where: { id: { in: rooms }, kind: { in: ["dm", "group"] } }, select: { id: true } });

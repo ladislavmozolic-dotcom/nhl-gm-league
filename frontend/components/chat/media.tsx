@@ -16,6 +16,21 @@ export async function prepareImage(file: File, opts: { max: number; square?: boo
   return await new Promise<Blob>((res) => c.toBlob((b) => res(b ?? file), "image/jpeg", 0.86));
 }
 
+export async function uploadFile(f: File): Promise<{ url: string; name: string; size: number } | { error: string }> {
+  const fd = new FormData(); fd.append("file", f, f.name); fd.append("kind", "file");
+  const r = await fetch("/api/im/upload", { method: "POST", body: fd }).catch(() => null);
+  if (!r) return { error: "Bez pripojenia — skús znova." };
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) return { error: (j as { error?: string }).error ?? "Nahranie zlyhalo." };
+  return j as { url: string; name: string; size: number };
+}
+
+export const fmtSize = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} kB`);
+export const fileIcon = (name: string) => {
+  const e = name.split(".").pop()?.toLowerCase() ?? "";
+  return e === "pdf" ? "📕" : e.startsWith("doc") ? "📘" : e.startsWith("xls") || e === "csv" ? "📗" : e.startsWith("ppt") ? "📙" : e === "zip" ? "🗜️" : "📄";
+};
+
 export async function uploadImage(blob: Blob): Promise<{ url: string } | { error: string }> {
   const fd = new FormData(); fd.append("file", blob, "img");
   const r = await fetch("/api/im/upload", { method: "POST", body: fd }).catch(() => null);

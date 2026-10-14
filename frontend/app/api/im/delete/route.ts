@@ -15,6 +15,7 @@ export async function POST(req: Request) {
   const mine = m.fromTeamId === me;
   const mod = m.room.kind === "league" && (await isAdmin());
   if (!mine && !mod) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  await prisma.imMessage.update({ where: { id: m.id }, data: { deletedAt: new Date(), deletedById: me } });
+  await prisma.imMessage.update({ where: { id: m.id }, data: { deletedAt: new Date(), deletedById: me, pinnedAt: null, pinnedById: null } });
+  if (m.pinnedAt) await prisma.imRoom.update({ where: { id: m.roomId }, data: { pinsAt: new Date() } });
   return NextResponse.json({ ok: true });
 }

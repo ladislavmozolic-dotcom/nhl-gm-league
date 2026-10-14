@@ -19,12 +19,35 @@ function sniff(b: Buffer): "png" | "jpg" | "gif" | "webp" | null {
   return null;
 }
 
+const FILE_EXT = new Set(["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv", "txt", "zip"]);
+const FILE_MAX = 15_000_000;
+function fileOk(ext: string, b: Buffer): boolean {
+  const head = b.subarray(0, 8);
+  if (ext === "pdf") return b.subarray(0, 4).toString("ascii") === "%PDF";
+  if (["docx", "xlsx", "pptx", "zip"].includes(ext)) return head[0] === 0x50 && head[1] === 0x4b;
+  if (["doc", "xls", "ppt"].includes(ext)) return head.equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+  return !b.subarray(0, 4096).includes(0); // csv / txt: plain text only
+}
+
 export async function POST(request: Request) {
   const me = await getTeamSession();
   if (!me || !(await chatEnabled())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "No file" }, { status: 400 });
+  if (form?.get("kind") === "file") {
+    // documents: strict extension whitelist + content check; stored under a random name (never served as HTML/JS)
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    if (!FILE_EXT.has(ext)) return NextResponse.json({ error: "Povolené súbory: PDF, Word, Excel, PowerPoint, CSV, TXT, ZIP" }, { status: 400 });
+    if (file.size > FILE_MAX) return NextResponse.json({ error: "Súbor je príliš veľký (max 15 MB)" }, { status: 400 });
+    const buf = Buffer.from(await file.arrayBuffer());
+    if (!fileOk(ext, buf)) return NextResponse.json({ error: "Obsah súboru nezodpovedá jeho typu" }, { status: 400 });
+    const stored = `${randomBytes(8).toString("hex")}.${ext}`;
+    const fdir = join(process.cwd(), "public", "uploads", "chat", "files");
+    await mkdir(fdir, { recursive: true });
+    await writeFile(join(fdir, stored), buf);
+    return NextResponse.json({ url: `/uploads/chat/files/${stored}`, name: file.name.replace(/[\u0000-\u001f<>]/g, "").slice(0, 120), size: buf.length });
+  }
   if (file.size > MAX) return NextResponse.json({ error: "Súbor je príliš veľký (max 8 MB)" }, { status: 400 });
   const bytes = Buffer.from(await file.arrayBuffer());
   const ext = sniff(bytes);
