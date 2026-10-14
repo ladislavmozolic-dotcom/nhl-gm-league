@@ -29,7 +29,7 @@ interface Team {
 // mobile accordion can recurse into either without caring which one it got.
 type NavNode = { key?: string; label: string; href: string; mega?: boolean; children?: NavNode[] };
 
-export default function MegaMenu({ gm, items, lang = "en", light = false, hideForum = false }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number } | null; items?: MenuItem[]; lang?: Lang; light?: boolean; hideForum?: boolean }) {
+export default function MegaMenu({ gm, items, lang = "en", light = false, hideForum = false }: { gm?: { nickname: string; slug: string; admin?: boolean; pendingJoins?: number; unreadDm?: number; forumNew?: number; chatOn?: boolean; chatUnread?: number } | null; items?: MenuItem[]; lang?: Lang; light?: boolean; hideForum?: boolean }) {
   const menuItems = items ?? DEFAULT_MENU;
   const tr = (k: string) => t(lang, k);
 
@@ -377,12 +377,30 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
               </Link>
             )}
 
-            {/* Messages — top-nav so a signed-in GM sees new-message badge right away */}
+            {/* Messages ▾ — dropdown: classic Messages page + the standalone UNHL Chat app */}
             {gm && (
-              <Link href="/messages" className={`relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md whitespace-nowrap flex items-center gap-1 ${linkIdle}`}>
-                💬 Messages
-                {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
-              </Link>
+              <div className="relative" onMouseEnter={() => setActiveMenu("__msg")} onMouseLeave={() => setActiveMenu(null)}>
+                <button className={`relative px-2.5 py-1.5 text-[13px] font-semibold rounded-md whitespace-nowrap flex items-center gap-1 ${linkIdle}`}>
+                  💬 Messages <span className="text-[9px] opacity-60">▾</span>
+                  {((gm.unreadDm ?? 0) + (gm.chatUnread ?? 0)) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{(gm.unreadDm ?? 0) + (gm.chatUnread ?? 0)}</span>}
+                </button>
+                {activeMenu === "__msg" && (
+                  <div className="absolute left-0 top-full pt-1 z-50">
+                    <div className={`w-48 border rounded-lg py-1 ${gmPanelBg} ${light ? "shadow-xl shadow-slate-300/60" : "shadow-xl shadow-black/40"}`}>
+                      <Link href="/messages" className={`flex items-center justify-between px-3 py-1.5 text-sm ${gmPanelText}`}>
+                        <span>✉️ Messages</span>
+                        {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
+                      </Link>
+                      {gm.chatOn && (
+                        <a href="/chat" className={`flex items-center justify-between px-3 py-1.5 text-sm ${gmPanelText}`}>
+                          <span>💬 Chat</span>
+                          {(gm.chatUnread ?? 0) > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.chatUnread}</span>}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* GM login / signed-in profile (with logout) */}
@@ -486,10 +504,18 @@ export default function MegaMenu({ gm, items, lang = "en", light = false, hideFo
           </Link>
         )}
         {gm && (
-          <Link href="/messages" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
-            💬 Messages
-            {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
-          </Link>
+          <>
+            <Link href="/messages" onClick={closeMobile} className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
+              ✉️ Messages
+              {(gm.unreadDm ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.unreadDm}</span>}
+            </Link>
+            {gm.chatOn && (
+              <a href="/chat" className={`flex items-center gap-1.5 py-2.5 px-3 text-[14px] ${mobileText}`}>
+                💬 Chat
+                {(gm.chatUnread ?? 0) > 0 && <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{gm.chatUnread}</span>}
+              </a>
+            )}
+          </>
         )}
         <InstallAppButton lang={lang} className={`w-full flex items-center gap-1.5 py-2.5 px-3 text-[14px] text-left ${mobileText}`} />
 

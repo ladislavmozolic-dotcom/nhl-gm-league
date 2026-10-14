@@ -78,7 +78,18 @@ export default async function RootLayout({
   const unreadDm = teamId ? await prisma.dmMessage.count({ where: { toTeamId: teamId, readAt: null } }).catch(() => 0) : 0;
   // new forum posts since this GM last viewed the forum (excluding their own)
   const forumNew = teamId ? await prisma.forumPost.count({ where: { teamId: { not: teamId }, createdAt: { gt: t?.forumSeenAt ?? new Date(0) } } }).catch(() => 0) : 0;
-  const gm = t ? { nickname: t.gmNickname || t.gm || "GM", slug: t.slug, admin: t.isAdmin, pendingJoins, unreadDm, forumNew } : null;
+  // UNHL Chat: menu entry only once the commissioner has switched it on (admins always see it)
+  const chatOn = t ? ((await prisma.imSettings.findUnique({ where: { id: 1 }, select: { enabled: true } }).catch(() => null))?.enabled || t.isAdmin) : false;
+  const chatUnread = teamId && chatOn
+    ? Number((await prisma.$queryRaw<{ n: bigint }[]>`
+        SELECT COUNT(*)::bigint AS n FROM "ImMessage" m
+        LEFT JOIN "ImRead" r ON r."roomId" = m."roomId" AND r."teamId" = ${teamId}
+        WHERE m."deletedAt" IS NULL AND m."fromTeamId" <> ${teamId} AND m.id > COALESCE(r."lastReadId", 0)
+          AND (m."roomId" IN (SELECT id FROM "ImRoom" WHERE kind = 'league')
+               OR m."roomId" IN (SELECT id FROM "ImRoom" WHERE "dmKey" LIKE ${teamId + "-%"} OR "dmKey" LIKE ${"%-" + teamId}))
+      `.catch(() => [{ n: BigInt(0) }]))[0]?.n ?? 0)
+    : 0;
+  const gm = t ? { nickname: t.gmNickname || t.gm || "GM", slug: t.slug, admin: t.isAdmin, pendingJoins, unreadDm, forumNew, chatOn: !!chatOn, chatUnread } : null;
   const site = await loadSiteConfig();
   const branding = site.branding;
   const nhlTeams = await prisma.team.findMany({
