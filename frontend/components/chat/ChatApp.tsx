@@ -1,6 +1,7 @@
 "use client";
 
 import InstallBanner from "./InstallBanner";
+import { PushBanner, usePush, type PushApi } from "./push";
 import { DEFAULT_PREFS, SOUNDS, loadPrefs, playSound, savePrefs, unlockAudio, type Prefs, type SoundId } from "./sound";
 import { EmojiPicker, GifPicker, Lightbox, VOICE_MAX_SECS, VoicePlayer, fileIcon, fmtSecs, fmtSize, isBigEmoji, prepareImage, startRecording, uploadFile, uploadImage, uploadVoice, type Recorder } from "./media";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -23,12 +24,6 @@ function dayLabel(iso: string) {
   const y = new Date(n); y.setDate(n.getDate() - 1);
   return same(d, y) ? "Včera" : d.toLocaleDateString("sk-SK", { day: "numeric", month: "long" });
 }
-function b64ToU8(s: string) {
-  const pad = "=".repeat((4 - (s.length % 4)) % 4);
-  const raw = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
-  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
-}
-
 function Logo({ t, size = 40 }: { t?: TeamLite | null; size?: number }) {
   return (
     <div className="shrink-0 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden" style={{ width: size, height: size }}>
@@ -61,6 +56,7 @@ export default function ChatApp() {
   const activeRef = useRef<number | null>(null);
   activeRef.current = active;
   const [prefs, setPrefsState] = useState<Prefs>(DEFAULT_PREFS);
+  const pushApi = usePush(boot?.vapid ?? null);
   const prefsRef = useRef<Prefs>(DEFAULT_PREFS);
   const bootRef = useRef<Boot | null>(null);
   bootRef.current = boot;
@@ -260,6 +256,7 @@ export default function ChatApp() {
           <button onClick={() => setSettings(true)} aria-label="Nastavenia" className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700">⚙︎</button>
         </header>
         <InstallBanner />
+        <PushBanner api={pushApi} />
         {!boot.enabled && <div className="bg-amber-500/10 text-amber-300 text-xs px-4 py-2">Chat je pre ostatných GM zatiaľ vypnutý (vidíš ho ako admin).</div>}
         <div className="flex-1 overflow-y-auto">
           {sortedRooms.map((r) => {
@@ -342,7 +339,7 @@ export default function ChatApp() {
           <span onClick={(e) => { e.stopPropagation(); setBanner(null); }} className="text-slate-500 px-1">✕</span>
         </button>
       )}
-      {settings && <Settings boot={boot} teamMap={teamMap} onClose={() => setSettings(false)} reload={load} prefs={prefs} setPrefs={setPrefs} />}
+      {settings && <Settings boot={boot} teamMap={teamMap} onClose={() => setSettings(false)} reload={load} prefs={prefs} setPrefs={setPrefs} pushApi={pushApi} />}
     </div>
   );
 }
@@ -714,38 +711,18 @@ function Thread(props: {
   );
 }
 
-function Settings({ boot, teamMap, onClose, reload, prefs, setPrefs }: { boot: Boot; teamMap: Map<number, TeamLite>; onClose: () => void; reload: () => Promise<void>; prefs: Prefs; setPrefs: (p: Prefs) => void }) {
-  const [push, setPush] = useState<"unknown" | "on" | "off" | "unsupported" | "ios-install">("unknown");
+function Settings({ boot, teamMap, onClose, reload, prefs, setPrefs, pushApi }: { boot: Boot; teamMap: Map<number, TeamLite>; onClose: () => void; reload: () => Promise<void>; prefs: Prefs; setPrefs: (p: Prefs) => void; pushApi: PushApi }) {
+  const push = pushApi.state;
+  const [testMsg, setTestMsg] = useState("");
   const [admin, setAdmin] = useState<{ enabled: boolean; mutes: { teamId: number; until: string | null }[] } | null>(null);
   const loadAdmin = useCallback(async () => { if (boot.admin) { const r = await fetch("/api/im/admin"); if (r.ok) setAdmin(await r.json()); } }, [boot.admin]);
 
   useEffect(() => {
     void loadAdmin();
-    (async () => {
-      const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone;
-      const ios = /iphone|ipad/i.test(navigator.userAgent);
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) return setPush(ios && !standalone ? "ios-install" : "unsupported");
-      const reg = await navigator.serviceWorker.getRegistration("/chat");
-      const sub = await reg?.pushManager.getSubscription();
-      setPush(sub ? "on" : "off");
-    })();
   }, [loadAdmin]);
 
-  async function enablePush() {
-    if (!boot.vapid) return;
-    if ((await Notification.requestPermission()) !== "granted") return;
-    const reg = (await navigator.serviceWorker.getRegistration("/chat")) ?? (await navigator.serviceWorker.register("/chat-sw.js", { scope: "/chat" }));
-    await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(boot.vapid) });
-    await fetch("/api/im/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
-    setPush("on");
-  }
-  async function disablePush() {
-    const reg = await navigator.serviceWorker.getRegistration("/chat");
-    const sub = await reg?.pushManager.getSubscription();
-    if (sub) { await fetch("/api/im/push", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }); await sub.unsubscribe(); }
-    setPush("off");
-  }
+  const enablePush = () => void pushApi.enable();
+  const disablePush = () => void pushApi.disable();
   async function adminPost(b: object) {
     await fetch("/api/im/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) });
     await loadAdmin(); await reload();
@@ -755,11 +732,17 @@ function Settings({ boot, teamMap, onClose, reload, prefs, setPrefs }: { boot: B
   return (
     <Sheet title="Nastavenia" onClose={onClose}>
       <div className={row}>
-        <div className="flex-1"><div>Notifikácie</div><div className="text-xs text-slate-500">
-          {push === "ios-install" ? "Na iPhone: Zdieľať → Pridať na plochu, potom otvor chat z ikony." : push === "unsupported" ? "Tento prehliadač push nepodporuje." : "Upozornenie aj keď je appka zatvorená."}</div></div>
+        <div className="flex-1"><div>Notifikácie na tomto zariadení</div><div className="text-xs text-slate-500">
+          {push === "ios-install" ? "Na iPhone: Zdieľať → Pridať na plochu, potom otvor chat z ikony." : push === "unsupported" ? "Tento prehliadač push nepodporuje." : push === "denied" ? "Zablokované — povoľ notifikácie pre chat.unhl.eu v nastaveniach prehliadača/telefónu." : push === "novapid" ? "Server nemá nastavené kľúče pre notifikácie." : push === "on" ? "Zapnuté — správy ti prídu aj keď je appka zatvorená." : "Vypnuté — správy ti neprídu, keď je appka zatvorená."}</div></div>
         {push === "off" && <button onClick={enablePush} className="rounded-lg bg-blue-600 px-4 py-2 text-sm">Zapnúť</button>}
         {push === "on" && <button onClick={disablePush} className="rounded-lg bg-slate-700 px-4 py-2 text-sm">Vypnúť</button>}
       </div>
+      {push === "on" && (
+        <div className={row}>
+          <div className="flex-1 text-xs text-slate-500">{testMsg || "Over, že to funguje — pošleme ti skúšobnú notifikáciu."}</div>
+          <button onClick={async () => { setTestMsg("Posielam…"); const n = await pushApi.test(); setTestMsg(n ? `Poslané na ${n} zariadenie(a). Ak nič nevidíš, skontroluj nastavenia notifikácií.` : "Žiadne zariadenie nie je zaregistrované."); }} className="rounded-lg bg-slate-700 px-4 py-2 text-sm whitespace-nowrap">Skúšobná notifikácia</button>
+        </div>
+      )}
       <div className="px-5 pt-3 pb-1 text-xs uppercase tracking-wide text-slate-500">Zvuk a upozornenia</div>
       <div className="px-5 pb-1 text-xs text-slate-500">Zvuk pri novej správe, keď máš chat otvorený. Notifikácie pri zatvorenej appke majú zvuk podľa nastavení telefónu.</div>
       {SOUNDS.map((so) => (

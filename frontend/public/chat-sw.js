@@ -10,7 +10,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil((async () => {
     // if the chat is open and focused, the in-app UI already shows it
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    if (wins.some((w) => w.visibilityState === "visible" && w.focused)) return;
+    if (!d.force && wins.some((w) => w.visibilityState === "visible" && w.focused)) return;
     await self.registration.showNotification(d.title || "UNHL Chat", {
       body: d.body || "", tag: d.tag, renotify: true, vibrate: [120, 60, 120], icon: "/icons/chat-192.png", badge: "/icons/chat-192.png", data: { url: d.url || "/chat" },
     });

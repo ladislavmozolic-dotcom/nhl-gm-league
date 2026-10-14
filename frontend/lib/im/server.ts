@@ -93,7 +93,7 @@ function initPush() {
   return (pushReady = true);
 }
 
-export async function pushToTeams(teamIds: number[], payload: { title: string; body: string; url: string; tag: string }) {
+export async function pushToTeams(teamIds: number[], payload: { title: string; body: string; url: string; tag: string; force?: boolean }) {
   if (!teamIds.length || !initPush()) return;
   const subs = await prisma.imPushSub.findMany({ where: { teamId: { in: teamIds } } });
   await Promise.all(subs.map(async (s) => {
