@@ -8,6 +8,7 @@ import SessionResume from "@/components/SessionResume";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "UNHL Chat",
+  icons: { icon: "/icons/chat-192.png", apple: "/icons/chat-apple-touch-icon.png" },
   appleWebApp: { capable: true, title: "UNHL Chat", statusBarStyle: "black-translucent" },
 };
 

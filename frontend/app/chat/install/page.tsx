@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { loadBranding } from "@/lib/site-config";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "UNHL Chat — inštalácia" };
+export const metadata: Metadata = { title: "UNHL Chat — inštalácia", icons: { icon: "/icons/chat-192.png", apple: "/icons/chat-apple-touch-icon.png" } };
 
 export default async function InstallPage() {
   const b = await loadBranding();

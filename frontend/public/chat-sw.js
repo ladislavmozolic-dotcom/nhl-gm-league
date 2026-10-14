@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     if (wins.some((w) => w.visibilityState === "visible" && w.focused)) return;
     await self.registration.showNotification(d.title || "UNHL Chat", {
-      body: d.body || "", tag: d.tag, renotify: true, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png", data: { url: d.url || "/chat" },
+      body: d.body || "", tag: d.tag, renotify: true, icon: "/icons/chat-192.png", badge: "/icons/chat-192.png", data: { url: d.url || "/chat" },
     });
   })());
 });
