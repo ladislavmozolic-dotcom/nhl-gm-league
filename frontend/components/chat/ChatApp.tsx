@@ -346,10 +346,10 @@ function Thread(props: {
 
   async function sendFile(f: File) {
     setUploading(true); setError("");
-    const url = await uploadImage(await prepareImage(f, { max: 1600 }));
+    const up = await uploadImage(await prepareImage(f, { max: 1600 }));
     setUploading(false);
-    if (!url) { setError("Obrázok sa nepodarilo nahrať (PNG/JPG/WEBP/GIF, max 8 MB)."); return; }
-    await send(url);
+    if ("error" in up) { setError(up.error); return; }
+    await send(up.url);
   }
 
   function startEdit(m: Msg) { setMenu(null); setReply(null); setEditing(m); setText(m.body); setTray(null); requestAnimationFrame(() => taRef.current?.focus()); }
@@ -386,10 +386,11 @@ function Thread(props: {
     <>
       <header className="flex items-center gap-3 px-3 py-3 border-b border-slate-800">
         <button onClick={onBack} className="md:hidden w-10 h-10 text-2xl text-slate-300" aria-label="Späť">‹</button>
-        <button onClick={() => isGroup && setInfo(true)} className={`flex items-center gap-3 min-w-0 flex-1 text-left ${isGroup ? "" : "cursor-default"}`}>
+        <button onClick={() => multi && setInfo(true)} className={`flex items-center gap-3 min-w-0 flex-1 text-left ${multi ? "" : "cursor-default"}`}>
           {room && room.kind !== "dm" ? <RoomIcon r={room} size={40} /> : <Logo t={other} size={40} />}
           <div className="min-w-0"><div className="font-semibold truncate">{title}</div><div className="text-xs text-slate-500 truncate">{isLeague ? "Verejný kanál celej ligy" : isGroup ? `${room!.members.length} členov · ${room!.members.map((id) => teamMap.get(id)?.code).filter(Boolean).join(", ")}` : other?.gmNickname ?? "Súkromná konverzácia"}</div></div>
         </button>
+        {multi && <button onClick={() => setInfo(true)} aria-label="Info a obrázok" className="h-9 px-3 rounded-full bg-slate-800 text-xs text-slate-300">📷 Info</button>}
         {room && room.kind !== "league" && <button onClick={() => setHead(true)} aria-label="Menu" className="w-10 h-10 text-xl text-slate-400">⋮</button>}
       </header>
 
@@ -479,7 +480,9 @@ function Thread(props: {
         </Sheet>
       )}
       {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
-      {info && room && <GroupInfo boot={boot} teamMap={teamMap} room={room} onClose={() => setInfo(false)} onChanged={onGroupChanged} />}
+      {info && room && (isGroup
+        ? <GroupInfo boot={boot} teamMap={teamMap} room={room} onClose={() => setInfo(false)} onChanged={onGroupChanged} />
+        : <LeagueInfo boot={boot} room={room} onClose={() => setInfo(false)} onChanged={onGroupChanged} />)}
       {menu && (
         <Sheet title="Správa" onClose={() => setMenu(null)}>
           <div className="px-5 py-3 text-sm text-slate-400 line-clamp-3">{menu.body}</div>
@@ -601,16 +604,18 @@ function GroupCreate({ boot, onClose, onCreated }: { boot: Boot; onClose: () => 
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [image, setImage] = useState<string | null>(null);
   const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   async function create() {
     setBusy(true); setErr("");
-    const r = await fetch("/api/im/group", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, memberIds: [...sel] }) });
+    const r = await fetch("/api/im/group", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, memberIds: [...sel], image }) });
     if (!r.ok) { setErr("Zadaj názov a vyber aspoň jedného GM."); setBusy(false); return; }
     await onCreated((await r.json()).roomId);
   }
   return (
     <Sheet title="Nová skupina" onClose={onClose}>
-      <div className="px-5 py-3"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Názov skupiny" className="w-full rounded-xl bg-slate-800 px-4 py-3 text-base outline-none" /></div>
+      <PictureRow label="Obrázok skupiny (nepovinné)" hasImage={!!image} preview={<RoomIcon r={{ kind: "group", imageUrl: image }} size={56} />} onSet={async (u) => setImage(u)} />
+      <div className="px-5 pb-3"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Názov skupiny" className="w-full rounded-xl bg-slate-800 px-4 py-3 text-base outline-none" /></div>
       <div className="px-5 pb-1 text-xs uppercase tracking-wide text-slate-500">Členovia ({sel.size})</div>
       <TeamPick teams={boot.teams.filter((t) => t.id !== boot.me.id)} selected={sel} toggle={toggle} />
       {err && <p className="px-5 pt-2 text-sm text-red-400">{err}</p>}
@@ -634,7 +639,7 @@ function GroupInfo({ boot, teamMap, room, onClose, onChanged }: { boot: Boot; te
   return (
     <Sheet title="Skupina" onClose={onClose}>
       {owner ? (
-        <PictureRow label="Obrázok skupiny" hasImage={!!room.imageUrl} preview={<RoomIcon r={room} size={44} />} onSet={(url) => patch({ image: url })} />
+        <PictureRow label="Obrázok skupiny" hasImage={!!room.imageUrl} preview={<RoomIcon r={room} size={56} />} onSet={(url) => patch({ image: url })} />
       ) : <div className="px-5 pt-4 flex justify-center"><RoomIcon r={room} size={72} /></div>}
       {owner ? (
         <div className="px-5 py-3 flex gap-2">
@@ -671,8 +676,8 @@ function PictureRow({ label, preview, hasImage, onSet }: { label: string; previe
   const [err, setErr] = useState("");
   async function pick(f: File) {
     setBusy(true); setErr("");
-    const url = await uploadImage(await prepareImage(f, { max: 384, square: true }));
-    if (!url) setErr("Nahranie zlyhalo (PNG/JPG/WEBP/GIF, max 8 MB)"); else await onSet(url);
+    const up = await uploadImage(await prepareImage(f, { max: 384, square: true }));
+    if ("error" in up) setErr(up.error); else await onSet(up.url);
     setBusy(false);
   }
   return (
@@ -680,8 +685,23 @@ function PictureRow({ label, preview, hasImage, onSet }: { label: string; previe
       {preview}
       <div className="flex-1 min-w-0"><div className="text-sm">{label}</div>{err && <div className="text-xs text-red-400">{err}</div>}</div>
       <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void pick(f); }} />
-      <button onClick={() => ref.current?.click()} disabled={busy} className="rounded-lg bg-blue-600 disabled:opacity-50 px-3 py-1.5 text-xs">{busy ? "…" : "Zmeniť"}</button>
+      <button onClick={() => ref.current?.click()} disabled={busy} className="rounded-lg bg-blue-600 disabled:opacity-50 px-3 py-2 text-xs font-medium whitespace-nowrap">{busy ? "Nahrávam…" : "📷 Zmeniť fotku"}</button>
       {hasImage && <button onClick={() => void onSet(null)} disabled={busy} className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs">Odstrániť</button>}
     </div>
+  );
+}
+
+function LeagueInfo({ boot, room, onClose, onChanged }: { boot: Boot; room: Room; onClose: () => void; onChanged: (left: boolean) => Promise<void> }) {
+  const set = async (url: string | null) => {
+    await fetch("/api/im/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "leagueImage", image: url }) });
+    await onChanged(false);
+  };
+  return (
+    <Sheet title="Ligový kanál" onClose={onClose}>
+      {boot.admin
+        ? <PictureRow label="Obrázok ligového kanála" hasImage={!!room.imageUrl} preview={<RoomIcon r={room} size={56} />} onSet={set} />
+        : <div className="px-5 pt-4 flex justify-center"><RoomIcon r={room} size={96} /></div>}
+      <p className="px-5 py-3 text-sm text-slate-400">Verejný kanál celej ligy. Píšu doň všetci GM{boot.admin ? "" : ", obrázok kanála mení komisár"}.</p>
+    </Sheet>
   );
 }

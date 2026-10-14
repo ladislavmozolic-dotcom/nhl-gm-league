@@ -15,13 +15,13 @@ async function humanTeamIds(ids: number[]) {
 export async function POST(req: Request) {
   const me = await getTeamSession();
   if (!me || !(await chatEnabled())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  const b = (await req.json().catch(() => ({}))) as { name?: string; memberIds?: number[] };
+  const b = (await req.json().catch(() => ({}))) as { name?: string; memberIds?: number[]; image?: string | null };
   const name = (b.name ?? "").trim().slice(0, 60);
   if (!name) return NextResponse.json({ error: "name" }, { status: 400 });
   const ids = [...new Set([me, ...(await humanTeamIds(b.memberIds ?? []))])].slice(0, MAX_MEMBERS);
   if (ids.length < 2) return NextResponse.json({ error: "members" }, { status: 400 });
   const room = await prisma.imRoom.create({
-    data: { kind: "group", name, createdById: me, members: { create: ids.map((teamId) => ({ teamId })) } }, select: { id: true },
+    data: { kind: "group", name, imageUrl: isOwnImage(b.image) ? b.image : null, createdById: me, members: { create: ids.map((teamId) => ({ teamId })) } }, select: { id: true },
   });
   const L = await teamLabels(ids);
   const others = ids.filter((i) => i !== me).map((i) => L.get(i)).join(", ");

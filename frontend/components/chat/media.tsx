@@ -16,11 +16,13 @@ export async function prepareImage(file: File, opts: { max: number; square?: boo
   return await new Promise<Blob>((res) => c.toBlob((b) => res(b ?? file), "image/jpeg", 0.86));
 }
 
-export async function uploadImage(blob: Blob): Promise<string | null> {
+export async function uploadImage(blob: Blob): Promise<{ url: string } | { error: string }> {
   const fd = new FormData(); fd.append("file", blob, "img");
-  const r = await fetch("/api/im/upload", { method: "POST", body: fd });
-  if (!r.ok) return null;
-  return (await r.json()).url as string;
+  const r = await fetch("/api/im/upload", { method: "POST", body: fd }).catch(() => null);
+  if (!r) return { error: "Bez pripojenia — skús znova." };
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) return { error: (j as { error?: string }).error === "forbidden" ? "Chat ešte nie je zapnutý alebo si odhlásený." : (j as { error?: string }).error ?? "Nahranie zlyhalo." };
+  return { url: (j as { url: string }).url };
 }
 
 /** Full emoji set (emoji-mart, native glyphs, search + skin tones). Loaded lazily so the chat opens fast. */
