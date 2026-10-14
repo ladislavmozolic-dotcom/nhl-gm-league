@@ -495,6 +495,7 @@ function Thread(props: {
     if (!r.ok) setError(r.status === 400 ? "Pripnúť sa dá najviac 10 správ." : "Pripnúť môže len komisár (ligový kanál).");
   }
   const [moreReact, setMoreReact] = useState(false);
+  const [infoMsg, setInfoMsg] = useState<Msg | null>(null);
   async function react(m: Msg, emoji: string) {
     setMenu(null); setMoreReact(false);
     const r = await fetch("/api/im/react", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id, emoji }) });
@@ -639,7 +640,9 @@ function Thread(props: {
                 onTouchStart={(e) => { swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, id: m.id }; }}
                 onTouchEnd={(e) => { const s0 = swipe.current; swipe.current = null; if (!s0 || m.deleted) return; const dx = e.changedTouches[0].clientX - s0.x, dy = Math.abs(e.changedTouches[0].clientY - s0.y); if (dx > 70 && dy < 40) { setReply(m); setEditing(null); taRef.current?.focus(); } }}>
                 {multi && !mine && (showName ? <Logo t={t} size={28} /> : <div className="w-7 shrink-0" />)}
-                <div role="button" tabIndex={0} onClick={() => { if (m.deleted || window.getSelection()?.toString()) return; setMenu(m); }}
+                <div role="button" tabIndex={0} onClick={() => { if (m.deleted || window.getSelection()?.toString()) return; if (window.matchMedia("(pointer: coarse)").matches) setMenu(m); }}
+                  onDoubleClick={() => { if (m.deleted) return; window.getSelection()?.removeAllRanges(); setMenu(m); }}
+                  onContextMenu={(e) => { if (m.deleted) return; e.preventDefault(); setMenu(m); }}
                   onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget && !m.deleted) setMenu(m); }}
                   className={`max-w-[80%] text-left select-text cursor-pointer rounded-2xl px-3 py-2 ${mine ? "bg-blue-600 text-white rounded-br-md" : "bg-slate-800 rounded-bl-md"} ${m.deleted ? "opacity-60 italic" : ""}`}>
                   {showName && <div className="text-[11px] font-semibold text-blue-300 mb-0.5">{t?.gmNickname ?? t?.code ?? "GM"} · {t?.code}</div>}
@@ -758,6 +761,33 @@ function Thread(props: {
           <button onClick={() => { setAttach(false); setPollNew(true); }} className="w-full text-left px-5 py-3.5 hover:bg-slate-800 flex gap-3"><span>📊</span>Anketa</button>
         </Sheet>
       )}
+      {infoMsg && (() => {
+        const m = infoMsg;
+        const mineMsg = m.fromTeamId === boot.me.id;
+        const everyone = isLeague ? boot.teams.map((t) => t.id).filter((id) => id !== m.fromTeamId) : isGroup ? room!.members.filter((id) => id !== m.fromTeamId) : dmTeamId ? [dmTeamId, boot.me.id].filter((id) => id !== m.fromTeamId) : [];
+        const seen = everyone.filter((id) => id === boot.me.id || (reads[id] ?? 0) >= m.id);
+        const unseen = everyone.filter((id) => !seen.includes(id));
+        const nm = (id: number) => { const t = teamMap.get(id); return id === boot.me.id ? "Ty" : `${t?.name ?? "GM"}${t?.gmNickname ? ` · ${t.gmNickname}` : ""}`; };
+        const Row = ({ id, extra }: { id: number; extra?: string }) => <div className="px-5 py-1.5 flex items-center gap-3"><Logo t={teamMap.get(id)} size={32} /><span className="flex-1 text-sm truncate">{nm(id)}</span>{extra && <span className="text-xl">{extra}</span>}</div>;
+        return (
+          <Sheet title="Informácie o správe" onClose={() => setInfoMsg(null)}>
+            <div className="px-5 pb-2 text-sm text-slate-400 line-clamp-2">{pinPreview(m) || "Správa"}</div>
+            <div className="px-5 pt-2 pb-1 text-xs text-slate-500">Odoslal: {nm(m.fromTeamId)} · {new Date(m.at).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+            <div className="px-5 pt-3 pb-1 text-xs uppercase tracking-wide text-slate-500">Reakcie ({m.reactions.reduce((n, r) => n + r.teams.length, 0)})</div>
+            {m.reactions.length === 0 && <p className="px-5 pb-2 text-sm text-slate-600">Zatiaľ žiadne reakcie</p>}
+            {m.reactions.flatMap((r) => r.teams.map((id) => <Row key={`${r.emoji}-${id}`} id={id} extra={r.emoji} />))}
+            {mineMsg && (
+              <>
+                <div className="px-5 pt-3 pb-1 text-xs uppercase tracking-wide text-sky-300">✓✓ Prečítali ({seen.filter((id) => id !== boot.me.id).length})</div>
+                {seen.filter((id) => id !== boot.me.id).length === 0 && <p className="px-5 pb-2 text-sm text-slate-600">Zatiaľ nikto</p>}
+                {seen.filter((id) => id !== boot.me.id).map((id) => <Row key={id} id={id} />)}
+                {unseen.length > 0 && <div className="px-5 pt-3 pb-1 text-xs uppercase tracking-wide text-slate-500">✓ Ešte nečítali ({unseen.length})</div>}
+                {unseen.map((id) => <Row key={id} id={id} />)}
+              </>
+            )}
+          </Sheet>
+        );
+      })()}
       {pollNew && <PollCreate onClose={() => setPollNew(false)} onCreate={createPoll} />}
       {pinList && (
         <Sheet title={`Pripnuté správy (${pins.length})`} onClose={() => setPinList(false)}>
@@ -790,14 +820,9 @@ function Thread(props: {
             )}
           </div>
           <div className="px-5 py-3 text-sm text-slate-400 line-clamp-3">{menu.body}</div>
-          {isGroup && menu.fromTeamId === boot.me.id && (
-            <div className="px-5 pb-3 text-xs space-y-1">
-              <div><span className="text-sky-300">✓✓ Prečítali:</span> <span className="text-slate-300">{readBy(menu).map((t) => teamMap.get(t)?.code).join(", ") || "zatiaľ nikto"}</span></div>
-              {audience.length > readBy(menu).length && <div><span className="text-slate-500">✓ Ešte nečítali:</span> <span className="text-slate-400">{audience.filter((t) => !readBy(menu).includes(t)).map((t) => teamMap.get(t)?.code).join(", ")}</span></div>}
-            </div>
-          )}
           <button onClick={() => { setReply(menu); setEditing(null); setMenu(null); requestAnimationFrame(() => taRef.current?.focus()); }} className="w-full text-left px-5 py-3 hover:bg-slate-800">↩︎ Odpovedať (citovať)</button>
           {menu.fromTeamId === boot.me.id && menu.body && menu.kind === "user" && <button onClick={() => startEdit(menu)} className="w-full text-left px-5 py-3 hover:bg-slate-800">✏️ Upraviť</button>}
+          <button onClick={() => { setInfoMsg(menu); setMenu(null); setMoreReact(false); }} className="w-full text-left px-5 py-3 hover:bg-slate-800">ℹ️ Informácie</button>
           {canPin && (menu.pinned || pins.some((p) => p.id === menu.id)
             ? <button onClick={() => void pin(menu, false)} className="w-full text-left px-5 py-3 hover:bg-slate-800">📌 Odopnúť</button>
             : <button onClick={() => void pin(menu, true)} className="w-full text-left px-5 py-3 hover:bg-slate-800">📌 Pripnúť na vrch chatu</button>)}

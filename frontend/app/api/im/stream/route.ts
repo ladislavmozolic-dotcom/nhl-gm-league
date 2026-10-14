@@ -62,7 +62,7 @@ export async function GET(req: Request) {
             send(`event: pins\ndata: ${JSON.stringify(pr.map((r) => ({ roomId: r.id })))}\n\n`);
           }
           // peers' read position in my DMs → drives the ✓✓ ticks
-          const dmRooms = await prisma.imRoom.findMany({ where: { id: { in: rooms }, kind: { in: ["dm", "group"] } }, select: { id: true } });
+          const dmRooms = await prisma.imRoom.findMany({ where: { id: { in: rooms }, kind: { in: ["dm", "group", "league"] } }, select: { id: true } });
           const rr = await prisma.imRead.findMany({ where: { roomId: { in: dmRooms.map((r) => r.id) }, teamId: { not: me } } });
           const changed = rr.filter((r) => peerSeen.get(`${r.roomId}:${r.teamId}`) !== r.lastReadId);
           if (changed.length) {
