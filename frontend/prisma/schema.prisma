@@ -2140,3 +2140,63 @@ model LiveRound {
 
   @@index([status])
 }
+
+// ── UNHL Chat (standalone installable chat app at /chat) ───────────────────────
+// Fully separate from the older DmMessage "Messages" page and the draft ChatMessage.
+// No relations to Team on purpose (teamId is a plain Int) so existing models stay untouched.
+model ImSettings {
+  id        Int      @id @default(1)
+  enabled   Boolean  @default(false) // master switch — chat is invisible until the commissioner turns it on
+  updatedAt DateTime @updatedAt
+}
+
+model ImRoom {
+  id            Int         @id @default(autoincrement())
+  kind          String // "league" | "dm"
+  dmKey         String?     @unique // "<lowTeamId>-<highTeamId>" for a dm room
+  createdAt     DateTime    @default(now())
+  lastMessageAt DateTime    @default(now())
+  messages      ImMessage[]
+  reads         ImRead[]
+}
+
+model ImMessage {
+  id          Int       @id @default(autoincrement())
+  roomId      Int
+  fromTeamId  Int
+  body        String
+  replyToId   Int?
+  deletedAt   DateTime? // soft delete (author or moderator) — body is hidden from clients
+  deletedById Int?
+  createdAt   DateTime  @default(now())
+  room        ImRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, id])
+}
+
+model ImRead {
+  roomId     Int
+  teamId     Int
+  lastReadId Int     @default(0)
+  room       ImRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, teamId])
+}
+
+model ImMute {
+  teamId    Int       @id
+  until     DateTime? // null = until lifted
+  reason    String?
+  createdAt DateTime  @default(now())
+}
+
+model ImPushSub {
+  id        Int      @id @default(autoincrement())
+  teamId    Int
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([teamId])
+}
