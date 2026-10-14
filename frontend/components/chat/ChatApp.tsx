@@ -1,5 +1,6 @@
 "use client";
 
+import InstallBanner from "./InstallBanner";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null };
@@ -170,6 +171,7 @@ export default function ChatApp() {
           <button onClick={() => setPicker(true)} aria-label="Nový chat" className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 text-xl">＋</button>
           <button onClick={() => setSettings(true)} aria-label="Nastavenia" className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700">⚙︎</button>
         </header>
+        <InstallBanner />
         {!boot.enabled && <div className="bg-amber-500/10 text-amber-300 text-xs px-4 py-2">Chat je pre ostatných GM zatiaľ vypnutý (vidíš ho ako admin).</div>}
         <div className="flex-1 overflow-y-auto">
           {sortedRooms.map((r) => {
@@ -457,6 +459,7 @@ function Settings({ boot, teamMap, onClose, reload }: { boot: Boot; teamMap: Map
           <p className="px-5 pt-2 text-[11px] text-slate-600">Správy v ligovom kanáli odstrániš ťuknutím na správu → Odstrániť.</p>
         </>
       )}
+      <a href="/chat/install" className="block px-5 py-3 text-slate-300 hover:bg-slate-800">📲 Ako pridať chat na plochu</a>
       <button onClick={() => { window.location.href = "/"; }} className="w-full text-left px-5 py-3 mt-2 text-slate-400 hover:bg-slate-800">← Späť na stránku ligy</button>
     </Sheet>
   );

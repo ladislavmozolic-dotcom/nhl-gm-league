@@ -28,6 +28,7 @@ export default async function ChatPage() {
           <h1 className="text-xl font-semibold">UNHL Chat</h1>
           <p className="text-slate-400 text-sm max-w-xs">Prihlás sa ako GM. Prihlásenie zostane aj po pridaní appky na plochu.</p>
           <SessionResume><ChatLogin /></SessionResume>
+          <a href="/chat/install" className="text-sm text-blue-400 underline">📲 Ako nainštalovať do mobilu</a>
         </div>
       </Shell>
     );
