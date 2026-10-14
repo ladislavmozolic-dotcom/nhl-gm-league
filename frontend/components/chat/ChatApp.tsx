@@ -1,6 +1,7 @@
 "use client";
 
 import InstallBanner from "./InstallBanner";
+import { DEFAULT_PREFS, SOUNDS, loadPrefs, playSound, savePrefs, unlockAudio, type Prefs, type SoundId } from "./sound";
 import { EmojiPicker, GifPicker, Lightbox, isBigEmoji, prepareImage, uploadImage } from "./media";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -52,6 +53,19 @@ export default function ChatApp() {
   const [settings, setSettings] = useState(false);
   const activeRef = useRef<number | null>(null);
   activeRef.current = active;
+  const [prefs, setPrefsState] = useState<Prefs>(DEFAULT_PREFS);
+  const prefsRef = useRef<Prefs>(DEFAULT_PREFS);
+  const bootRef = useRef<Boot | null>(null);
+  bootRef.current = boot;
+  const [banner, setBanner] = useState<{ roomId: number; title: string; text: string; team: TeamLite | null; kind: string } | null>(null);
+  const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setPrefs = (p: Prefs) => { prefsRef.current = p; setPrefsState(p); savePrefs(p); };
+  useEffect(() => {
+    const p = loadPrefs(); prefsRef.current = p; setPrefsState(p);
+    const un = () => { unlockAudio(); window.removeEventListener("pointerdown", un); window.removeEventListener("keydown", un); };
+    window.addEventListener("pointerdown", un); window.addEventListener("keydown", un);
+    return () => { window.removeEventListener("pointerdown", un); window.removeEventListener("keydown", un); };
+  }, []);
 
   const teamMap = useMemo(() => new Map((boot?.teams ?? []).map((t) => [t.id, t])), [boot]);
 
@@ -115,6 +129,27 @@ export default function ChatApp() {
       es.addEventListener("messages", (e) => {
         const list = JSON.parse((e as MessageEvent).data) as Msg[];
         lastSeen.current = Math.max(lastSeen.current, ...list.map((m) => m.id));
+        // live alert for messages from others: sound + in-app banner (not for muted chats / own / system lines)
+        const b0 = bootRef.current;
+        if (b0 && document.visibilityState === "visible") {
+          const incoming = list.filter((m) => m.kind !== "system" && m.fromTeamId !== b0.me.id && !(b0.rooms.find((r) => r.id === m.roomId)?.muted));
+          const m = incoming[incoming.length - 1];
+          if (m) {
+            const pr = prefsRef.current;
+            playSound(pr.sound, pr.volume);
+            if (pr.vibrate) navigator.vibrate?.(120);
+            const viewing = activeRef.current === m.roomId;
+            if (pr.banner && !viewing) {
+              const room = b0.rooms.find((r) => r.id === m.roomId);
+              const from = b0.teams.find((t) => t.id === m.fromTeamId) ?? null;
+              const title = room?.kind === "league" ? `${room.name || "# Liga"} · ${from?.code ?? ""}` : room?.kind === "group" ? `${room.name ?? "Skupina"} · ${from?.code ?? ""}` : from?.name ?? "GM";
+              const text = m.body || (m.imageUrl ? (/\.gif|giphy/i.test(m.imageUrl) ? "GIF" : "📷 Fotka") : "");
+              setBanner({ roomId: m.roomId, title, text, team: from, kind: room?.kind ?? "dm" });
+              if (bannerTimer.current) clearTimeout(bannerTimer.current);
+              bannerTimer.current = setTimeout(() => setBanner(null), 4500);
+            }
+          }
+        }
         setMsgs((cur) => {
           const next = { ...cur };
           for (const m of list) {
@@ -272,7 +307,16 @@ export default function ChatApp() {
         </Sheet>
       )}
       {groupNew && <GroupCreate boot={boot} onClose={() => setGroupNew(false)} onCreated={async (roomId) => { setGroupNew(false); await load(); setPendingDm(null); setActive(roomId); }} />}
-      {settings && <Settings boot={boot} teamMap={teamMap} onClose={() => setSettings(false)} reload={load} />}
+      {banner && (
+        <button onClick={() => { setPendingDm(null); setActive(banner.roomId); setBanner(null); }}
+          className="fixed top-3 left-1/2 -translate-x-1/2 z-40 w-[min(94vw,420px)] flex items-center gap-3 rounded-2xl bg-slate-800/95 backdrop-blur border border-slate-700 shadow-2xl px-4 py-3 text-left"
+          style={{ marginTop: "env(safe-area-inset-top)" }}>
+          {banner.kind === "dm" ? <Logo t={banner.team} size={40} /> : <div className="w-10 h-10 shrink-0 rounded-full bg-blue-600/20 flex items-center justify-center text-lg">{banner.kind === "league" ? "🏒" : "👥"}</div>}
+          <div className="min-w-0 flex-1"><div className="text-sm font-semibold truncate">{banner.title}</div><div className="text-sm text-slate-300 truncate">{banner.text}</div></div>
+          <span onClick={(e) => { e.stopPropagation(); setBanner(null); }} className="text-slate-500 px-1">✕</span>
+        </button>
+      )}
+      {settings && <Settings boot={boot} teamMap={teamMap} onClose={() => setSettings(false)} reload={load} prefs={prefs} setPrefs={setPrefs} />}
     </div>
   );
 }
@@ -488,7 +532,7 @@ function Thread(props: {
   );
 }
 
-function Settings({ boot, teamMap, onClose, reload }: { boot: Boot; teamMap: Map<number, TeamLite>; onClose: () => void; reload: () => Promise<void> }) {
+function Settings({ boot, teamMap, onClose, reload, prefs, setPrefs }: { boot: Boot; teamMap: Map<number, TeamLite>; onClose: () => void; reload: () => Promise<void>; prefs: Prefs; setPrefs: (p: Prefs) => void }) {
   const [push, setPush] = useState<"unknown" | "on" | "off" | "unsupported" | "ios-install">("unknown");
   const [admin, setAdmin] = useState<{ enabled: boolean; mutes: { teamId: number; until: string | null }[] } | null>(null);
   const loadAdmin = useCallback(async () => { if (boot.admin) { const r = await fetch("/api/im/admin"); if (r.ok) setAdmin(await r.json()); } }, [boot.admin]);
@@ -534,6 +578,28 @@ function Settings({ boot, teamMap, onClose, reload }: { boot: Boot; teamMap: Map
         {push === "off" && <button onClick={enablePush} className="rounded-lg bg-blue-600 px-4 py-2 text-sm">Zapnúť</button>}
         {push === "on" && <button onClick={disablePush} className="rounded-lg bg-slate-700 px-4 py-2 text-sm">Vypnúť</button>}
       </div>
+      <div className="px-5 pt-3 pb-1 text-xs uppercase tracking-wide text-slate-500">Zvuk a upozornenia</div>
+      <div className="px-5 pb-1 text-xs text-slate-500">Zvuk pri novej správe, keď máš chat otvorený. Notifikácie pri zatvorenej appke majú zvuk podľa nastavení telefónu.</div>
+      {SOUNDS.map((so) => (
+        <button key={so.id} onClick={() => { setPrefs({ ...prefs, sound: so.id as SoundId }); playSound(so.id as SoundId, prefs.volume); }} className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-slate-800 text-left">
+          <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${prefs.sound === so.id ? "border-blue-500" : "border-slate-600"}`}>{prefs.sound === so.id && <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />}</span>
+          <span className="flex-1 text-sm">{so.label}</span>
+          {so.id !== "off" && <span className="text-xs text-slate-500">▶ vypočuť</span>}
+        </button>
+      ))}
+      <div className="px-5 py-3 flex items-center gap-3">
+        <span className="text-sm w-20">Hlasitosť</span>
+        <input type="range" min={0.1} max={1} step={0.1} value={prefs.volume} onChange={(e) => setPrefs({ ...prefs, volume: Number(e.target.value) })} onPointerUp={() => playSound(prefs.sound, prefs.volume)} className="flex-1" />
+      </div>
+      <button onClick={() => setPrefs({ ...prefs, banner: !prefs.banner })} className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-slate-800 text-left">
+        <span className="flex-1 text-sm">Upozornenie na obrazovke pri novej správe</span>
+        <span className={`w-11 h-6 rounded-full p-0.5 transition-colors ${prefs.banner ? "bg-blue-600" : "bg-slate-700"}`}><span className={`block w-5 h-5 rounded-full bg-white transition-transform ${prefs.banner ? "translate-x-5" : ""}`} /></span>
+      </button>
+      <button onClick={() => setPrefs({ ...prefs, vibrate: !prefs.vibrate })} className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-slate-800 text-left">
+        <span className="flex-1 text-sm">Vibrovanie (Android)</span>
+        <span className={`w-11 h-6 rounded-full p-0.5 transition-colors ${prefs.vibrate ? "bg-blue-600" : "bg-slate-700"}`}><span className={`block w-5 h-5 rounded-full bg-white transition-transform ${prefs.vibrate ? "translate-x-5" : ""}`} /></span>
+      </button>
+      <div className="border-t border-slate-800 my-2" />
       <PictureRow label="Moja fotka v chate" hasImage={!!boot.me.avatarUrl}
         preview={<Logo t={boot.me} size={44} />}
         onSet={async (url) => { await fetch("/api/im/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ avatarUrl: url }) }); await reload(); }} />
