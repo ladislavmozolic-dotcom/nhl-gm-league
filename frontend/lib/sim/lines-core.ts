@@ -389,13 +389,21 @@ export function autoFill(data: TeamLinesData, skaters: Skater[], goalies: Goalie
 export function deployConfiguredLines(lines: TeamLinesData, dressedF: number[], dressedD: number[]): TeamLinesData {
   const fill = (units: Array<Record<string, number | null>>, slots: string[], dressed: number[]) => {
     const ok = new Set(dressed);
+    // Everyone the GM's lines already use (valid, dressed, not repeated inside a trio/pair). A hole — an injured or
+    // missing player — is filled with a dressed skater NOBODY uses yet (e.g. the call-up from the farm) before
+    // anybody is double-shifted across two lines (Geekie played 40 minutes because he covered Leonard's slot).
+    const assigned = new Set<number>();
+    for (const u of units) {
+      const seen = new Set<number>();
+      for (const k of slots) { const id = u[k]; if (id != null && ok.has(id) && !seen.has(id)) { seen.add(id); assigned.add(id); } }
+    }
     for (const u of units) {
       const inUnit = new Set<number>();
       for (const k of slots) {
         const id = u[k];
         if (id != null && ok.has(id) && !inUnit.has(id)) { inUnit.add(id); continue; }
-        const next = dressed.find((d) => !inUnit.has(d)) ?? dressed[0] ?? null;
-        u[k] = next; if (next != null) inUnit.add(next);
+        const next = dressed.find((d) => !inUnit.has(d) && !assigned.has(d)) ?? dressed.find((d) => !inUnit.has(d)) ?? dressed[0] ?? null;
+        u[k] = next; if (next != null) { inUnit.add(next); assigned.add(next); }
       }
     }
   };

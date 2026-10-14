@@ -73,3 +73,20 @@ test("a GM double-shift across lines is preserved but a duplicate inside one lin
   deployConfiguredLines(lines, dressedF, dressedD);
   assert.equal([lines.forwardLines[3].lw, lines.forwardLines[3].c, lines.forwardLines[3].rw].filter((id) => id === star).length, 1);
 });
+
+test("a hole in the lines (injured player) is filled by an unused dressed skater, not by double-shifting a regular", () => {
+  const fwd = Array.from({ length: 12 }, (_, i) => i + 1); // dressed F: 1..12 — 12 is the call-up, in no line
+  const lines = normalize({
+    forwardLines: [
+      { lw: 1, c: 2, rw: 99 }, // 99 = injured, not dressed
+      { lw: 4, c: 5, rw: 6 },
+      { lw: 7, c: 8, rw: 9 },
+      { lw: 10, c: 11, rw: 3 },
+    ] as never,
+    defensePairs: [{ ld: 101, rd: 102 }, { ld: 103, rd: 104 }, { ld: 105, rd: 106 }] as never,
+  });
+  const out = deployConfiguredLines(lines, fwd, [101, 102, 103, 104, 105, 106]);
+  assert.equal(out.forwardLines[0].rw, 12, "the call-up takes the injured player's slot");
+  const all = out.forwardLines.flatMap((l) => [l.lw, l.c, l.rw]);
+  assert.equal(new Set(all).size, all.length - 0, "nobody is on two lines");
+});
