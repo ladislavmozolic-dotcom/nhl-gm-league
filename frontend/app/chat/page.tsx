@@ -8,7 +8,6 @@ import SessionResume from "@/components/SessionResume";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "UNHL Chat",
-  manifest: "/chat/manifest.webmanifest",
   appleWebApp: { capable: true, title: "UNHL Chat", statusBarStyle: "black-translucent" },
 };
 

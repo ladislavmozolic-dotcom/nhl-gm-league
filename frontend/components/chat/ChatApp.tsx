@@ -55,7 +55,19 @@ export default function ChatApp() {
 
   // PWA: swap in the chat manifest + register the push-capable service worker
   useEffect(() => {
-    document.querySelectorAll('link[rel="manifest"]').forEach((l) => { if (!(l as HTMLLinkElement).href.includes("/chat/")) l.remove(); });
+    // Swap in the chat manifest ONLY for a standalone browser tab / the chat app itself.
+    // If /chat was opened from a link inside the installed LEAGUE app window (standalone +
+    // a same-site referrer), leave the league manifest alone — otherwise Chrome would
+    // "update" the league app into the chat app.
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone;
+    let fromSite = false;
+    try { fromSite = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch { /* ignore */ }
+    if (!(standalone && fromSite)) {
+      document.querySelectorAll('link[rel="manifest"]').forEach((l) => l.remove());
+      const link = document.createElement("link");
+      link.rel = "manifest"; link.href = "/chat/manifest.webmanifest";
+      document.head.appendChild(link);
+    }
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/chat-sw.js", { scope: "/chat" }).catch(() => {});
   }, []);
 

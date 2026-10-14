@@ -15,6 +15,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     name: `${b.leagueName} — ${b.tagline}`,
     short_name: b.leagueName,
     description: b.tagline,
+    id: "/",
     start_url: "/",
     display: "standalone",
     background_color: b.bgColor,
