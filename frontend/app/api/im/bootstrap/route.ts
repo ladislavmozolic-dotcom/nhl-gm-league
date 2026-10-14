@@ -12,6 +12,7 @@ export async function GET() {
   const enabled = await chatEnabled();
   if (!enabled && !admin) return NextResponse.json({ error: "disabled" }, { status: 403 });
 
+  const cursor = (await prisma.imMessage.findFirst({ orderBy: { id: "desc" }, select: { id: true } }))?.id ?? 0; // read BEFORE the rooms, so the live stream resumes exactly from here
   const [meTeam, teams, roomIds, league] = await Promise.all([
     prisma.team.findUnique({ where: { id: me }, select: { id: true, code: true, name: true, logoUrl: true, gmNickname: true } }),
     // human-run NHL clubs only (AI-GM clubs have no login → no chat)
@@ -38,7 +39,7 @@ export async function GET() {
     return { lastReadId: readMap.get(r.id) ?? 0, muted: muteActive(mutedMap.get(r.id)), mutedUntil: muteActive(mutedMap.get(r.id)) ? mutedMap.get(r.id)!.mutedUntil?.toISOString() ?? null : null, id: r.id, kind: r.kind, otherTeamId, unread, last: lastW, name: r.name, imageUrl: r.imageUrl, createdById: r.createdById, members: r.members.map((m) => m.teamId) };
   }));
   return NextResponse.json({
-    me: meTeam ? withAv(meTeam) : meTeam, admin, enabled, muted: await isMuted(me), leagueRoomId: league, teams: teams.map(withAv), rooms: out,
+    cursor, me: meTeam ? withAv(meTeam) : meTeam, admin, enabled, muted: await isMuted(me), leagueRoomId: league, teams: teams.map(withAv), rooms: out,
     vapid: process.env.VAPID_PUBLIC_KEY ?? null, gif: !!process.env.GIPHY_API_KEY,
   });
 }

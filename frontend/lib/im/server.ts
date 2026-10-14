@@ -49,7 +49,15 @@ export async function isMuted(teamId: number): Promise<boolean> {
 }
 
 export type PollWire = { id: number; question: string; multi: boolean; closed: boolean; options: { id: number; text: string; voters: number[] }[] };
+export type ReactionWire = { emoji: string; teams: number[] };
+export function groupReactions(rs: { emoji: string; teamId: number }[]): ReactionWire[] {
+  const m = new Map<string, number[]>();
+  for (const r of rs) m.set(r.emoji, [...(m.get(r.emoji) ?? []), r.teamId]);
+  return [...m.entries()].map(([emoji, teams]) => ({ emoji, teams })).sort((a, b) => b.teams.length - a.teams.length);
+}
+
 export type WireMessage = {
+  reactions: ReactionWire[];
   kind: string; imageUrl: string | null; voice: { url: string; secs: number } | null; file: { url: string; name: string; size: number } | null; pinned: boolean; poll: PollWire | null;
   edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string;
   replyTo: { id: number; fromTeamId: number; body: string } | null; deleted: boolean;
@@ -70,10 +78,14 @@ export async function wire(rows: ImMessage[]): Promise<WireMessage[]> {
   const pollIds = rows.filter((r) => r.kind === "poll" && !r.deletedAt).map((r) => r.id);
   const polls = pollIds.length ? await prisma.imPoll.findMany({ where: { messageId: { in: pollIds } }, include: pollInclude }) : [];
   const pm = new Map(polls.map((p) => [p.messageId, pollWire(p)]));
+  const rx = await prisma.imReaction.findMany({ where: { messageId: { in: rows.map((r) => r.id) } }, select: { messageId: true, teamId: true, emoji: true } });
+  const rxBy = new Map<number, { emoji: string; teamId: number }[]>();
+  for (const r of rx) rxBy.set(r.messageId, [...(rxBy.get(r.messageId) ?? []), r]);
   return rows.map((r) => {
     const rp = r.replyToId != null ? rm.get(r.replyToId) : null;
     return {
       kind: r.kind, imageUrl: r.deletedAt ? null : r.imageUrl, edited: !!r.editedAt && !r.deletedAt, id: r.id, roomId: r.roomId, fromTeamId: r.fromTeamId,
+      reactions: r.deletedAt ? [] : groupReactions(rxBy.get(r.id) ?? []),
       voice: !r.deletedAt && r.voiceUrl ? { url: r.voiceUrl, secs: r.voiceSecs ?? 0 } : null,
       file: !r.deletedAt && r.fileUrl ? { url: r.fileUrl, name: r.fileName ?? "súbor", size: r.fileSize ?? 0 } : null,
       pinned: !!r.pinnedAt && !r.deletedAt, poll: pm.get(r.id) ?? null,

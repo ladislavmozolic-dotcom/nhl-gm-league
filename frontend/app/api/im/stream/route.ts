@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
-import { chatEnabled, myRoomIds, pollInclude, pollWire, wire } from "@/lib/im/server";
+import { chatEnabled, groupReactions, myRoomIds, pollInclude, pollWire, wire } from "@/lib/im/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,13 +19,15 @@ export async function GET(req: Request) {
   let editCursor = new Date();
   let pollCursor = new Date();
   let pinCursor = new Date();
+  let reactCursor = new Date();
   const peerSeen = new Map<string, number>(); // "roomId:teamId" -> that member's lastReadId, last value sent
 
   const stream = new ReadableStream({
     async start(controller) {
       const started = Date.now();
       const send = (s: string) => { try { controller.enqueue(enc.encode(s)); } catch { /* closed */ } };
-      send("retry: 2000\n\n");
+      send(`retry: 2000\n\nid: ${cursor}\nevent: hello\ndata: ${cursor}\n\n`); // id: so a reconnect resumes exactly here (no gap)
+      let beat = 0;
       const tick = async () => {
         try {
           const rooms = await myRoomIds(me);
@@ -38,7 +40,7 @@ export async function GET(req: Request) {
           if (dels.length) {
             delCursor = new Date(Math.max(...dels.map((d) => d.deletedAt!.getTime())));
             send(`event: deleted\ndata: ${JSON.stringify(dels.map((d) => ({ id: d.id, roomId: d.roomId })))}\n\n`);
-          } else send(": ping\n\n");
+          } else if (++beat % 4 === 0) send(`id: ${cursor}\nevent: hb\ndata: ${cursor}\n\n`); // heartbeat the client can watch (comments are invisible to EventSource)
           const eds = await prisma.imMessage.findMany({ where: { roomId: { in: rooms }, editedAt: { gt: editCursor }, deletedAt: null } });
           if (eds.length) {
             editCursor = new Date(Math.max(...eds.map((d) => d.editedAt!.getTime())));
@@ -48,6 +50,11 @@ export async function GET(req: Request) {
           if (pls.length) {
             pollCursor = new Date(Math.max(...pls.map((p) => p.updatedAt.getTime())));
             send(`event: polls\ndata: ${JSON.stringify(pls.map((p) => ({ messageId: p.messageId, roomId: p.message.roomId, poll: pollWire(p) })))}\n\n`);
+          }
+          const rxm = await prisma.imMessage.findMany({ where: { roomId: { in: rooms }, reactedAt: { gt: reactCursor }, deletedAt: null }, select: { id: true, roomId: true, reactedAt: true, reactions: { select: { emoji: true, teamId: true } } } });
+          if (rxm.length) {
+            reactCursor = new Date(Math.max(...rxm.map((m) => m.reactedAt!.getTime())));
+            send(`event: reacts\ndata: ${JSON.stringify(rxm.map((m) => ({ messageId: m.id, roomId: m.roomId, reactions: groupReactions(m.reactions) })))}\n\n`);
           }
           const pr = await prisma.imRoom.findMany({ where: { id: { in: rooms }, pinsAt: { gt: pinCursor } }, select: { id: true, pinsAt: true } });
           if (pr.length) {
@@ -71,5 +78,5 @@ export async function GET(req: Request) {
       req.signal.addEventListener("abort", () => { clearInterval(iv); try { controller.close(); } catch {} });
     },
   });
-  return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" } });
+  return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no", "Content-Encoding": "identity" } });
 }

@@ -52,7 +52,7 @@ export function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
       const btn = 40;
       const perLine = Math.max(8, Math.min(32, Math.floor((host.current.clientWidth - 24) / btn)));
       const picker = new Picker({
-        data: data.default, theme: "dark", locale: "en", previewPosition: "none", skinTonePosition: "search",
+        data: data.default, theme: document.querySelector(".chat-light") ? "light" : "dark", locale: "en", previewPosition: "none", skinTonePosition: "search",
         navPosition: "bottom", perLine, maxFrequentRows: 2, emojiButtonSize: btn, emojiSize: 26,
         onEmojiSelect: (e: { native: string }) => onPick(e.native),
       });
@@ -197,7 +197,7 @@ export function VoicePlayer({ url, secs }: { url: string; secs: number }) {
   const dur = a.current && isFinite(a.current.duration) && a.current.duration > 0 ? a.current.duration : secs;
   return (
     <div className="flex items-center gap-3 min-w-[210px] py-1" onClick={(e) => e.stopPropagation()}>
-      <button onClick={toggle} aria-label={on ? "Pauza" : "Prehrať"} className="w-10 h-10 shrink-0 rounded-full bg-white/90 text-slate-900 text-base flex items-center justify-center">{on ? "❚❚" : "▶"}</button>
+      <button onClick={toggle} aria-label={on ? "Pauza" : "Prehrať"} className="w-10 h-10 shrink-0 rounded-full bg-white/90 text-black text-base flex items-center justify-center">{on ? "❚❚" : "▶"}</button>
       <div className="flex-1 min-w-0">
         <input type="range" min={0} max={dur || 1} step={0.1} value={pos} onChange={(e) => { const v = Number(e.target.value); setPos(v); if (a.current) a.current.currentTime = v; }} className="w-full h-1 accent-white" aria-label="Pozícia" />
         <div className="text-[11px] opacity-70 mt-0.5">🎤 {fmtSecs(on || pos ? pos : dur)} / {fmtSecs(dur)}</div>
@@ -205,3 +205,13 @@ export function VoicePlayer({ url, secs }: { url: string; secs: number }) {
     </div>
   );
 }
+
+// ── text emoticons → emoji (":D" → 😃, "<3" → ❤️ …), like Viber. Only standalone tokens, so "10:30" or URLs stay intact.
+const EMOTICONS: Record<string, string> = {
+  ":)": "🙂", ":-)": "🙂", "(:": "🙂", ":D": "😃", ":-D": "😃", xD: "😆", XD: "😆", ";)": "😉", ";-)": "😉", ":(": "🙁", ":-(": "🙁", ":'(": "😢",
+  ":P": "😛", ":p": "😛", ":-P": "😛", ":O": "😮", ":o": "😮", ":*": "😘", "<3": "❤️", "</3": "💔", ":/": "😕", ":|": "😐", "B)": "😎", "O:)": "😇",
+  ">:(": "😠", ":@": "😡", "^^": "😊", "-_-": "😑", ":3": "😺",
+};
+const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const EMOTICON_RE = new RegExp(`(^|\\s)(${Object.keys(EMOTICONS).sort((a, b) => b.length - a.length).map(esc).join("|")})(?=$|\\s|[.,!?)])`, "g");
+export const emoticonize = (s: string) => s.replace(EMOTICON_RE, (_m, pre: string, e: string) => pre + EMOTICONS[e]);

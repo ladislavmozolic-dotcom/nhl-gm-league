@@ -2,19 +2,22 @@
 
 import InstallBanner from "./InstallBanner";
 import { PushBanner, usePush, type PushApi } from "./push";
-import { DEFAULT_PREFS, SOUNDS, loadPrefs, playSound, savePrefs, unlockAudio, type Prefs, type SoundId } from "./sound";
-import { EmojiPicker, GifPicker, Lightbox, VOICE_MAX_SECS, VoicePlayer, fileIcon, fmtSecs, fmtSize, isBigEmoji, prepareImage, startRecording, uploadFile, uploadImage, uploadVoice, type Recorder } from "./media";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_PREFS, SOUNDS, loadPrefs, playSound, savePrefs, unlockAudio, type Prefs, type SoundId, type Theme } from "./sound";
+import { EmojiPicker, GifPicker, Lightbox, VOICE_MAX_SECS, emoticonize, VoicePlayer, fileIcon, fmtSecs, fmtSize, isBigEmoji, prepareImage, startRecording, uploadFile, uploadImage, uploadVoice, type Recorder } from "./media";
+import { useLayoutEffect, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null; avatarUrl: string | null };
 type Poll = { id: number; question: string; multi: boolean; closed: boolean; options: { id: number; text: string; voters: number[] }[] };
 type FileAtt = { url: string; name: string; size: number };
-type Msg = { kind: string; voice: { url: string; secs: number } | null; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
+type Reaction = { emoji: string; teams: number[] };
+const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
+const MORE_REACTIONS = ["🔥", "🏒", "🥅", "🎉", "👏", "🍆", "👎", "🙏"];
+type Msg = { reactions: Reaction[]; kind: string; voice: { url: string; secs: number } | null; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
 type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; mutedUntil: string | null; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
 const roomMuted = (r?: { muted: boolean; mutedUntil: string | null } | null) => !!r?.muted && (!r.mutedUntil || new Date(r.mutedUntil) > new Date());
 const muteLabel = (until: string | null) => (!until ? "Navždy" : `do ${new Date(until).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`);
 const MUTE_OPTIONS: { label: string; hours: number | null }[] = [{ label: "1 hodinu", hours: 1 }, { label: "8 hodín", hours: 8 }, { label: "1 deň", hours: 24 }, { label: "1 týždeň", hours: 168 }, { label: "Navždy", hours: null }];
-type Boot = { me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null; gif: boolean };
+type Boot = { cursor: number; me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null; gif: boolean };
 
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" });
 function dayLabel(iso: string) {
@@ -41,6 +44,15 @@ function RoomIcon({ r, size }: { r: { kind: string; imageUrl: string | null } | 
   );
 }
 
+// Light theme = the whole slate scale flipped inside .chat-light (Tailwind utilities read these CSS variables),
+// plus darker accent text colours and white text on solid accent fills.
+const LIGHT_CSS = `
+.chat-light{--color-slate-950:#ffffff;--color-slate-900:#f1f5f9;--color-slate-800:#e2e8f0;--color-slate-700:#cbd5e1;--color-slate-600:#94a3b8;--color-slate-500:#64748b;--color-slate-400:#475569;--color-slate-300:#334155;--color-slate-200:#1e293b;--color-slate-100:#0f172a;--color-slate-50:#020617;
+--color-blue-400:#2563eb;--color-blue-300:#1d4ed8;--color-violet-300:#6d28d9;--color-violet-200:#5b21b6;--color-amber-300:#b45309;--color-amber-400:#b45309;--color-red-400:#dc2626;--color-red-300:#b91c1c;--surface:#f1f5f9;--surface-2:#e2e8f0;--border:#e2e8f0;--text:#0f172a;--text-2:#475569;--text-3:#64748b;color-scheme:light}
+.chat-light .bg-blue-600,.chat-light .bg-blue-500,.chat-light .bg-red-500,.chat-light .bg-emerald-600{color:#fff}
+.chat-light .bg-slate-600{color:#fff}
+`;
+
 export default function ChatApp() {
   const [boot, setBoot] = useState<Boot | null>(null);
   const [err, setErr] = useState("");
@@ -57,14 +69,21 @@ export default function ChatApp() {
   activeRef.current = active;
   const [prefs, setPrefsState] = useState<Prefs>(DEFAULT_PREFS);
   const pushApi = usePush(boot?.vapid ?? null);
+  const [sysLight, setSysLight] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: light)"); setSysLight(mq.matches);
+    const h = (e: MediaQueryListEvent) => setSysLight(e.matches);
+    mq.addEventListener("change", h); return () => mq.removeEventListener("change", h);
+  }, []);
+  const light = prefs.theme === "light" || (prefs.theme === "auto" && sysLight);
   const prefsRef = useRef<Prefs>(DEFAULT_PREFS);
   const bootRef = useRef<Boot | null>(null);
   bootRef.current = boot;
   const [banner, setBanner] = useState<{ roomId: number; title: string; text: string; team: TeamLite | null; kind: string } | null>(null);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setPrefs = (p: Prefs) => { prefsRef.current = p; setPrefsState(p); savePrefs(p); };
+  useLayoutEffect(() => { const p = loadPrefs(); prefsRef.current = p; setPrefsState(p); }, []);
   useEffect(() => {
-    const p = loadPrefs(); prefsRef.current = p; setPrefsState(p);
     const un = () => { unlockAudio(); window.removeEventListener("pointerdown", un); window.removeEventListener("keydown", un); };
     window.addEventListener("pointerdown", un); window.addEventListener("keydown", un);
     return () => { window.removeEventListener("pointerdown", un); window.removeEventListener("keydown", un); };
@@ -128,12 +147,9 @@ export default function ChatApp() {
   const lastSeen = useRef(0);
   useEffect(() => {
     if (!boot) return;
-    let es: EventSource | null = null, dead = false;
-    const open = () => {
-      if (dead) return;
-      es = new EventSource(`/api/im/stream${lastSeen.current ? `?after=${lastSeen.current}` : ""}`);
-      es.addEventListener("messages", (e) => {
-        const list = JSON.parse((e as MessageEvent).data) as Msg[];
+    let es: EventSource | null = null, dead = false, lastBeat = Date.now();
+    if (lastSeen.current === 0) lastSeen.current = boot.cursor;
+    const handleMessages = (list: Msg[]) => {
         lastSeen.current = Math.max(lastSeen.current, ...list.map((m) => m.id));
         // live alert for messages from others: sound + in-app banner (not for muted chats / own / system lines)
         const b0 = bootRef.current;
@@ -177,7 +193,20 @@ export default function ChatApp() {
           return { ...b, rooms };
         });
         if (unknownRoom) void load();
-      });
+    };
+    // catch-up for anything missed while the stream was stalled / the app was asleep
+    const catchUp = async () => {
+      const r = await fetch(`/api/im/since?after=${lastSeen.current}`).catch(() => null);
+      if (!r?.ok) return;
+      const j = (await r.json()) as { messages: Msg[]; latest: number };
+      if (j.messages.length) handleMessages(j.messages); else lastSeen.current = Math.max(lastSeen.current, j.latest);
+    };
+    const open = () => {
+      if (dead) return;
+      es = new EventSource(`/api/im/stream${lastSeen.current ? `?after=${lastSeen.current}` : ""}`);
+      es.addEventListener("messages", (e) => { lastBeat = Date.now(); handleMessages(JSON.parse((e as MessageEvent).data) as Msg[]); });
+      es.addEventListener("hello", () => { lastBeat = Date.now(); });
+      es.addEventListener("hb", () => { lastBeat = Date.now(); });
       es.addEventListener("deleted", (e) => {
         const dl = JSON.parse((e as MessageEvent).data) as { id: number; roomId: number }[];
         setMsgs((cur) => {
@@ -194,6 +223,14 @@ export default function ChatApp() {
           return next;
         });
         setBoot((b) => b && { ...b, rooms: b.rooms.map((r) => (r.last && list.some((m) => m.id === r.last!.id) ? { ...r, last: { ...r.last, body: list.find((m) => m.id === r.last!.id)!.body } } : r)) });
+      });
+      es.addEventListener("reacts", (e) => {
+        const rs = JSON.parse((e as MessageEvent).data) as { messageId: number; roomId: number; reactions: Reaction[] }[];
+        setMsgs((cur) => {
+          const next = { ...cur };
+          for (const r of rs) if (next[r.roomId]) next[r.roomId] = next[r.roomId].map((x) => (x.id === r.messageId ? { ...x, reactions: r.reactions } : x));
+          return next;
+        });
       });
       es.addEventListener("polls", (e) => {
         const ps = JSON.parse((e as MessageEvent).data) as { messageId: number; roomId: number; poll: Poll }[];
@@ -213,9 +250,14 @@ export default function ChatApp() {
       });
     };
     open();
-    const onVis = () => { if (document.visibilityState === "visible") { void load(); if (activeRef.current) void loadRoom(activeRef.current); } };
+    const reopen = () => { es?.close(); lastBeat = Date.now(); open(); void catchUp(); };
+    // watchdog: a healthy stream beats every ~8 s; if it goes quiet (proxy buffering, sleeping tab, dropped Wi-Fi) reconnect + catch up
+    const wd = setInterval(() => { if (document.visibilityState === "visible" && (Date.now() - lastBeat > 14000 || es?.readyState === 2)) reopen(); }, 5000);
+    const onVis = () => { if (document.visibilityState === "visible") { reopen(); void load(); if (activeRef.current) void loadRoom(activeRef.current); } };
+    const onOnline = () => reopen();
     document.addEventListener("visibilitychange", onVis);
-    return () => { dead = true; es?.close(); document.removeEventListener("visibilitychange", onVis); };
+    window.addEventListener("online", onOnline);
+    return () => { dead = true; es?.close(); clearInterval(wd); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("online", onOnline); };
   }, [boot?.me.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // app-icon badge with total unread
@@ -243,7 +285,8 @@ export default function ChatApp() {
   const showThread = active != null || pendingDm != null;
 
   return (
-    <div className="h-full flex" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <div className={`chat-root h-full flex bg-slate-950 text-slate-100 ${light ? "chat-light" : ""}`} style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <style>{LIGHT_CSS}</style>
       {/* LEFT — conversation list */}
       <aside className={`${showThread ? "hidden md:flex" : "flex"} w-full md:w-[360px] md:border-r border-slate-800 flex-col min-h-0`}>
         <header className="flex items-center gap-3 px-4 py-3 border-b border-slate-800">
@@ -253,6 +296,7 @@ export default function ChatApp() {
             <div className="text-xs text-slate-500 truncate">{boot.me.gmNickname ?? boot.me.name}</div>
           </div>
           <button onClick={() => setPicker(true)} aria-label="Nový chat" className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 text-xl">＋</button>
+          <button onClick={() => setPrefs({ ...prefs, theme: light ? "dark" : "light" })} aria-label="Svetlý / tmavý režim" title={light ? "Tmavý režim" : "Svetlý režim"} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700">{light ? "🌙" : "☀️"}</button>
           <button onClick={() => setSettings(true)} aria-label="Nastavenia" className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700">⚙︎</button>
         </header>
         <InstallBanner />
@@ -299,6 +343,7 @@ export default function ChatApp() {
             onBack={() => { setActive(null); setPendingDm(null); }}
             pinTick={active != null && pinSig.roomId === active ? pinSig.n : 0}
             missed={active != null && openUnread.roomId === active ? openUnread : null}
+            onReactions={(messageId, roomId, reactions) => setMsgs((c) => (c[roomId] ? { ...c, [roomId]: c[roomId].map((x) => (x.id === messageId ? { ...x, reactions } : x)) } : c))}
             onPollUpdate={(messageId, roomId, poll) => setMsgs((c) => (c[roomId] ? { ...c, [roomId]: c[roomId].map((x) => (x.id === messageId ? { ...x, poll } : x)) } : c))}
             onGroupChanged={async (left) => { await load(); if (left) setActive(null); }}
             onCleared={async (roomId) => { setMsgs((c) => { const n = { ...c }; delete n[roomId]; return n; }); setActive(null); await load(); }}
@@ -358,9 +403,9 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 function Thread(props: {
   boot: Boot; teamMap: Map<number, TeamLite>; room: Room | null; dmTeamId: number | null; messages: Msg[] | null;
   reads: Record<number, number>; title: string; onBack: () => void; onSent: (roomId: number, m: Msg) => void; onGroupChanged: (left: boolean) => Promise<void>; onCleared: (roomId: number) => Promise<void>;
-  pinTick: number; onPollUpdate: (messageId: number, roomId: number, poll: Poll) => void; missed: { roomId: number; n: number; afterId: number } | null;
+  pinTick: number; onPollUpdate: (messageId: number, roomId: number, poll: Poll) => void; onReactions: (messageId: number, roomId: number, reactions: Reaction[]) => void; missed: { roomId: number; n: number; afterId: number } | null;
 }) {
-  const { boot, teamMap, room, dmTeamId, messages, reads, title, onBack, onSent, onGroupChanged, onCleared, pinTick, onPollUpdate, missed } = props;
+  const { boot, teamMap, room, dmTeamId, messages, reads, title, onBack, onSent, onGroupChanged, onCleared, pinTick, onPollUpdate, onReactions, missed } = props;
   const [sum, setSum] = useState<null | { state: "loading" } | { state: "done"; text: string; ai: boolean; note?: string } | { state: "hidden" }>(null);
   async function summarize() {
     if (!room || !missed) return;
@@ -439,6 +484,12 @@ function Thread(props: {
     const r = await fetch("/api/im/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id, pinned: v }) });
     if (!r.ok) setError(r.status === 400 ? "Pripnúť sa dá najviac 10 správ." : "Pripnúť môže len komisár (ligový kanál).");
   }
+  const [moreReact, setMoreReact] = useState(false);
+  async function react(m: Msg, emoji: string) {
+    setMenu(null); setMoreReact(false);
+    const r = await fetch("/api/im/react", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id, emoji }) });
+    if (r.ok) { const j = await r.json(); onReactions(m.id, m.roomId, j.reactions); }
+  }
   async function vote(m: Msg, optionId: number) {
     const r = await fetch("/api/im/poll/vote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pollId: m.poll!.id, optionId }) });
     if (r.ok) { const j = await r.json(); if (j.poll) onPollUpdate(m.id, m.roomId, j.poll); }
@@ -455,7 +506,7 @@ function Thread(props: {
   const allRead = (m: Msg) => audience.length > 0 && readBy(m).length === audience.length;
 
   async function send(imageUrl?: string, file?: FileAtt, voice?: { url: string; secs: number }) {
-    const body = imageUrl || file || voice ? "" : text.trim();
+    const body = imageUrl || file || voice ? "" : emoticonize(text.trim());
     if ((!body && !imageUrl && !file && !voice) || sending) return;
     setSending(true); setError("");
     if (editing) {
@@ -579,7 +630,7 @@ function Thread(props: {
                 onTouchEnd={(e) => { const s0 = swipe.current; swipe.current = null; if (!s0 || m.deleted) return; const dx = e.changedTouches[0].clientX - s0.x, dy = Math.abs(e.changedTouches[0].clientY - s0.y); if (dx > 70 && dy < 40) { setReply(m); setEditing(null); taRef.current?.focus(); } }}>
                 {multi && !mine && (showName ? <Logo t={t} size={28} /> : <div className="w-7 shrink-0" />)}
                 <button onClick={() => !m.deleted && setMenu(m)}
-                  className={`max-w-[80%] text-left rounded-2xl px-3 py-2 ${mine ? "bg-blue-600 rounded-br-md" : "bg-slate-800 rounded-bl-md"} ${m.deleted ? "opacity-60 italic" : ""}`}>
+                  className={`max-w-[80%] text-left rounded-2xl px-3 py-2 ${mine ? "bg-blue-600 text-white rounded-br-md" : "bg-slate-800 rounded-bl-md"} ${m.deleted ? "opacity-60 italic" : ""}`}>
                   {showName && <div className="text-[11px] font-semibold text-blue-300 mb-0.5">{t?.gmNickname ?? t?.code ?? "GM"} · {t?.code}</div>}
                   {m.replyTo && !m.deleted && (
                     <div onClick={(e) => { e.stopPropagation(); jumpTo(m.replyTo!.id); }} className="border-l-2 border-white/40 pl-2 mb-1 text-xs opacity-80 cursor-pointer">
@@ -600,11 +651,25 @@ function Thread(props: {
                     </a>
                   )}
                   {m.poll && !m.deleted && <PollCard m={m} me={boot.me.id} teamMap={teamMap} onVote={(oid) => void vote(m, oid)} onClose={() => void closePoll(m)} />}
-                  {(m.deleted || (m.body && !m.poll)) && <div className={`whitespace-pre-wrap break-words ${!m.deleted && isBigEmoji(m.body) ? "text-5xl leading-tight" : "text-[15px]"}`}>{m.deleted ? "🚫 Správa bola odstránená" : m.body}</div>}
+                  {(m.deleted || (m.body && !m.poll)) && <div className={`whitespace-pre-wrap break-words ${!m.deleted && isBigEmoji(emoticonize(m.body)) ? "text-5xl leading-tight" : "text-[15px]"}`}>{m.deleted ? "🚫 Správa bola odstránená" : emoticonize(m.body)}</div>}
+                  {m.reactions.length > 0 && !m.deleted && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {m.reactions.map((rc) => {
+                        const mineR = rc.teams.includes(boot.me.id);
+                        return (
+                          <span key={rc.emoji} onClick={(e) => { e.stopPropagation(); void react(m, rc.emoji); }} title={rc.teams.map((id) => teamMap.get(id)?.code).filter(Boolean).join(", ")}
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs cursor-pointer ${mineR ? "bg-white/30 ring-1 ring-white/60" : "bg-black/20"}`}>
+                            <span className="text-sm leading-none">{rc.emoji}</span>{rc.teams.length > 1 && <span className="opacity-80">{rc.teams.length}</span>}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="text-[10px] opacity-60 text-right mt-0.5">
                     {m.edited && !m.deleted && <span>upravené · </span>}{hm(m.at)}{mine && !isLeague && !m.deleted && <span className={allRead(m) ? "text-sky-300 opacity-100" : ""}> {allRead(m) ? "✓✓" : "✓"}</span>}
                   </div>
                 </button>
+                {!m.deleted && <button onClick={() => void react(m, "❤️")} aria-label="Páči sa mi" className={`shrink-0 w-7 h-7 rounded-full text-sm hover:bg-slate-800 opacity-40 group-hover:opacity-100 ${mine ? "order-first" : ""}`}>{m.reactions.some((rc) => rc.emoji === "❤️" && rc.teams.includes(boot.me.id)) ? "❤️" : "🤍"}</button>}
                 {!m.deleted && <button onClick={() => { setReply(m); setEditing(null); taRef.current?.focus(); }} aria-label="Odpovedať" className={`shrink-0 w-7 h-7 rounded-full text-sm text-slate-500 hover:text-white hover:bg-slate-800 opacity-40 group-hover:opacity-100 ${mine ? "order-first" : ""}`}>↩︎</button>}
               </div>
               )}
@@ -688,7 +753,19 @@ function Thread(props: {
       {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
       {info && room && <InfoPanel boot={boot} teamMap={teamMap} room={room} title={title} onClose={() => setInfo(false)} onChanged={onGroupChanged} onCleared={onCleared} />}
       {menu && (
-        <Sheet title="Správa" onClose={() => setMenu(null)}>
+        <Sheet title="Správa" onClose={() => { setMenu(null); setMoreReact(false); }}>
+          <div className="px-4 pt-1 pb-2">
+            <div className="flex items-center justify-between gap-1">
+              {QUICK_REACTIONS.map((em) => <button key={em} onClick={() => void react(menu, em)} className={`w-11 h-11 rounded-full text-2xl hover:bg-slate-800 ${menu.reactions.some((rc) => rc.emoji === em && rc.teams.includes(boot.me.id)) ? "bg-slate-800 ring-1 ring-blue-500" : ""}`}>{em}</button>)}
+              <button onClick={() => setMoreReact((v) => !v)} aria-label="Ďalšie emoji" className="w-11 h-11 rounded-full bg-slate-800 text-xl text-slate-300">{moreReact ? "−" : "＋"}</button>
+            </div>
+            {moreReact && (
+              <div className="mt-2">
+                <div className="flex flex-wrap gap-1 mb-1">{MORE_REACTIONS.map((em) => <button key={em} onClick={() => void react(menu, em)} className="w-10 h-10 rounded-full text-xl hover:bg-slate-800">{em}</button>)}</div>
+                <EmojiPicker onPick={(em) => void react(menu, em)} />
+              </div>
+            )}
+          </div>
           <div className="px-5 py-3 text-sm text-slate-400 line-clamp-3">{menu.body}</div>
           {isGroup && menu.fromTeamId === boot.me.id && (
             <div className="px-5 pb-3 text-xs space-y-1">
@@ -743,7 +820,13 @@ function Settings({ boot, teamMap, onClose, reload, prefs, setPrefs, pushApi }: 
           <button onClick={async () => { setTestMsg("Posielam…"); const n = await pushApi.test(); setTestMsg(n ? `Poslané na ${n} zariadenie(a). Ak nič nevidíš, skontroluj nastavenia notifikácií.` : "Žiadne zariadenie nie je zaregistrované."); }} className="rounded-lg bg-slate-700 px-4 py-2 text-sm whitespace-nowrap">Skúšobná notifikácia</button>
         </div>
       )}
-      <div className="px-5 pt-3 pb-1 text-xs uppercase tracking-wide text-slate-500">Zvuk a upozornenia</div>
+      <div className="px-5 pt-3 pb-1 text-xs uppercase tracking-wide text-slate-500">Vzhľad</div>
+      <div className="px-5 pb-3 flex gap-2">
+        {([["dark", "🌙 Tmavý"], ["light", "☀️ Svetlý"], ["auto", "📱 Podľa zariadenia"]] as [Theme, string][]).map(([t, label]) => (
+          <button key={t} onClick={() => setPrefs({ ...prefs, theme: t })} className={`flex-1 rounded-xl border px-2 py-2.5 text-sm ${prefs.theme === t ? "border-blue-500 bg-blue-600/15" : "border-slate-700 hover:bg-slate-800"}`}>{label}</button>
+        ))}
+      </div>
+      <div className="px-5 pt-1 pb-1 text-xs uppercase tracking-wide text-slate-500">Zvuk a upozornenia</div>
       <div className="px-5 pb-1 text-xs text-slate-500">Zvuk pri novej správe, keď máš chat otvorený. Notifikácie pri zatvorenej appke majú zvuk podľa nastavení telefónu.</div>
       {SOUNDS.map((so) => (
         <button key={so.id} onClick={() => { setPrefs({ ...prefs, sound: so.id as SoundId }); playSound(so.id as SoundId, prefs.volume); }} className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-slate-800 text-left">
@@ -960,7 +1043,7 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
         ) : (
           <>
             {/* hero */}
-            <div className="relative h-60 bg-gradient-to-br from-slate-800 to-slate-900 overflow-hidden">
+            <div className="theme-dark-scope relative h-60 bg-gradient-to-br from-slate-700 to-slate-900 overflow-hidden text-slate-100">
               {(isLeague || isGroup) && room.imageUrl && <img src={room.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />}
               {room.kind === "dm" && <div className="absolute inset-0 flex items-center justify-center pb-10"><Logo t={other} size={120} /></div>}
               {!room.imageUrl && !(room.kind === "dm") && <div className="absolute inset-0 flex items-center justify-center pb-10 text-7xl opacity-60">{isLeague ? "🏒" : "👥"}</div>}
@@ -1062,7 +1145,7 @@ function PollCard({ m, me, teamMap, onVote, onClose }: { m: Msg; me: number; tea
             <button key={o.id} disabled={p.closed} onClick={(e) => { e.stopPropagation(); onVote(o.id); }} className="relative w-full text-left rounded-lg overflow-hidden bg-black/20 px-3 py-2 disabled:cursor-default">
               <span className="absolute inset-y-0 left-0 bg-white/25 transition-all" style={{ width: `${pct}%` }} />
               <span className="relative flex items-center gap-2">
-                <span className={`w-4 h-4 shrink-0 ${p.multi ? "rounded" : "rounded-full"} border border-white/60 flex items-center justify-center text-[10px] ${mine ? "bg-white text-slate-900" : ""}`}>{mine ? "✓" : ""}</span>
+                <span className={`w-4 h-4 shrink-0 ${p.multi ? "rounded" : "rounded-full"} border border-white/60 flex items-center justify-center text-[10px] ${mine ? "bg-white text-black" : ""}`}>{mine ? "✓" : ""}</span>
                 <span className="flex-1 text-sm break-words">{o.text}</span>
                 <span className="text-xs opacity-80">{o.voters.length}</span>
               </span>

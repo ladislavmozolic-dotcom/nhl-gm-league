@@ -12,9 +12,10 @@ export const SOUNDS = [
 ] as const;
 export type SoundId = (typeof SOUNDS)[number]["id"];
 
-export type Prefs = { sound: SoundId; volume: number; banner: boolean; vibrate: boolean };
+export type Theme = "dark" | "light" | "auto";
+export type Prefs = { sound: SoundId; volume: number; banner: boolean; vibrate: boolean; theme: Theme };
 const KEY = "unhl-chat-prefs";
-export const DEFAULT_PREFS: Prefs = { sound: "classic", volume: 0.7, banner: true, vibrate: true };
+export const DEFAULT_PREFS: Prefs = { sound: "classic", volume: 0.7, banner: true, vibrate: true, theme: "dark" };
 
 export function loadPrefs(): Prefs {
   try { return { ...DEFAULT_PREFS, ...(JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Prefs>) }; } catch { return DEFAULT_PREFS; }

@@ -83,7 +83,7 @@ export function PushBanner({ api }: { api: PushApi }) {
     <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/30 text-sm">
       <span className="text-lg">🔔</span>
       <span className="flex-1">Zapni notifikácie, aby ti správy chodili aj keď je appka zatvorená</span>
-      <button onClick={async () => { await api.enable(); }} className="rounded-lg bg-amber-500 text-slate-900 px-3 py-1.5 text-xs font-semibold">Zapnúť</button>
+      <button onClick={async () => { await api.enable(); }} className="rounded-lg bg-amber-500 text-black px-3 py-1.5 text-xs font-semibold">Zapnúť</button>
       <button onClick={() => { try { localStorage.setItem(KEY, String(Date.now())); } catch { /* ignore */ } setHidden(true); }} aria-label="Neskôr" className="text-slate-400">✕</button>
     </div>
   );
