@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null };
 type Msg = { id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
-type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null };
+type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; name: string | null; createdById: number | null; members: number[] };
 type Boot = { me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null };
 
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" });
@@ -37,6 +37,7 @@ export default function ChatApp() {
   const [msgs, setMsgs] = useState<Record<number, Msg[]>>({});
   const [peerRead, setPeerRead] = useState<Record<number, number>>({});
   const [picker, setPicker] = useState(false);
+  const [groupNew, setGroupNew] = useState(false);
   const [settings, setSettings] = useState(false);
   const activeRef = useRef<number | null>(null);
   activeRef.current = active;
@@ -140,6 +141,9 @@ export default function ChatApp() {
     if (totalUnread) nav.setAppBadge?.(totalUnread).catch(() => {}); else nav.clearAppBadge?.().catch(() => {});
   }, [totalUnread]);
 
+  // removed from / left the open group → back to the list
+  useEffect(() => { if (boot && active != null && !boot.rooms.some((r) => r.id === active)) setActive(null); }, [boot, active]);
+
   if (err) return <div className="h-full flex items-center justify-center text-slate-400 p-6 text-center">{err}</div>;
   if (!boot) return <div className="h-full flex items-center justify-center text-slate-500">Načítavam…</div>;
 
@@ -149,7 +153,7 @@ export default function ChatApp() {
     return (b.last?.id ?? 0) - (a.last?.id ?? 0);
   }).filter((r) => r.kind === "league" || r.last);
 
-  const roomTitle = (r: Room) => (r.kind === "league" ? "# Liga" : teamMap.get(r.otherTeamId ?? 0)?.name ?? "GM");
+  const roomTitle = (r: Room) => (r.kind === "league" ? "# Liga" : r.kind === "group" ? r.name ?? "Skupina" : teamMap.get(r.otherTeamId ?? 0)?.name ?? "GM");
   const activeRoom = boot.rooms.find((r) => r.id === active) ?? null;
   const showThread = active != null || pendingDm != null;
 
@@ -174,7 +178,7 @@ export default function ChatApp() {
             return (
               <button key={r.id} onClick={() => { setPendingDm(null); setActive(r.id); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-900 ${active === r.id ? "bg-slate-900" : ""}`}>
-                {r.kind === "league" ? <div className="w-12 h-12 shrink-0 rounded-full bg-blue-600/20 flex items-center justify-center text-xl">🏒</div> : <Logo t={other} size={48} />}
+                {r.kind === "league" ? <div className="w-12 h-12 shrink-0 rounded-full bg-blue-600/20 flex items-center justify-center text-xl">🏒</div> : r.kind === "group" ? <div className="w-12 h-12 shrink-0 rounded-full bg-emerald-600/20 flex items-center justify-center text-xl">👥</div> : <Logo t={other} size={48} />}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="font-medium truncate flex-1">{roomTitle(r)}</span>
@@ -182,7 +186,7 @@ export default function ChatApp() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-sm truncate flex-1 ${r.unread ? "text-slate-200" : "text-slate-500"}`}>
-                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : `${lastMine ? "Ty: " : r.kind === "league" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
+                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : `${lastMine ? "Ty: " : r.kind !== "dm" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
                     </span>
                     {r.unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-blue-600 text-[11px] font-bold flex items-center justify-center">{r.unread}</span>}
                   </div>
@@ -205,6 +209,7 @@ export default function ChatApp() {
             peerRead={active != null ? peerRead[active] ?? 0 : 0}
             title={activeRoom ? roomTitle(activeRoom) : teamMap.get(pendingDm ?? 0)?.name ?? ""}
             onBack={() => { setActive(null); setPendingDm(null); }}
+            onGroupChanged={async (left) => { await load(); if (left) setActive(null); }}
             onSent={async (roomId, m) => {
               if (active == null) { await load(); setPendingDm(null); setActive(roomId); setMsgs((c) => ({ ...c, [roomId]: [m] })); }
               else setMsgs((c) => (c[roomId]?.some((x) => x.id === m.id) ? c : { ...c, [roomId]: [...(c[roomId] ?? []), m] }));
@@ -218,6 +223,9 @@ export default function ChatApp() {
 
       {picker && (
         <Sheet title="Nový chat" onClose={() => setPicker(false)}>
+          <button onClick={() => { setPicker(false); setGroupNew(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-800 text-left">
+            <div className="w-9 h-9 rounded-full bg-emerald-600/20 flex items-center justify-center">👥</div><span className="flex-1 font-medium">Nová skupina</span>
+          </button>
           {boot.teams.filter((t) => t.id !== boot.me.id).map((t) => (
             <button key={t.id} onClick={() => {
               setPicker(false);
@@ -229,6 +237,7 @@ export default function ChatApp() {
           ))}
         </Sheet>
       )}
+      {groupNew && <GroupCreate boot={boot} onClose={() => setGroupNew(false)} onCreated={async (roomId) => { setGroupNew(false); await load(); setPendingDm(null); setActive(roomId); }} />}
       {settings && <Settings boot={boot} teamMap={teamMap} onClose={() => setSettings(false)} reload={load} />}
     </div>
   );
@@ -247,9 +256,10 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 
 function Thread(props: {
   boot: Boot; teamMap: Map<number, TeamLite>; room: Room | null; dmTeamId: number | null; messages: Msg[] | null;
-  peerRead: number; title: string; onBack: () => void; onSent: (roomId: number, m: Msg) => void;
+  peerRead: number; title: string; onBack: () => void; onSent: (roomId: number, m: Msg) => void; onGroupChanged: (left: boolean) => Promise<void>;
 }) {
-  const { boot, teamMap, room, dmTeamId, messages, peerRead, title, onBack, onSent } = props;
+  const { boot, teamMap, room, dmTeamId, messages, peerRead, title, onBack, onSent, onGroupChanged } = props;
+  const [info, setInfo] = useState(false);
   const [text, setText] = useState("");
   const [reply, setReply] = useState<Msg | null>(null);
   const [menu, setMenu] = useState<Msg | null>(null);
@@ -257,6 +267,8 @@ function Thread(props: {
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const isLeague = room?.kind === "league";
+  const isGroup = room?.kind === "group";
+  const multi = isLeague || isGroup; // multi-party room: show sender names
   const other = dmTeamId ? teamMap.get(dmTeamId) : null;
   const canWrite = !(isLeague && boot.muted);
 
@@ -287,8 +299,10 @@ function Thread(props: {
     <>
       <header className="flex items-center gap-3 px-3 py-3 border-b border-slate-800">
         <button onClick={onBack} className="md:hidden w-10 h-10 text-2xl text-slate-300" aria-label="Späť">‹</button>
-        {isLeague ? <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center text-lg">🏒</div> : <Logo t={other} size={40} />}
-        <div className="min-w-0"><div className="font-semibold truncate">{title}</div><div className="text-xs text-slate-500">{isLeague ? "Verejný kanál celej ligy" : other?.gmNickname ?? "Súkromná konverzácia"}</div></div>
+        <button onClick={() => isGroup && setInfo(true)} className={`flex items-center gap-3 min-w-0 flex-1 text-left ${isGroup ? "" : "cursor-default"}`}>
+          {isLeague ? <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center text-lg">🏒</div> : isGroup ? <div className="w-10 h-10 rounded-full bg-emerald-600/20 flex items-center justify-center text-lg">👥</div> : <Logo t={other} size={40} />}
+          <div className="min-w-0"><div className="font-semibold truncate">{title}</div><div className="text-xs text-slate-500 truncate">{isLeague ? "Verejný kanál celej ligy" : isGroup ? `${room!.members.length} členov · ${room!.members.map((id) => teamMap.get(id)?.code).filter(Boolean).join(", ")}` : other?.gmNickname ?? "Súkromná konverzácia"}</div></div>
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 bg-slate-950">
@@ -300,12 +314,12 @@ function Thread(props: {
           const day = dayLabel(m.at);
           const showDay = day !== lastDay; lastDay = day;
           const prev = messages[i - 1];
-          const showName = isLeague && !mine && (!prev || prev.fromTeamId !== m.fromTeamId || showDay);
+          const showName = multi && !mine && (!prev || prev.fromTeamId !== m.fromTeamId || showDay);
           return (
             <div key={m.id}>
               {showDay && <div className="text-center my-3"><span className="text-[11px] text-slate-400 bg-slate-800/70 rounded-full px-3 py-1">{day}</span></div>}
               <div className={`flex gap-2 ${mine ? "justify-end" : "justify-start"}`}>
-                {isLeague && !mine && (showName ? <Logo t={t} size={28} /> : <div className="w-7 shrink-0" />)}
+                {multi && !mine && (showName ? <Logo t={t} size={28} /> : <div className="w-7 shrink-0" />)}
                 <button onClick={() => !m.deleted && setMenu(m)}
                   className={`max-w-[80%] text-left rounded-2xl px-3 py-2 ${mine ? "bg-blue-600 rounded-br-md" : "bg-slate-800 rounded-bl-md"} ${m.deleted ? "opacity-60 italic" : ""}`}>
                   {showName && <div className="text-[11px] font-semibold text-blue-300 mb-0.5">{t?.gmNickname ?? t?.code ?? "GM"} · {t?.code}</div>}
@@ -317,7 +331,7 @@ function Thread(props: {
                   )}
                   <div className="whitespace-pre-wrap break-words text-[15px]">{m.deleted ? "🚫 Správa bola odstránená" : m.body}</div>
                   <div className="text-[10px] opacity-60 text-right mt-0.5">
-                    {hm(m.at)}{mine && !isLeague && !m.deleted && <span className={m.id <= peerRead ? "text-sky-300 opacity-100" : ""}> {m.id <= peerRead ? "✓✓" : "✓"}</span>}
+                    {hm(m.at)}{mine && !multi && !m.deleted && <span className={m.id <= peerRead ? "text-sky-300 opacity-100" : ""}> {m.id <= peerRead ? "✓✓" : "✓"}</span>}
                   </div>
                 </button>
               </div>
@@ -343,6 +357,7 @@ function Thread(props: {
         </div>
       ) : <div className="p-4 text-center text-sm text-amber-300 bg-slate-900 border-t border-slate-800">Komisár ti dočasne zakázal písať do ligového kanála.</div>}
 
+      {info && room && <GroupInfo boot={boot} teamMap={teamMap} room={room} onClose={() => setInfo(false)} onChanged={onGroupChanged} />}
       {menu && (
         <Sheet title="Správa" onClose={() => setMenu(null)}>
           <div className="px-5 py-3 text-sm text-slate-400 line-clamp-3">{menu.body}</div>
@@ -428,6 +443,84 @@ function Settings({ boot, teamMap, onClose, reload }: { boot: Boot; teamMap: Map
         </>
       )}
       <button onClick={() => { window.location.href = "/"; }} className="w-full text-left px-5 py-3 mt-2 text-slate-400 hover:bg-slate-800">← Späť na stránku ligy</button>
+    </Sheet>
+  );
+}
+
+function TeamPick({ teams, selected, toggle }: { teams: TeamLite[]; selected: Set<number>; toggle: (id: number) => void }) {
+  return (
+    <>
+      {teams.map((t) => (
+        <button key={t.id} onClick={() => toggle(t.id)} className="w-full flex items-center gap-3 px-5 py-2 hover:bg-slate-800 text-left">
+          <Logo t={t} size={32} /><span className="flex-1 text-sm">{t.name}</span>
+          <span className={`w-5 h-5 rounded-md border flex items-center justify-center text-xs ${selected.has(t.id) ? "bg-blue-600 border-blue-600" : "border-slate-600"}`}>{selected.has(t.id) ? "✓" : ""}</span>
+        </button>
+      ))}
+    </>
+  );
+}
+
+function GroupCreate({ boot, onClose, onCreated }: { boot: Boot; onClose: () => void; onCreated: (roomId: number) => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  async function create() {
+    setBusy(true); setErr("");
+    const r = await fetch("/api/im/group", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, memberIds: [...sel] }) });
+    if (!r.ok) { setErr("Zadaj názov a vyber aspoň jedného GM."); setBusy(false); return; }
+    await onCreated((await r.json()).roomId);
+  }
+  return (
+    <Sheet title="Nová skupina" onClose={onClose}>
+      <div className="px-5 py-3"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Názov skupiny" className="w-full rounded-xl bg-slate-800 px-4 py-3 text-base outline-none" /></div>
+      <div className="px-5 pb-1 text-xs uppercase tracking-wide text-slate-500">Členovia ({sel.size})</div>
+      <TeamPick teams={boot.teams.filter((t) => t.id !== boot.me.id)} selected={sel} toggle={toggle} />
+      {err && <p className="px-5 pt-2 text-sm text-red-400">{err}</p>}
+      <div className="px-5 pt-3"><button onClick={create} disabled={busy} className="w-full rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 py-3 font-medium">Vytvoriť skupinu</button></div>
+    </Sheet>
+  );
+}
+
+function GroupInfo({ boot, teamMap, room, onClose, onChanged }: { boot: Boot; teamMap: Map<number, TeamLite>; room: Room; onClose: () => void; onChanged: (left: boolean) => Promise<void> }) {
+  const owner = room.createdById === boot.me.id;
+  const [name, setName] = useState(room.name ?? "");
+  const [adding, setAdding] = useState(false);
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  async function patch(b: object, left = false) {
+    await fetch("/api/im/group", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomId: room.id, ...b }) });
+    await onChanged(left);
+    if (left) onClose();
+  }
+  const candidates = boot.teams.filter((t) => !room.members.includes(t.id));
+  return (
+    <Sheet title="Skupina" onClose={onClose}>
+      {owner ? (
+        <div className="px-5 py-3 flex gap-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="flex-1 rounded-xl bg-slate-800 px-4 py-2.5 outline-none" />
+          <button onClick={() => patch({ rename: name })} disabled={!name.trim() || name === room.name} className="rounded-xl bg-blue-600 disabled:opacity-40 px-4 text-sm">Uložiť</button>
+        </div>
+      ) : <div className="px-5 py-3 font-semibold">{room.name}</div>}
+      <div className="px-5 pb-1 text-xs uppercase tracking-wide text-slate-500">Členovia ({room.members.length})</div>
+      {room.members.map((id) => {
+        const t = teamMap.get(id);
+        return (
+          <div key={id} className="px-5 py-1.5 flex items-center gap-3">
+            <Logo t={t} size={32} /><span className="flex-1 text-sm">{t?.name ?? "GM"}{id === room.createdById && <span className="ml-2 text-[10px] text-amber-400">správca</span>}</span>
+            {owner && id !== boot.me.id && <button onClick={() => patch({ remove: id })} className="text-xs text-red-400 rounded-lg bg-slate-800 px-3 py-1">Odobrať</button>}
+          </div>
+        );
+      })}
+      {owner && candidates.length > 0 && (adding ? (
+        <>
+          <div className="px-5 pt-3 pb-1 text-xs uppercase tracking-wide text-slate-500">Pridať</div>
+          <TeamPick teams={candidates} selected={sel} toggle={toggle} />
+          <div className="px-5 pt-2"><button onClick={async () => { await patch({ add: [...sel] }); setSel(new Set()); setAdding(false); }} disabled={!sel.size} className="w-full rounded-xl bg-blue-600 disabled:opacity-40 py-2.5">Pridať ({sel.size})</button></div>
+        </>
+      ) : <button onClick={() => setAdding(true)} className="w-full text-left px-5 py-3 mt-1 hover:bg-slate-800 text-blue-400">＋ Pridať členov</button>)}
+      <button onClick={() => { if (confirm("Naozaj opustiť skupinu?")) void patch({ leave: true }, true); }} className="w-full text-left px-5 py-3 mt-2 hover:bg-slate-800 text-red-400">Opustiť skupinu</button>
     </Sheet>
   );
 }

@@ -86,7 +86,8 @@ export default async function RootLayout({
         LEFT JOIN "ImRead" r ON r."roomId" = m."roomId" AND r."teamId" = ${teamId}
         WHERE m."deletedAt" IS NULL AND m."fromTeamId" <> ${teamId} AND m.id > COALESCE(r."lastReadId", 0)
           AND (m."roomId" IN (SELECT id FROM "ImRoom" WHERE kind = 'league')
-               OR m."roomId" IN (SELECT id FROM "ImRoom" WHERE "dmKey" LIKE ${teamId + "-%"} OR "dmKey" LIKE ${"%-" + teamId}))
+               OR m."roomId" IN (SELECT id FROM "ImRoom" WHERE "dmKey" LIKE ${teamId + "-%"} OR "dmKey" LIKE ${"%-" + teamId})
+               OR m."roomId" IN (SELECT "roomId" FROM "ImMember" WHERE "teamId" = ${teamId}))
       `.catch(() => [{ n: BigInt(0) }]))[0]?.n ?? 0)
     : 0;
   const gm = t ? { nickname: t.gmNickname || t.gm || "GM", slug: t.slug, admin: t.isAdmin, pendingJoins, unreadDm, forumNew, chatOn: !!chatOn, chatUnread } : null;

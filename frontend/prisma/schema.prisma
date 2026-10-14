@@ -2152,8 +2152,11 @@ model ImSettings {
 
 model ImRoom {
   id            Int         @id @default(autoincrement())
-  kind          String // "league" | "dm"
+  kind          String // "league" | "dm" | "group"
   dmKey         String?     @unique // "<lowTeamId>-<highTeamId>" for a dm room
+  name          String? // group name
+  createdById   Int? // group owner (can rename / add / remove members)
+  members       ImMember[]
   createdAt     DateTime    @default(now())
   lastMessageAt DateTime    @default(now())
   messages      ImMessage[]
@@ -2172,6 +2175,16 @@ model ImMessage {
   room        ImRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@index([roomId, id])
+}
+
+model ImMember {
+  roomId   Int
+  teamId   Int
+  joinedAt DateTime @default(now())
+  room     ImRoom   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, teamId])
+  @@index([teamId])
 }
 
 model ImRead {

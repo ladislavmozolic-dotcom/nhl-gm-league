@@ -32,7 +32,8 @@ export async function myRoomIds(teamId: number): Promise<number[]> {
     where: { kind: "dm", OR: [{ dmKey: { startsWith: `${teamId}-` } }, { dmKey: { endsWith: `-${teamId}` } }] },
     select: { id: true },
   });
-  return [league, ...dms.map((d) => d.id)];
+  const groups = await prisma.imMember.findMany({ where: { teamId }, select: { roomId: true } });
+  return [league, ...dms.map((d) => d.id), ...groups.map((g) => g.roomId)];
 }
 
 export async function canAccessRoom(teamId: number, roomId: number): Promise<boolean> {

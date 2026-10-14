@@ -44,6 +44,9 @@ export async function POST(req: Request) {
   let title = who;
   if (room?.kind === "dm" && room.dmKey) {
     targets = room.dmKey.split("-").map(Number).filter((x) => x !== me);
+  } else if (room?.kind === "group") {
+    title = `${room.name ?? "Skupina"} · ${who}`;
+    targets = (await prisma.imMember.findMany({ where: { roomId, teamId: { not: me } }, select: { teamId: true } })).map((m) => m.teamId);
   } else {
     title = `# League · ${who}`;
     targets = (await prisma.imPushSub.findMany({ where: { teamId: { not: me } }, select: { teamId: true }, distinct: ["teamId"] })).map((s) => s.teamId);
