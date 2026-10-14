@@ -48,11 +48,11 @@ export async function isMuted(teamId: number): Promise<boolean> {
 }
 
 export type WireMessage = {
-  id: number; roomId: number; fromTeamId: number; body: string; at: string;
+  kind: string; id: number; roomId: number; fromTeamId: number; body: string; at: string;
   replyTo: { id: number; fromTeamId: number; body: string } | null; deleted: boolean;
 };
 
-export async function wire(rows: { id: number; roomId: number; fromTeamId: number; body: string; createdAt: Date; replyToId: number | null; deletedAt: Date | null }[]): Promise<WireMessage[]> {
+export async function wire(rows: { id: number; roomId: number; fromTeamId: number; body: string; createdAt: Date; replyToId: number | null; deletedAt: Date | null; kind: string }[]): Promise<WireMessage[]> {
   const replyIds = [...new Set(rows.map((r) => r.replyToId).filter((x): x is number => x != null))];
   const replies = replyIds.length
     ? await prisma.imMessage.findMany({ where: { id: { in: replyIds } }, select: { id: true, fromTeamId: true, body: true, deletedAt: true } })
@@ -61,7 +61,7 @@ export async function wire(rows: { id: number; roomId: number; fromTeamId: numbe
   return rows.map((r) => {
     const rp = r.replyToId != null ? rm.get(r.replyToId) : null;
     return {
-      id: r.id, roomId: r.roomId, fromTeamId: r.fromTeamId,
+      kind: r.kind, id: r.id, roomId: r.roomId, fromTeamId: r.fromTeamId,
       body: r.deletedAt ? "" : r.body, deleted: !!r.deletedAt, at: r.createdAt.toISOString(),
       replyTo: rp ? { id: rp.id, fromTeamId: rp.fromTeamId, body: rp.deletedAt ? "" : rp.body.slice(0, 140) } : null,
     };
@@ -89,4 +89,15 @@ export async function pushToTeams(teamIds: number[], payload: { title: string; b
       if (code === 404 || code === 410) await prisma.imPushSub.delete({ where: { id: s.id } }).catch(() => {});
     }
   }));
+}
+
+/** Group event line ("X pridal Y") shown centred in the thread. Not counted as unread, never pushed. */
+export async function systemMessage(roomId: number, actorTeamId: number, body: string) {
+  const m = await prisma.imMessage.create({ data: { roomId, fromTeamId: actorTeamId, body, kind: "system" } });
+  await prisma.imRoom.update({ where: { id: roomId }, data: { lastMessageAt: m.createdAt } });
+}
+
+export async function teamLabels(ids: number[]): Promise<Map<number, string>> {
+  const t = await prisma.team.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
+  return new Map(t.map((x) => [x.id, x.name]));
 }

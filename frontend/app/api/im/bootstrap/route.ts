@@ -25,7 +25,7 @@ export async function GET() {
 
   const out = await Promise.all(rooms.map(async (r) => {
     const last = await prisma.imMessage.findFirst({ where: { roomId: r.id }, orderBy: { id: "desc" } });
-    const unread = await prisma.imMessage.count({ where: { roomId: r.id, id: { gt: readMap.get(r.id) ?? 0 }, fromTeamId: { not: me }, deletedAt: null } });
+    const unread = await prisma.imMessage.count({ where: { roomId: r.id, id: { gt: readMap.get(r.id) ?? 0 }, fromTeamId: { not: me }, deletedAt: null, kind: "user" } });
     let otherTeamId: number | null = null;
     if (r.kind === "dm" && r.dmKey) otherTeamId = r.dmKey.split("-").map(Number).find((x) => x !== me) ?? null;
     const lastW = last ? (await wire([last]))[0] : null;

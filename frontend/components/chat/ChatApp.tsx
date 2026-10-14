@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null };
-type Msg = { id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
+type Msg = { kind: string; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
 type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; name: string | null; createdById: number | null; members: number[] };
 type Boot = { me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null };
 
@@ -35,7 +35,7 @@ export default function ChatApp() {
   const [active, setActive] = useState<number | null>(null); // roomId; null = list (mobile)
   const [pendingDm, setPendingDm] = useState<number | null>(null); // teamId of a DM with no room yet
   const [msgs, setMsgs] = useState<Record<number, Msg[]>>({});
-  const [peerRead, setPeerRead] = useState<Record<number, number>>({});
+  const [reads, setReads] = useState<Record<number, Record<number, number>>>({}); // roomId -> teamId -> lastReadId
   const [picker, setPicker] = useState(false);
   const [groupNew, setGroupNew] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -63,7 +63,7 @@ export default function ChatApp() {
     if (!r.ok) return;
     const j = await r.json();
     setMsgs((m) => ({ ...m, [roomId]: j.messages }));
-    setPeerRead((p) => ({ ...p, [roomId]: j.peerRead }));
+    setReads((p) => ({ ...p, [roomId]: j.reads ?? {} }));
   }, []);
 
   const markRead = useCallback((roomId: number, list: Msg[]) => {
@@ -107,7 +107,7 @@ export default function ChatApp() {
           for (const m of list) {
             const ex = rooms.find((r) => r.id === m.roomId);
             if (!ex) { unknownRoom = true; continue; }
-            const mineMsg = m.fromTeamId === b.me.id;
+            const mineMsg = m.fromTeamId === b.me.id || m.kind === "system";
             rooms = rooms.map((r) => r.id === m.roomId ? { ...r, last: m, unread: mineMsg || activeRef.current === m.roomId ? r.unread : r.unread + 1 } : r);
           }
           return { ...b, rooms };
@@ -123,8 +123,8 @@ export default function ChatApp() {
         });
       });
       es.addEventListener("reads", (e) => {
-        const rs = JSON.parse((e as MessageEvent).data) as { roomId: number; lastReadId: number }[];
-        setPeerRead((p) => { const n = { ...p }; rs.forEach((r) => (n[r.roomId] = r.lastReadId)); return n; });
+        const rs = JSON.parse((e as MessageEvent).data) as { roomId: number; teamId: number; lastReadId: number }[];
+        setReads((p) => { const n = { ...p }; rs.forEach((r) => (n[r.roomId] = { ...(n[r.roomId] ?? {}), [r.teamId]: r.lastReadId })); return n; });
       });
     };
     open();
@@ -186,7 +186,7 @@ export default function ChatApp() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-sm truncate flex-1 ${r.unread ? "text-slate-200" : "text-slate-500"}`}>
-                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : `${lastMine ? "Ty: " : r.kind !== "dm" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
+                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
                     </span>
                     {r.unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-blue-600 text-[11px] font-bold flex items-center justify-center">{r.unread}</span>}
                   </div>
@@ -206,7 +206,7 @@ export default function ChatApp() {
             boot={boot} teamMap={teamMap}
             room={activeRoom} dmTeamId={activeRoom ? activeRoom.otherTeamId : pendingDm}
             messages={active != null ? msgs[active] ?? null : []}
-            peerRead={active != null ? peerRead[active] ?? 0 : 0}
+            reads={active != null ? reads[active] ?? {} : {}}
             title={activeRoom ? roomTitle(activeRoom) : teamMap.get(pendingDm ?? 0)?.name ?? ""}
             onBack={() => { setActive(null); setPendingDm(null); }}
             onGroupChanged={async (left) => { await load(); if (left) setActive(null); }}
@@ -256,9 +256,9 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 
 function Thread(props: {
   boot: Boot; teamMap: Map<number, TeamLite>; room: Room | null; dmTeamId: number | null; messages: Msg[] | null;
-  peerRead: number; title: string; onBack: () => void; onSent: (roomId: number, m: Msg) => void; onGroupChanged: (left: boolean) => Promise<void>;
+  reads: Record<number, number>; title: string; onBack: () => void; onSent: (roomId: number, m: Msg) => void; onGroupChanged: (left: boolean) => Promise<void>;
 }) {
-  const { boot, teamMap, room, dmTeamId, messages, peerRead, title, onBack, onSent, onGroupChanged } = props;
+  const { boot, teamMap, room, dmTeamId, messages, reads, title, onBack, onSent, onGroupChanged } = props;
   const [info, setInfo] = useState(false);
   const [text, setText] = useState("");
   const [reply, setReply] = useState<Msg | null>(null);
@@ -273,6 +273,11 @@ function Thread(props: {
   const canWrite = !(isLeague && boot.muted);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages?.length]);
+
+  // who must have read a message of mine: the peer (DM) or every other current member (group)
+  const audience: number[] = isGroup ? room!.members.filter((id) => id !== boot.me.id) : dmTeamId ? [dmTeamId] : [];
+  const readBy = (m: Msg) => audience.filter((t) => (reads[t] ?? 0) >= m.id);
+  const allRead = (m: Msg) => audience.length > 0 && readBy(m).length === audience.length;
 
   async function send() {
     const body = text.trim();
@@ -314,10 +319,13 @@ function Thread(props: {
           const day = dayLabel(m.at);
           const showDay = day !== lastDay; lastDay = day;
           const prev = messages[i - 1];
-          const showName = multi && !mine && (!prev || prev.fromTeamId !== m.fromTeamId || showDay);
+          const showName = multi && !mine && m.kind !== "system" && (!prev || prev.fromTeamId !== m.fromTeamId || prev.kind === "system" || showDay);
           return (
             <div key={m.id}>
               {showDay && <div className="text-center my-3"><span className="text-[11px] text-slate-400 bg-slate-800/70 rounded-full px-3 py-1">{day}</span></div>}
+              {m.kind === "system" ? (
+                <div className="text-center my-2"><span className="text-[11px] text-slate-400 bg-slate-800/60 rounded-full px-3 py-1 inline-block max-w-[90%]">{m.body}</span></div>
+              ) : (
               <div className={`flex gap-2 ${mine ? "justify-end" : "justify-start"}`}>
                 {multi && !mine && (showName ? <Logo t={t} size={28} /> : <div className="w-7 shrink-0" />)}
                 <button onClick={() => !m.deleted && setMenu(m)}
@@ -331,10 +339,11 @@ function Thread(props: {
                   )}
                   <div className="whitespace-pre-wrap break-words text-[15px]">{m.deleted ? "🚫 Správa bola odstránená" : m.body}</div>
                   <div className="text-[10px] opacity-60 text-right mt-0.5">
-                    {hm(m.at)}{mine && !multi && !m.deleted && <span className={m.id <= peerRead ? "text-sky-300 opacity-100" : ""}> {m.id <= peerRead ? "✓✓" : "✓"}</span>}
+                    {hm(m.at)}{mine && !isLeague && !m.deleted && <span className={allRead(m) ? "text-sky-300 opacity-100" : ""}> {allRead(m) ? "✓✓" : "✓"}</span>}
                   </div>
                 </button>
               </div>
+              )}
             </div>
           );
         })}
@@ -361,6 +370,12 @@ function Thread(props: {
       {menu && (
         <Sheet title="Správa" onClose={() => setMenu(null)}>
           <div className="px-5 py-3 text-sm text-slate-400 line-clamp-3">{menu.body}</div>
+          {isGroup && menu.fromTeamId === boot.me.id && (
+            <div className="px-5 pb-3 text-xs space-y-1">
+              <div><span className="text-sky-300">✓✓ Prečítali:</span> <span className="text-slate-300">{readBy(menu).map((t) => teamMap.get(t)?.code).join(", ") || "zatiaľ nikto"}</span></div>
+              {audience.length > readBy(menu).length && <div><span className="text-slate-500">✓ Ešte nečítali:</span> <span className="text-slate-400">{audience.filter((t) => !readBy(menu).includes(t)).map((t) => teamMap.get(t)?.code).join(", ")}</span></div>}
+            </div>
+          )}
           <button onClick={() => { setReply(menu); setMenu(null); }} className="w-full text-left px-5 py-3 hover:bg-slate-800">↩︎ Odpovedať</button>
           <button onClick={() => { void navigator.clipboard?.writeText(menu.body); setMenu(null); }} className="w-full text-left px-5 py-3 hover:bg-slate-800">⧉ Kopírovať</button>
           {(menu.fromTeamId === boot.me.id || (isLeague && boot.admin)) && (

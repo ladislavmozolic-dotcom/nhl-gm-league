@@ -84,7 +84,7 @@ export default async function RootLayout({
     ? Number((await prisma.$queryRaw<{ n: bigint }[]>`
         SELECT COUNT(*)::bigint AS n FROM "ImMessage" m
         LEFT JOIN "ImRead" r ON r."roomId" = m."roomId" AND r."teamId" = ${teamId}
-        WHERE m."deletedAt" IS NULL AND m."fromTeamId" <> ${teamId} AND m.id > COALESCE(r."lastReadId", 0)
+        WHERE m."deletedAt" IS NULL AND m."kind" = 'user' AND m."fromTeamId" <> ${teamId} AND m.id > COALESCE(r."lastReadId", 0)
           AND (m."roomId" IN (SELECT id FROM "ImRoom" WHERE kind = 'league')
                OR m."roomId" IN (SELECT id FROM "ImRoom" WHERE "dmKey" LIKE ${teamId + "-%"} OR "dmKey" LIKE ${"%-" + teamId})
                OR m."roomId" IN (SELECT "roomId" FROM "ImMember" WHERE "teamId" = ${teamId}))

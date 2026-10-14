@@ -16,6 +16,6 @@ export async function GET(req: Request) {
     where: { roomId, ...(before ? { id: { lt: before } } : {}) },
     orderBy: { id: "desc" }, take: 50,
   });
-  const peer = await prisma.imRead.findFirst({ where: { roomId, teamId: { not: me } }, select: { lastReadId: true }, orderBy: { lastReadId: "desc" } });
-  return NextResponse.json({ messages: await wire(rows.reverse()), more: rows.length === 50, peerRead: peer?.lastReadId ?? 0 });
+  const rr = await prisma.imRead.findMany({ where: { roomId, teamId: { not: me } }, select: { teamId: true, lastReadId: true } });
+  return NextResponse.json({ messages: await wire(rows.reverse()), more: rows.length === 50, reads: Object.fromEntries(rr.map((r) => [r.teamId, r.lastReadId])) });
 }
