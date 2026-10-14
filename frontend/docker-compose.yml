@@ -35,6 +35,9 @@ services:
       CRON_SECRET: ${CRON_SECRET}   # protects /api/cron/advance-day (the 20:30 auto-sim trigger)
       RESEND_API_KEY: ${RESEND_API_KEY}   # transactional email (welcome mail on GM approval)
       ALERT_EMAIL: ${ALERT_EMAIL:-}       # ops alerts (pre-sim integrity check) — see scripts/ops
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}    # UNHL Chat web push (empty = push disabled)
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@unhl.eu}
     volumes:
       - uploads:/app/public/uploads   # persist admin-uploaded logos/wordmarks
     expose:
