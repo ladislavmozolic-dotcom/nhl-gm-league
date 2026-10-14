@@ -13,7 +13,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
   const chatOrigin = process.env.CHAT_ORIGIN;
-  if (chatOrigin) return NextResponse.redirect(`${chatOrigin}${request.nextUrl.pathname}${request.nextUrl.search}`, 307);
+  const path = request.nextUrl.pathname;
+  if (chatOrigin && (path === "/chat" || path.startsWith("/chat/"))) return NextResponse.redirect(`${chatOrigin}${request.nextUrl.pathname}${request.nextUrl.search}`, 307);
   return NextResponse.next();
 }
 
