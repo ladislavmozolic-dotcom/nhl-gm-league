@@ -11,6 +11,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.134.0",
     "@emoji-mart/data": "^1.2.1",
     "@prisma/client": "^6.19.3",
     "@types/qrcode": "^1.5.6",

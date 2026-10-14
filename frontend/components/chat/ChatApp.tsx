@@ -9,7 +9,7 @@ type TeamLite = { id: number; code: string | null; name: string; logoUrl: string
 type Poll = { id: number; question: string; multi: boolean; closed: boolean; options: { id: number; text: string; voters: number[] }[] };
 type FileAtt = { url: string; name: string; size: number };
 type Msg = { kind: string; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
-type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; muted: boolean; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
+type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
 type Boot = { me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null; gif: boolean };
 
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" });
@@ -53,6 +53,7 @@ export default function ChatApp() {
   const [picker, setPicker] = useState(false);
   const [groupNew, setGroupNew] = useState(false);
   const [pinSig, setPinSig] = useState<{ roomId: number; n: number }>({ roomId: 0, n: 0 });
+  const [openUnread, setOpenUnread] = useState<{ roomId: number; n: number; afterId: number }>({ roomId: 0, n: 0, afterId: 0 });
   const [settings, setSettings] = useState(false);
   const activeRef = useRef<number | null>(null);
   activeRef.current = active;
@@ -115,6 +116,9 @@ export default function ChatApp() {
 
   useEffect(() => {
     if (active == null) return;
+    // remember how many were unread (and where) BEFORE the chat is marked read — for "Summarize what I missed"
+    const r = bootRef.current?.rooms.find((x) => x.id === active);
+    setOpenUnread({ roomId: active, n: r?.unread ?? 0, afterId: r?.lastReadId ?? 0 });
     void loadRoom(active);
   }, [active, loadRoom]);
   useEffect(() => {
@@ -293,6 +297,7 @@ export default function ChatApp() {
             title={activeRoom ? roomTitle(activeRoom) : teamMap.get(pendingDm ?? 0)?.name ?? ""}
             onBack={() => { setActive(null); setPendingDm(null); }}
             pinTick={active != null && pinSig.roomId === active ? pinSig.n : 0}
+            missed={active != null && openUnread.roomId === active ? openUnread : null}
             onPollUpdate={(messageId, roomId, poll) => setMsgs((c) => (c[roomId] ? { ...c, [roomId]: c[roomId].map((x) => (x.id === messageId ? { ...x, poll } : x)) } : c))}
             onGroupChanged={async (left) => { await load(); if (left) setActive(null); }}
             onCleared={async (roomId) => { setMsgs((c) => { const n = { ...c }; delete n[roomId]; return n; }); setActive(null); await load(); }}
@@ -352,9 +357,18 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 function Thread(props: {
   boot: Boot; teamMap: Map<number, TeamLite>; room: Room | null; dmTeamId: number | null; messages: Msg[] | null;
   reads: Record<number, number>; title: string; onBack: () => void; onSent: (roomId: number, m: Msg) => void; onGroupChanged: (left: boolean) => Promise<void>; onCleared: (roomId: number) => Promise<void>;
-  pinTick: number; onPollUpdate: (messageId: number, roomId: number, poll: Poll) => void;
+  pinTick: number; onPollUpdate: (messageId: number, roomId: number, poll: Poll) => void; missed: { roomId: number; n: number; afterId: number } | null;
 }) {
-  const { boot, teamMap, room, dmTeamId, messages, reads, title, onBack, onSent, onGroupChanged, onCleared, pinTick, onPollUpdate } = props;
+  const { boot, teamMap, room, dmTeamId, messages, reads, title, onBack, onSent, onGroupChanged, onCleared, pinTick, onPollUpdate, missed } = props;
+  const [sum, setSum] = useState<null | { state: "loading" } | { state: "done"; text: string; ai: boolean; note?: string } | { state: "hidden" }>(null);
+  async function summarize() {
+    if (!room || !missed) return;
+    setSum({ state: "loading" });
+    const r = await fetch("/api/im/summary", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomId: room.id, afterId: missed.afterId }) }).catch(() => null);
+    if (!r?.ok) { setSum({ state: "done", text: "Zhrnutie sa nepodarilo načítať, skús znova.", ai: false }); return; }
+    const j = await r.json();
+    setSum({ state: "done", text: j.summary, ai: j.ai, note: j.note });
+  }
   const [info, setInfo] = useState(false);
   const [tray, setTray] = useState<null | "emoji" | "gif">(null);
   const [editing, setEditing] = useState<Msg | null>(null);
@@ -495,6 +509,23 @@ function Thread(props: {
       )}
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 bg-slate-950">
+        {missed && missed.n >= 8 && sum?.state !== "hidden" && (
+          <div className="sticky top-0 z-[5] mb-2">
+            {sum?.state === "done" ? (
+              <div className="rounded-2xl bg-slate-900/95 backdrop-blur border border-violet-500/40 p-4 shadow-xl">
+                <div className="flex items-center gap-2 mb-2"><span className="text-sm font-semibold text-violet-300">✨ {sum.ai ? "AI zhrnutie" : "Prehľad"} zmeškaných správ</span><button onClick={() => setSum({ state: "hidden" })} aria-label="Zavrieť" className="ml-auto text-slate-400">✕</button></div>
+                <div className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{sum.text}</div>
+                {sum.note && <div className="mt-2 text-[11px] text-slate-500">{sum.note}</div>}
+                {sum.ai && <div className="mt-2 text-[11px] text-slate-600">Vytvorené AI, môže obsahovať chyby. Dôležité si over v správach.</div>}
+              </div>
+            ) : (
+              <button onClick={summarize} disabled={sum?.state === "loading"} className="w-full flex items-center gap-3 rounded-2xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 px-4 py-3 text-left disabled:opacity-70">
+                <span className="text-xl">✨</span>
+                <span className="flex-1 min-w-0"><span className="block text-sm font-semibold text-violet-200">{sum?.state === "loading" ? "Zhŕňam…" : `Zhrnúť ${missed.n} neprečítaných správ`}</span><span className="block text-xs text-slate-400">Čo sa riešilo, kým si tu nebol</span></span>
+              </button>
+            )}
+          </div>
+        )}
         {messages == null && <p className="text-center text-slate-600 text-sm py-6">Načítavam…</p>}
         {messages?.length === 0 && <p className="text-center text-slate-600 text-sm py-10">Napíš prvú správu 👋</p>}
         {messages?.map((m, i) => {
