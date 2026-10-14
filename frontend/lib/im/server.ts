@@ -105,12 +105,28 @@ function initPush() {
   return (pushReady = true);
 }
 
+/** Total unread messages for a club across all its chats (same rule as the menu badge) — becomes the app-icon badge. */
+export async function unreadTotal(teamId: number): Promise<number> {
+  try {
+    const r = await prisma.$queryRaw<{ n: bigint }[]>`
+      SELECT COUNT(*)::bigint AS n FROM "ImMessage" m
+      LEFT JOIN "ImRead" r ON r."roomId" = m."roomId" AND r."teamId" = ${teamId}
+      WHERE m."deletedAt" IS NULL AND m."kind" <> 'system' AND m."fromTeamId" <> ${teamId} AND m.id > GREATEST(COALESCE(r."lastReadId", 0), COALESCE(r."clearedId", 0))
+        AND (m."roomId" IN (SELECT id FROM "ImRoom" WHERE kind = 'league')
+             OR m."roomId" IN (SELECT id FROM "ImRoom" WHERE "dmKey" LIKE ${teamId + "-%"} OR "dmKey" LIKE ${"%-" + teamId})
+             OR m."roomId" IN (SELECT "roomId" FROM "ImMember" WHERE "teamId" = ${teamId}))`;
+    return Number(r[0]?.n ?? 0);
+  } catch { return 0; }
+}
+
 export async function pushToTeams(teamIds: number[], payload: { title: string; body: string; url: string; tag: string; force?: boolean }) {
   if (!teamIds.length || !initPush()) return;
   const subs = await prisma.imPushSub.findMany({ where: { teamId: { in: teamIds } } });
+  const badges = new Map<number, number>();
+  for (const t of new Set(subs.map((s) => s.teamId))) badges.set(t, await unreadTotal(t));
   await Promise.all(subs.map(async (s) => {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 3600 });
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify({ ...payload, badge: badges.get(s.teamId) ?? 0 }), { TTL: 3600 });
     } catch (e) {
       const code = (e as { statusCode?: number }).statusCode;
       if (code === 404 || code === 410) await prisma.imPushSub.delete({ where: { id: s.id } }).catch(() => {});

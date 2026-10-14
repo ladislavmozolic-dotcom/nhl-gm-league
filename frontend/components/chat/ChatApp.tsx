@@ -14,6 +14,7 @@ const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
 const MORE_REACTIONS = ["🔥", "🏒", "🥅", "🎉", "👏", "🍆", "👎", "🙏"];
 type Msg = { reactions: Reaction[]; kind: string; voice: { url: string; secs: number } | null; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
 type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; mutedUntil: string | null; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
+const attending = () => typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
 const roomMuted = (r?: { muted: boolean; mutedUntil: string | null } | null) => !!r?.muted && (!r.mutedUntil || new Date(r.mutedUntil) > new Date());
 const muteLabel = (until: string | null) => (!until ? "Navždy" : `do ${new Date(until).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`);
 const MUTE_OPTIONS: { label: string; hours: number | null }[] = [{ label: "1 hodinu", hours: 1 }, { label: "8 hodín", hours: 8 }, { label: "1 deň", hours: 24 }, { label: "1 týždeň", hours: 168 }, { label: "Navždy", hours: null }];
@@ -79,6 +80,8 @@ export default function ChatApp() {
   const prefsRef = useRef<Prefs>(DEFAULT_PREFS);
   const bootRef = useRef<Boot | null>(null);
   bootRef.current = boot;
+  const msgsRef = useRef<Record<number, Msg[]>>({});
+  msgsRef.current = msgs;
   const [banner, setBanner] = useState<{ roomId: number; title: string; text: string; team: TeamLite | null; kind: string } | null>(null);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setPrefs = (p: Prefs) => { prefsRef.current = p; setPrefsState(p); savePrefs(p); };
@@ -140,7 +143,7 @@ export default function ChatApp() {
     void loadRoom(active);
   }, [active, loadRoom]);
   useEffect(() => {
-    if (active != null && msgs[active]) markRead(active, msgs[active]);
+    if (active != null && msgs[active] && attending()) markRead(active, msgs[active]);
   }, [active, msgs, markRead]);
 
   // live stream (auto-reconnect by EventSource; server recycles every ~55 s)
@@ -160,7 +163,7 @@ export default function ChatApp() {
             const pr = prefsRef.current;
             playSound(pr.sound, pr.volume);
             if (pr.vibrate) navigator.vibrate?.(120);
-            const viewing = activeRef.current === m.roomId;
+            const viewing = activeRef.current === m.roomId && attending();
             if (pr.banner && !viewing) {
               const room = b0.rooms.find((r) => r.id === m.roomId);
               const from = b0.teams.find((t) => t.id === m.fromTeamId) ?? null;
@@ -188,7 +191,7 @@ export default function ChatApp() {
             const ex = rooms.find((r) => r.id === m.roomId);
             if (!ex) { unknownRoom = true; continue; }
             const mineMsg = m.fromTeamId === b.me.id || m.kind === "system";
-            rooms = rooms.map((r) => r.id === m.roomId ? { ...r, last: m, unread: mineMsg || activeRef.current === m.roomId ? r.unread : r.unread + 1 } : r);
+            rooms = rooms.map((r) => r.id === m.roomId ? { ...r, last: m, unread: mineMsg || (activeRef.current === m.roomId && attending()) ? r.unread : r.unread + 1 } : r);
           }
           return { ...b, rooms };
         });
@@ -253,11 +256,13 @@ export default function ChatApp() {
     const reopen = () => { es?.close(); lastBeat = Date.now(); open(); void catchUp(); };
     // watchdog: a healthy stream beats every ~8 s; if it goes quiet (proxy buffering, sleeping tab, dropped Wi-Fi) reconnect + catch up
     const wd = setInterval(() => { if (document.visibilityState === "visible" && (Date.now() - lastBeat > 14000 || es?.readyState === 2)) reopen(); }, 5000);
-    const onVis = () => { if (document.visibilityState === "visible") { reopen(); void load(); if (activeRef.current) void loadRoom(activeRef.current); } };
+    const onVis = () => { if (document.visibilityState === "visible") { onFocus(); reopen(); void load(); if (activeRef.current) void loadRoom(activeRef.current); } };
     const onOnline = () => reopen();
+    const onFocus = () => { const a = activeRef.current; if (a != null && attending() && msgsRef.current[a]) markRead(a, msgsRef.current[a]); };
+    window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("online", onOnline);
-    return () => { dead = true; es?.close(); clearInterval(wd); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("online", onOnline); };
+    return () => { dead = true; es?.close(); clearInterval(wd); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("online", onOnline); window.removeEventListener("focus", onFocus); };
   }, [boot?.me.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // app-icon badge with total unread
