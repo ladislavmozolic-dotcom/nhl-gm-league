@@ -118,3 +118,90 @@ export function Lightbox({ src, onClose }: { src: string; onClose: () => void })
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}(?:\uFE0F|\u200D|\p{Emoji_Modifier})*\s*){1,3}$/u;
 export const isBigEmoji = (s: string) => EMOJI_ONLY.test(s.trim());
+
+// ── voice messages ─────────────────────────────────────────────────────────────
+// Recorded with WebAudio and encoded to 16 kHz mono WAV in the browser, so every phone / desktop can play it
+// (MediaRecorder gives webm on Chrome and mp4 on Safari — not interchangeable).
+export const VOICE_MAX_SECS = 120;
+export type Recorder = { level: () => number; elapsed: () => number; stop: () => Promise<{ blob: Blob; secs: number }>; cancel: () => void };
+
+export async function startRecording(): Promise<Recorder> {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const ctx = new AC();
+  if (ctx.state === "suspended") await ctx.resume();
+  const src = ctx.createMediaStreamSource(stream);
+  const analyser = ctx.createAnalyser(); analyser.fftSize = 512;
+  const proc = ctx.createScriptProcessor(4096, 1, 1);
+  const chunks: Float32Array[] = [];
+  const t0 = Date.now();
+  proc.onaudioprocess = (e) => { chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+  src.connect(analyser); src.connect(proc); proc.connect(ctx.destination); // output stays silent (we never fill it)
+  const buf = new Uint8Array(analyser.fftSize);
+  const cleanup = () => { try { proc.disconnect(); src.disconnect(); } catch { /* ignore */ } stream.getTracks().forEach((t) => t.stop()); void ctx.close(); };
+  return {
+    level: () => { analyser.getByteTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v - 128)); return m / 128; },
+    elapsed: () => (Date.now() - t0) / 1000,
+    cancel: cleanup,
+    stop: async () => {
+      const rate = ctx.sampleRate; cleanup();
+      const total = chunks.reduce((n, c) => n + c.length, 0);
+      const all = new Float32Array(total); let o = 0; for (const c of chunks) { all.set(c, o); o += c.length; }
+      const OUT = 16000, ratio = rate / OUT, n = Math.floor(total / ratio);
+      const pcm = new Int16Array(n);
+      for (let i = 0; i < n; i++) { // box-filter downsample
+        const a = Math.floor(i * ratio), b = Math.min(total, Math.floor((i + 1) * ratio)); let sum = 0;
+        for (let j = a; j < b; j++) sum += all[j];
+        const v = Math.max(-1, Math.min(1, sum / Math.max(1, b - a)));
+        pcm[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+      }
+      const wav = new ArrayBuffer(44 + pcm.length * 2), dv = new DataView(wav);
+      const w = (off: number, str: string) => { for (let i = 0; i < str.length; i++) dv.setUint8(off + i, str.charCodeAt(i)); };
+      w(0, "RIFF"); dv.setUint32(4, 36 + pcm.length * 2, true); w(8, "WAVE"); w(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+      dv.setUint32(24, OUT, true); dv.setUint32(28, OUT * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, "data"); dv.setUint32(40, pcm.length * 2, true);
+      new Int16Array(wav, 44).set(pcm);
+      return { blob: new Blob([wav], { type: "audio/wav" }), secs: Math.max(1, Math.round(n / OUT)) };
+    },
+  };
+}
+
+export async function uploadVoice(blob: Blob): Promise<{ url: string } | { error: string }> {
+  const fd = new FormData(); fd.append("file", blob, "voice.wav"); fd.append("kind", "voice");
+  const r = await fetch("/api/im/upload", { method: "POST", body: fd }).catch(() => null);
+  if (!r) return { error: "Bez pripojenia — skús znova." };
+  const j = await r.json().catch(() => ({}));
+  return r.ok ? { url: (j as { url: string }).url } : { error: (j as { error?: string }).error ?? "Nahranie zlyhalo." };
+}
+
+export const fmtSecs = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
+
+let playing: HTMLAudioElement | null = null; // only one voice message plays at a time
+export function VoicePlayer({ url, secs }: { url: string; secs: number }) {
+  const a = useRef<HTMLAudioElement | null>(null);
+  const [on, setOn] = useState(false);
+  const [pos, setPos] = useState(0);
+  useEffect(() => () => { a.current?.pause(); }, []);
+  function toggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!a.current) {
+      const el = new Audio(url);
+      el.ontimeupdate = () => setPos(el.currentTime);
+      el.onended = () => { setOn(false); setPos(0); };
+      el.onpause = () => setOn(false);
+      el.onplay = () => setOn(true);
+      a.current = el;
+    }
+    const el = a.current;
+    if (el.paused) { if (playing && playing !== el) playing.pause(); playing = el; void el.play(); } else el.pause();
+  }
+  const dur = a.current && isFinite(a.current.duration) && a.current.duration > 0 ? a.current.duration : secs;
+  return (
+    <div className="flex items-center gap-3 min-w-[210px] py-1" onClick={(e) => e.stopPropagation()}>
+      <button onClick={toggle} aria-label={on ? "Pauza" : "Prehrať"} className="w-10 h-10 shrink-0 rounded-full bg-white/90 text-slate-900 text-base flex items-center justify-center">{on ? "❚❚" : "▶"}</button>
+      <div className="flex-1 min-w-0">
+        <input type="range" min={0} max={dur || 1} step={0.1} value={pos} onChange={(e) => { const v = Number(e.target.value); setPos(v); if (a.current) a.current.currentTime = v; }} className="w-full h-1 accent-white" aria-label="Pozícia" />
+        <div className="text-[11px] opacity-70 mt-0.5">🎤 {fmtSecs(on || pos ? pos : dur)} / {fmtSecs(dur)}</div>
+      </div>
+    </div>
+  );
+}

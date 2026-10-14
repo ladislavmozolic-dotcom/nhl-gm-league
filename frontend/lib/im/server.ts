@@ -50,7 +50,7 @@ export async function isMuted(teamId: number): Promise<boolean> {
 
 export type PollWire = { id: number; question: string; multi: boolean; closed: boolean; options: { id: number; text: string; voters: number[] }[] };
 export type WireMessage = {
-  kind: string; imageUrl: string | null; file: { url: string; name: string; size: number } | null; pinned: boolean; poll: PollWire | null;
+  kind: string; imageUrl: string | null; voice: { url: string; secs: number } | null; file: { url: string; name: string; size: number } | null; pinned: boolean; poll: PollWire | null;
   edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string;
   replyTo: { id: number; fromTeamId: number; body: string } | null; deleted: boolean;
 };
@@ -74,6 +74,7 @@ export async function wire(rows: ImMessage[]): Promise<WireMessage[]> {
     const rp = r.replyToId != null ? rm.get(r.replyToId) : null;
     return {
       kind: r.kind, imageUrl: r.deletedAt ? null : r.imageUrl, edited: !!r.editedAt && !r.deletedAt, id: r.id, roomId: r.roomId, fromTeamId: r.fromTeamId,
+      voice: !r.deletedAt && r.voiceUrl ? { url: r.voiceUrl, secs: r.voiceSecs ?? 0 } : null,
       file: !r.deletedAt && r.fileUrl ? { url: r.fileUrl, name: r.fileName ?? "súbor", size: r.fileSize ?? 0 } : null,
       pinned: !!r.pinnedAt && !r.deletedAt, poll: pm.get(r.id) ?? null,
       body: r.deletedAt ? "" : r.body, deleted: !!r.deletedAt, at: r.createdAt.toISOString(),
@@ -135,4 +136,6 @@ export async function leaveGroup(roomId: number, teamId: number) {
 }
 
 const FILE_RE = /^\/uploads\/chat\/files\/[a-f0-9]{16}\.(pdf|docx?|xlsx?|pptx?|csv|txt|zip)$/;
+const VOICE_RE = /^\/uploads\/chat\/voice\/[a-f0-9]{16}\.wav$/;
+export const isOwnVoice = (u: unknown): u is string => typeof u === "string" && VOICE_RE.test(u);
 export const isOwnFile = (u: unknown): u is string => typeof u === "string" && FILE_RE.test(u);

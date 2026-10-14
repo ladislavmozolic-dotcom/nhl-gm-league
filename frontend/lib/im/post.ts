@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { MAX_LEN, canAccessRoom, dmRoomId, isAttachableImage, isMuted, isOwnFile, pushToTeams, wire, type WireMessage } from "./server";
+import { MAX_LEN, canAccessRoom, dmRoomId, isAttachableImage, isMuted, isOwnFile, isOwnVoice, pushToTeams, wire, type WireMessage } from "./server";
 
 export type PostInput = {
   roomId?: number; toTeamId?: number; body?: string; replyToId?: number; imageUrl?: string | null;
   file?: { url: string; name: string; size: number } | null;
+  voice?: { url: string; secs: number } | null;
   poll?: { question: string; options: string[]; multi: boolean } | null;
 };
 export type PostResult = { ok: true; roomId: number; message: WireMessage } | { ok: false; status: number; error: string };
@@ -17,7 +18,8 @@ export async function postMessage(me: number, b: PostInput): Promise<PostResult>
   const body = poll ? poll.question : (b.body ?? "").trim().slice(0, MAX_LEN);
   const imageUrl = isAttachableImage(b.imageUrl) ? b.imageUrl : null;
   const file = b.file && isOwnFile(b.file.url) ? { url: b.file.url, name: String(b.file.name ?? "súbor").replace(/[\u0000-\u001f<>]/g, "").slice(0, 120) || "súbor", size: Math.max(0, Math.floor(Number(b.file.size) || 0)) } : null;
-  if (!body && !imageUrl && !file) return { ok: false, status: 400, error: "empty" };
+  const voice = b.voice && isOwnVoice(b.voice.url) ? { url: b.voice.url, secs: Math.min(600, Math.max(1, Math.round(Number(b.voice.secs) || 1))) } : null;
+  if (!body && !imageUrl && !file && !voice) return { ok: false, status: 400, error: "empty" };
 
   let roomId = b.roomId ?? 0;
   if (!roomId && b.toTeamId) {
@@ -38,6 +40,7 @@ export async function postMessage(me: number, b: PostInput): Promise<PostResult>
   const msg = await prisma.imMessage.create({
     data: {
       roomId, fromTeamId: me, body, replyToId, imageUrl, kind: poll ? "poll" : "user",
+      ...(voice ? { voiceUrl: voice.url, voiceSecs: voice.secs } : {}),
       ...(file ? { fileUrl: file.url, fileName: file.name, fileSize: file.size } : {}),
       ...(poll ? { poll: { create: { question: poll.question, multi: poll.multi, options: { create: poll.options.map((text, order) => ({ text, order })) } } } } : {}),
     },
@@ -60,7 +63,7 @@ export async function postMessage(me: number, b: PostInput): Promise<PostResult>
   }
   const mutedSet = new Set((await prisma.imRead.findMany({ where: { roomId, muted: true, teamId: { in: targets } }, select: { teamId: true } })).map((r) => r.teamId));
   targets = targets.filter((t) => !mutedSet.has(t));
-  const preview = poll ? `📊 ${poll.question}` : file && !body ? `📎 ${file.name}` : body ? body.slice(0, 140) : /\.gif|giphy/i.test(imageUrl ?? "") ? "GIF" : "📷 Fotka";
+  const preview = voice ? "🎤 Hlasová správa" : poll ? `📊 ${poll.question}` : file && !body ? `📎 ${file.name}` : body ? body.slice(0, 140) : /\.gif|giphy/i.test(imageUrl ?? "") ? "GIF" : "📷 Fotka";
   void pushToTeams(targets, { title, body: preview, url: "/chat", tag: `room-${roomId}` }).catch(() => {});
   return { ok: true, roomId, message: (await wire([msg]))[0] };
 }

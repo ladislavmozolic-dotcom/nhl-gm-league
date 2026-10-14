@@ -2,13 +2,13 @@
 
 import InstallBanner from "./InstallBanner";
 import { DEFAULT_PREFS, SOUNDS, loadPrefs, playSound, savePrefs, unlockAudio, type Prefs, type SoundId } from "./sound";
-import { EmojiPicker, GifPicker, Lightbox, fileIcon, fmtSize, isBigEmoji, prepareImage, uploadFile, uploadImage } from "./media";
+import { EmojiPicker, GifPicker, Lightbox, VOICE_MAX_SECS, VoicePlayer, fileIcon, fmtSecs, fmtSize, isBigEmoji, prepareImage, startRecording, uploadFile, uploadImage, uploadVoice, type Recorder } from "./media";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null; avatarUrl: string | null };
 type Poll = { id: number; question: string; multi: boolean; closed: boolean; options: { id: number; text: string; voters: number[] }[] };
 type FileAtt = { url: string; name: string; size: number };
-type Msg = { kind: string; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
+type Msg = { kind: string; voice: { url: string; secs: number } | null; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
 type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
 type Boot = { me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null; gif: boolean };
 
@@ -150,7 +150,7 @@ export default function ChatApp() {
               const room = b0.rooms.find((r) => r.id === m.roomId);
               const from = b0.teams.find((t) => t.id === m.fromTeamId) ?? null;
               const title = room?.kind === "league" ? `${room.name || "# Liga"} · ${from?.code ?? ""}` : room?.kind === "group" ? `${room.name ?? "Skupina"} · ${from?.code ?? ""}` : from?.name ?? "GM";
-              const text = m.body || (m.imageUrl ? (/\.gif|giphy/i.test(m.imageUrl) ? "GIF" : "📷 Fotka") : "");
+              const text = m.voice ? "🎤 Hlasová správa" : m.body || (m.imageUrl ? (/\.gif|giphy/i.test(m.imageUrl) ? "GIF" : "📷 Fotka") : "");
               setBanner({ roomId: m.roomId, title, text, team: from, kind: room?.kind ?? "dm" });
               if (bannerTimer.current) clearTimeout(bannerTimer.current);
               bannerTimer.current = setTimeout(() => setBanner(null), 4500);
@@ -273,7 +273,7 @@ export default function ChatApp() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-sm truncate flex-1 ${r.unread ? "text-slate-200" : "text-slate-500"}`}>
-                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : r.last.poll ? `${lastMine ? "Ty: " : ""}📊 ${r.last.poll.question}` : !r.last.body && r.last.file ? `${lastMine ? "Ty: " : ""}📎 ${r.last.file.name}` : !r.last.body && r.last.imageUrl ? `${lastMine ? "Ty: " : ""}${/\.gif|giphy/i.test(r.last.imageUrl) ? "GIF" : "📷 Fotka"}` : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
+                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : r.last.voice ? `${lastMine ? "Ty: " : ""}🎤 Hlasová správa` : r.last.poll ? `${lastMine ? "Ty: " : ""}📊 ${r.last.poll.question}` : !r.last.body && r.last.file ? `${lastMine ? "Ty: " : ""}📎 ${r.last.file.name}` : !r.last.body && r.last.imageUrl ? `${lastMine ? "Ty: " : ""}${/\.gif|giphy/i.test(r.last.imageUrl) ? "GIF" : "📷 Fotka"}` : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
                     </span>
                     {r.unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-blue-600 text-[11px] font-bold flex items-center justify-center">{r.unread}</span>}
                   </div>
@@ -382,6 +382,38 @@ function Thread(props: {
   const [pollNew, setPollNew] = useState(false);
   const [pins, setPins] = useState<Msg[]>([]);
   const [pinList, setPinList] = useState(false);
+  const [rec, setRec] = useState<null | { secs: number; lvl: number }>(null);
+  const recRef = useRef<Recorder | null>(null);
+  async function beginRec() {
+    setError(""); setTray(null);
+    try {
+      const r = await startRecording();
+      recRef.current = r; setRec({ secs: 0, lvl: 0 });
+    } catch { setError("Mikrofón sa nepodarilo zapnúť — povoľ prístup k mikrofónu v prehliadači/telefóne."); }
+  }
+  function cancelRec() { recRef.current?.cancel(); recRef.current = null; setRec(null); }
+  async function finishRec() {
+    const r = recRef.current; if (!r) return;
+    recRef.current = null; setRec(null);
+    const { blob, secs } = await r.stop();
+    if (secs < 1 || blob.size < 2000) return;
+    setUploading(true);
+    const up = await uploadVoice(blob);
+    setUploading(false);
+    if ("error" in up) { setError(up.error); return; }
+    await send(undefined, undefined, { url: up.url, secs });
+  }
+  useEffect(() => {
+    if (!rec) return;
+    const iv = setInterval(() => {
+      const r = recRef.current; if (!r) return;
+      const secs = r.elapsed();
+      if (secs >= VOICE_MAX_SECS) { void finishRec(); return; }
+      setRec({ secs, lvl: r.level() });
+    }, 120);
+    return () => clearInterval(iv);
+  }, [!!rec]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { recRef.current?.cancel(); }, []);
   const [text, setText] = useState("");
   const [reply, setReply] = useState<Msg | null>(null);
   const [menu, setMenu] = useState<Msg | null>(null);
@@ -400,7 +432,7 @@ function Thread(props: {
     void fetch(`/api/im/pins?roomId=${room.id}`).then((r) => r.ok ? r.json() : { pins: [] }).then((j) => setPins(j.pins));
   }, [room?.id, pinTick]); // eslint-disable-line react-hooks/exhaustive-deps
   const canPin = isLeague ? boot.admin : true;
-  const pinPreview = (m: Msg) => (m.poll ? `📊 ${m.poll.question}` : m.file && !m.body ? `📎 ${m.file.name}` : m.imageUrl && !m.body ? "📷 Fotka / GIF" : m.body);
+  const pinPreview = (m: Msg) => (m.voice ? "🎤 Hlasová správa" : m.poll ? `📊 ${m.poll.question}` : m.file && !m.body ? `📎 ${m.file.name}` : m.imageUrl && !m.body ? "📷 Fotka / GIF" : m.body);
   async function pin(m: Msg, v: boolean) {
     setMenu(null);
     const r = await fetch("/api/im/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id, pinned: v }) });
@@ -421,9 +453,9 @@ function Thread(props: {
   const readBy = (m: Msg) => audience.filter((t) => (reads[t] ?? 0) >= m.id);
   const allRead = (m: Msg) => audience.length > 0 && readBy(m).length === audience.length;
 
-  async function send(imageUrl?: string, file?: FileAtt) {
-    const body = imageUrl || file ? "" : text.trim();
-    if ((!body && !imageUrl && !file) || sending) return;
+  async function send(imageUrl?: string, file?: FileAtt, voice?: { url: string; secs: number }) {
+    const body = imageUrl || file || voice ? "" : text.trim();
+    if ((!body && !imageUrl && !file && !voice) || sending) return;
     setSending(true); setError("");
     if (editing) {
       const er = await fetch("/api/im/edit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editing.id, body }) });
@@ -434,12 +466,12 @@ function Thread(props: {
     }
     const r = await fetch("/api/im/send", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...(room ? { roomId: room.id } : { toTeamId: dmTeamId }), body, imageUrl, file, replyToId: reply?.id }),
+      body: JSON.stringify({ ...(room ? { roomId: room.id } : { toTeamId: dmTeamId }), body, imageUrl, file, voice, replyToId: reply?.id }),
     });
     setSending(false);
     if (!r.ok) { setError(r.status === 403 ? "Nemáš oprávnenie písať." : "Nepodarilo sa odoslať."); return; }
     const j = await r.json();
-    if (!imageUrl && !file) setText("");
+    if (!imageUrl && !file && !voice) setText("");
     setReply(null); setTray(null);
     onSent(j.roomId, j.message);
   }
@@ -558,6 +590,7 @@ function Thread(props: {
                     <img src={m.imageUrl} alt="" loading="lazy" onClick={(e) => { e.stopPropagation(); setZoom(m.imageUrl); }}
                       className="rounded-xl max-h-72 max-w-full object-cover mb-1 cursor-zoom-in bg-slate-900/40" />
                   )}
+                  {m.voice && !m.deleted && <VoicePlayer url={m.voice.url} secs={m.voice.secs} />}
                   {m.file && !m.deleted && (
                     <a href={m.file.url} target="_blank" rel="noopener noreferrer" download={m.file.name} onClick={(e) => e.stopPropagation()}
                       className="flex items-center gap-3 rounded-xl bg-black/20 hover:bg-black/30 px-3 py-2.5 mb-1 min-w-[200px]">
@@ -596,6 +629,18 @@ function Thread(props: {
       {canWrite ? (
         <div className="border-t border-slate-800 bg-slate-900">
           {uploading && <div className="px-4 pt-2 text-xs text-slate-400">Nahrávam obrázok…</div>}
+          {rec ? (
+            <div className="flex items-center gap-3 p-3">
+              <button onClick={cancelRec} aria-label="Zrušiť" className="w-11 h-11 rounded-full bg-slate-800 text-lg text-red-400">🗑</button>
+              <div className="flex-1 flex items-center gap-3 rounded-2xl bg-slate-800 px-4 h-11">
+                <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-sm tabular-nums">{fmtSecs(rec.secs)}</span>
+                <div className="flex-1 h-1.5 rounded-full bg-slate-700 overflow-hidden"><div className="h-full bg-red-400 transition-all" style={{ width: `${Math.min(100, rec.lvl * 160)}%` }} /></div>
+                <span className="text-[11px] text-slate-500">max {fmtSecs(VOICE_MAX_SECS)}</span>
+              </div>
+              <button onClick={() => void finishRec()} aria-label="Odoslať hlasovú správu" className="w-11 h-11 rounded-full bg-blue-600 text-lg">➤</button>
+            </div>
+          ) : (
           <div className="flex items-end gap-1.5 p-3">
             <button onClick={() => setTray(tray === "emoji" ? null : "emoji")} aria-label="Emoji" className={`w-10 h-11 text-2xl ${tray === "emoji" ? "text-blue-400" : "text-slate-400"}`}>☺︎</button>
             <button onClick={() => { setTray(null); setAttach(true); }} aria-label="Pripojiť" className="w-9 h-11 text-2xl text-slate-400">＋</button>
@@ -607,8 +652,11 @@ function Thread(props: {
             <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} placeholder="Správa" onFocus={() => setTray(null)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(pointer:fine)").matches) { e.preventDefault(); void send(); } }}
               className="flex-1 min-w-0 resize-none max-h-32 rounded-2xl bg-slate-800 px-4 py-2.5 text-base outline-none" />
-            <button onClick={() => send()} disabled={!text.trim() || sending} className="w-11 h-11 rounded-full bg-blue-600 disabled:opacity-40 text-lg" aria-label="Odoslať">➤</button>
+            {text.trim() || editing
+              ? <button onClick={() => send()} disabled={!text.trim() || sending} className="w-11 h-11 rounded-full bg-blue-600 disabled:opacity-40 text-lg" aria-label="Odoslať">➤</button>
+              : <button onClick={() => void beginRec()} disabled={sending || uploading} className="w-11 h-11 rounded-full bg-blue-600 disabled:opacity-40 text-lg" aria-label="Nahrať hlasovú správu">🎤</button>}
           </div>
+          )}
           {tray === "emoji" && <div className="border-t border-slate-800"><EmojiPicker onPick={insertEmoji} /></div>}
           {tray === "gif" && <div className="border-t border-slate-800 pt-2 max-h-[240px] overflow-y-auto"><GifPicker search={boot.gif} roomId={room?.id ?? null} onPick={(u) => void send(u)} onUpload={() => { if (fileRef.current) { fileRef.current.accept = "image/gif"; fileRef.current.click(); } }} /></div>}
         </div>

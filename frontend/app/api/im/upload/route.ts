@@ -35,6 +35,17 @@ export async function POST(request: Request) {
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "No file" }, { status: 400 });
+  if (form?.get("kind") === "voice") {
+    // voice messages: WAV only (encoded in the browser — plays on every phone/desktop), verified by header, ≤ 6 MB
+    if (file.size > 6_000_000) return NextResponse.json({ error: "Hlasová správa je príliš dlhá" }, { status: 400 });
+    const wav = Buffer.from(await file.arrayBuffer());
+    if (!(wav.length > 44 && wav.subarray(0, 4).toString("ascii") === "RIFF" && wav.subarray(8, 12).toString("ascii") === "WAVE")) return NextResponse.json({ error: "Neplatný zvuk" }, { status: 400 });
+    const vname = `${randomBytes(8).toString("hex")}.wav`;
+    const vdir = join(process.cwd(), "public", "uploads", "chat", "voice");
+    await mkdir(vdir, { recursive: true });
+    await writeFile(join(vdir, vname), wav);
+    return NextResponse.json({ url: `/uploads/chat/voice/${vname}` });
+  }
   if (form?.get("kind") === "file") {
     // documents: strict extension whitelist + content check; stored under a random name (never served as HTML/JS)
     const ext = (file.name.split(".").pop() ?? "").toLowerCase();

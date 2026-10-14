@@ -2171,6 +2171,8 @@ model ImMessage {
   fromTeamId  Int
   body        String
   replyToId   Int?
+  voiceUrl    String? // voice message (WAV) under /uploads/chat/voice
+  voiceSecs   Int?
   fileUrl     String? // attached document (PDF / Office / CSV / TXT / ZIP) under /uploads/chat/files
   fileName    String? // original file name, for display
   fileSize    Int?
