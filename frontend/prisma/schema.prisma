@@ -2155,6 +2155,7 @@ model ImRoom {
   kind          String // "league" | "dm" | "group"
   dmKey         String?     @unique // "<lowTeamId>-<highTeamId>" for a dm room
   name          String? // group name
+  imageUrl      String? // custom chat picture (group / league channel)
   createdById   Int? // group owner (can rename / add / remove members)
   members       ImMember[]
   createdAt     DateTime    @default(now())
@@ -2169,6 +2170,7 @@ model ImMessage {
   fromTeamId  Int
   body        String
   replyToId   Int?
+  imageUrl    String? // attached picture / GIF (uploaded under /uploads/chat or a Giphy URL)
   kind        String    @default("user") // "user" | "system" (group events: created / added / removed / left / renamed)
   deletedAt   DateTime? // soft delete (author or moderator) — body is hidden from clients
   deletedById Int?
@@ -2195,6 +2197,11 @@ model ImRead {
   room       ImRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@id([roomId, teamId])
+}
+
+model ImProfile {
+  teamId    Int     @id
+  avatarUrl String? // GM's own chat picture (replaces the club logo in chat)
 }
 
 model ImMute {

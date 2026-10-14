@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
-import { chatEnabled, systemMessage, teamLabels } from "@/lib/im/server";
+import { chatEnabled, isOwnImage, systemMessage, teamLabels } from "@/lib/im/server";
 
 export const dynamic = "force-dynamic";
 const MAX_MEMBERS = 40;
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   const me = await getTeamSession();
   if (!me || !(await chatEnabled())) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  const b = (await req.json().catch(() => ({}))) as { roomId?: number; rename?: string; add?: number[]; remove?: number; leave?: boolean };
+  const b = (await req.json().catch(() => ({}))) as { roomId?: number; rename?: string; image?: string | null; add?: number[]; remove?: number; leave?: boolean };
   const room = b.roomId ? await prisma.imRoom.findUnique({ where: { id: b.roomId }, include: { members: true } }) : null;
   if (!room || room.kind !== "group" || !room.members.some((m) => m.teamId === me)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const owner = room.createdById === me;
@@ -52,6 +52,10 @@ export async function PATCH(req: Request) {
     const nn = b.rename.trim().slice(0, 60);
     await prisma.imRoom.update({ where: { id: room.id }, data: { name: nn } });
     await systemMessage(room.id, me, `${L.get(me)} premenoval skupinu na „${nn}“`);
+  }
+  if (b.image !== undefined && (b.image === null || isOwnImage(b.image))) {
+    await prisma.imRoom.update({ where: { id: room.id }, data: { imageUrl: b.image } });
+    await systemMessage(room.id, me, b.image ? `${L.get(me)} zmenil obrázok skupiny` : `${L.get(me)} odstránil obrázok skupiny`);
   }
   if (b.add?.length) {
     const have = new Set(room.members.map((m) => m.teamId));

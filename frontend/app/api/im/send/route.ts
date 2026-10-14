@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
-import { MAX_LEN, canAccessRoom, chatEnabled, dmRoomId, isMuted, leagueRoomId, pushToTeams, wire } from "@/lib/im/server";
+import { MAX_LEN, isAttachableImage, canAccessRoom, chatEnabled, dmRoomId, isMuted, leagueRoomId, pushToTeams, wire } from "@/lib/im/server";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +10,10 @@ export async function POST(req: Request) {
   const me = await getTeamSession();
   if (!me) return NextResponse.json({ error: "auth" }, { status: 401 });
   if (!(await chatEnabled())) return NextResponse.json({ error: "disabled" }, { status: 403 });
-  const b = (await req.json().catch(() => ({}))) as { roomId?: number; toTeamId?: number; body?: string; replyToId?: number };
+  const b = (await req.json().catch(() => ({}))) as { roomId?: number; toTeamId?: number; body?: string; replyToId?: number; imageUrl?: string };
   const body = (b.body ?? "").trim().slice(0, MAX_LEN);
-  if (!body) return NextResponse.json({ error: "empty" }, { status: 400 });
+  const imageUrl = isAttachableImage(b.imageUrl) ? b.imageUrl : null;
+  if (!body && !imageUrl) return NextResponse.json({ error: "empty" }, { status: 400 });
 
   let roomId = b.roomId ?? 0;
   if (!roomId && b.toTeamId) {
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
     const r = await prisma.imMessage.findUnique({ where: { id: b.replyToId }, select: { roomId: true } });
     if (r?.roomId === roomId) replyToId = b.replyToId;
   }
-  const msg = await prisma.imMessage.create({ data: { roomId, fromTeamId: me, body, replyToId } });
+  const msg = await prisma.imMessage.create({ data: { roomId, fromTeamId: me, body, replyToId, imageUrl } });
   await prisma.imRoom.update({ where: { id: roomId }, data: { lastMessageAt: msg.createdAt } });
   await prisma.imRead.upsert({
     where: { roomId_teamId: { roomId, teamId: me } }, update: { lastReadId: msg.id }, create: { roomId, teamId: me, lastReadId: msg.id },
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
     title = `# League · ${who}`;
     targets = (await prisma.imPushSub.findMany({ where: { teamId: { not: me } }, select: { teamId: true }, distinct: ["teamId"] })).map((s) => s.teamId);
   }
-  void pushToTeams(targets, { title, body: body.slice(0, 140), url: "/chat", tag: `room-${roomId}` }).catch(() => {});
+  void pushToTeams(targets, { title, body: body ? body.slice(0, 140) : /\.gif/i.test(imageUrl ?? "") ? "GIF" : "📷 Fotka", url: "/chat", tag: `room-${roomId}` }).catch(() => {});
   void leagueRoomId;
   return NextResponse.json({ ok: true, roomId, message: (await wire([msg]))[0] });
 }

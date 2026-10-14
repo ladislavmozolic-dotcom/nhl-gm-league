@@ -1,12 +1,13 @@
 "use client";
 
 import InstallBanner from "./InstallBanner";
+import { EmojiPicker, GifPicker, Lightbox, isBigEmoji, prepareImage, uploadImage } from "./media";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null };
-type Msg = { kind: string; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
-type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; name: string | null; createdById: number | null; members: number[] };
-type Boot = { me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null };
+type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null; avatarUrl: string | null };
+type Msg = { kind: string; imageUrl: string | null; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
+type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
+type Boot = { me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null; gif: boolean };
 
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" });
 function dayLabel(iso: string) {
@@ -25,7 +26,16 @@ function b64ToU8(s: string) {
 function Logo({ t, size = 40 }: { t?: TeamLite | null; size?: number }) {
   return (
     <div className="shrink-0 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden" style={{ width: size, height: size }}>
-      {t?.logoUrl ? <img src={t.logoUrl} alt="" className="w-[75%] h-[75%] object-contain" /> : <span className="text-xs font-bold text-slate-400">{t?.code ?? "?"}</span>}
+      {t?.avatarUrl ? <img src={t.avatarUrl} alt="" className="w-full h-full object-cover" /> : t?.logoUrl ? <img src={t.logoUrl} alt="" className="w-[75%] h-[75%] object-contain" /> : <span className="text-xs font-bold text-slate-400">{t?.code ?? "?"}</span>}
+    </div>
+  );
+}
+
+function RoomIcon({ r, size }: { r: { kind: string; imageUrl: string | null } | null; size: number }) {
+  const league = r?.kind === "league";
+  return (
+    <div className={`shrink-0 rounded-full overflow-hidden flex items-center justify-center ${league ? "bg-blue-600/20" : "bg-emerald-600/20"}`} style={{ width: size, height: size, fontSize: size * 0.45 }}>
+      {r?.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : league ? "🏒" : "👥"}
     </div>
   );
 }
@@ -192,7 +202,7 @@ export default function ChatApp() {
             return (
               <button key={r.id} onClick={() => { setPendingDm(null); setActive(r.id); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-900 ${active === r.id ? "bg-slate-900" : ""}`}>
-                {r.kind === "league" ? <div className="w-12 h-12 shrink-0 rounded-full bg-blue-600/20 flex items-center justify-center text-xl">🏒</div> : r.kind === "group" ? <div className="w-12 h-12 shrink-0 rounded-full bg-emerald-600/20 flex items-center justify-center text-xl">👥</div> : <Logo t={other} size={48} />}
+                {r.kind === "dm" ? <Logo t={other} size={48} /> : <RoomIcon r={r} size={48} />}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="font-medium truncate flex-1">{roomTitle(r)}</span>
@@ -200,7 +210,7 @@ export default function ChatApp() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-sm truncate flex-1 ${r.unread ? "text-slate-200" : "text-slate-500"}`}>
-                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
+                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : !r.last.body && r.last.imageUrl ? `${lastMine ? "Ty: " : ""}${/\.gif/i.test(r.last.imageUrl) ? "GIF" : "📷 Fotka"}` : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
                     </span>
                     {r.unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-blue-600 text-[11px] font-bold flex items-center justify-center">{r.unread}</span>}
                   </div>
@@ -274,6 +284,11 @@ function Thread(props: {
 }) {
   const { boot, teamMap, room, dmTeamId, messages, reads, title, onBack, onSent, onGroupChanged } = props;
   const [info, setInfo] = useState(false);
+  const [tray, setTray] = useState<null | "emoji" | "gif">(null);
+  const [zoom, setZoom] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [reply, setReply] = useState<Msg | null>(null);
   const [menu, setMenu] = useState<Msg | null>(null);
@@ -293,19 +308,36 @@ function Thread(props: {
   const readBy = (m: Msg) => audience.filter((t) => (reads[t] ?? 0) >= m.id);
   const allRead = (m: Msg) => audience.length > 0 && readBy(m).length === audience.length;
 
-  async function send() {
-    const body = text.trim();
-    if (!body || sending) return;
+  async function send(imageUrl?: string) {
+    const body = imageUrl ? "" : text.trim();
+    if ((!body && !imageUrl) || sending) return;
     setSending(true); setError("");
     const r = await fetch("/api/im/send", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...(room ? { roomId: room.id } : { toTeamId: dmTeamId }), body, replyToId: reply?.id }),
+      body: JSON.stringify({ ...(room ? { roomId: room.id } : { toTeamId: dmTeamId }), body, imageUrl, replyToId: reply?.id }),
     });
     setSending(false);
     if (!r.ok) { setError(r.status === 403 ? "Nemáš oprávnenie písať." : "Nepodarilo sa odoslať."); return; }
     const j = await r.json();
-    setText(""); setReply(null);
+    if (!imageUrl) setText("");
+    setReply(null); setTray(null);
     onSent(j.roomId, j.message);
+  }
+
+  async function sendFile(f: File) {
+    setUploading(true); setError("");
+    const url = await uploadImage(await prepareImage(f, { max: 1600 }));
+    setUploading(false);
+    if (!url) { setError("Obrázok sa nepodarilo nahrať (PNG/JPG/WEBP/GIF, max 8 MB)."); return; }
+    await send(url);
+  }
+
+  function insertEmoji(e: string) {
+    const ta = taRef.current;
+    if (!ta) { setText((t) => t + e); return; }
+    const a = ta.selectionStart ?? text.length, b = ta.selectionEnd ?? text.length;
+    setText(text.slice(0, a) + e + text.slice(b));
+    requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(a + e.length, a + e.length); });
   }
 
   async function del(m: Msg) {
@@ -319,7 +351,7 @@ function Thread(props: {
       <header className="flex items-center gap-3 px-3 py-3 border-b border-slate-800">
         <button onClick={onBack} className="md:hidden w-10 h-10 text-2xl text-slate-300" aria-label="Späť">‹</button>
         <button onClick={() => isGroup && setInfo(true)} className={`flex items-center gap-3 min-w-0 flex-1 text-left ${isGroup ? "" : "cursor-default"}`}>
-          {isLeague ? <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center text-lg">🏒</div> : isGroup ? <div className="w-10 h-10 rounded-full bg-emerald-600/20 flex items-center justify-center text-lg">👥</div> : <Logo t={other} size={40} />}
+          {room && room.kind !== "dm" ? <RoomIcon r={room} size={40} /> : <Logo t={other} size={40} />}
           <div className="min-w-0"><div className="font-semibold truncate">{title}</div><div className="text-xs text-slate-500 truncate">{isLeague ? "Verejný kanál celej ligy" : isGroup ? `${room!.members.length} členov · ${room!.members.map((id) => teamMap.get(id)?.code).filter(Boolean).join(", ")}` : other?.gmNickname ?? "Súkromná konverzácia"}</div></div>
         </button>
       </header>
@@ -348,10 +380,14 @@ function Thread(props: {
                   {m.replyTo && !m.deleted && (
                     <div className="border-l-2 border-white/40 pl-2 mb-1 text-xs opacity-80">
                       <div className="font-semibold">{m.replyTo.fromTeamId === boot.me.id ? "Ty" : teamMap.get(m.replyTo.fromTeamId)?.code}</div>
-                      <div className="line-clamp-2">{m.replyTo.body || "🚫 odstránená"}</div>
+                      <div className="line-clamp-2">{m.replyTo.body || "📷"}</div>
                     </div>
                   )}
-                  <div className="whitespace-pre-wrap break-words text-[15px]">{m.deleted ? "🚫 Správa bola odstránená" : m.body}</div>
+                  {m.imageUrl && !m.deleted && (
+                    <img src={m.imageUrl} alt="" loading="lazy" onClick={(e) => { e.stopPropagation(); setZoom(m.imageUrl); }}
+                      className="rounded-xl max-h-72 max-w-full object-cover mb-1 cursor-zoom-in bg-slate-900/40" />
+                  )}
+                  {(m.deleted || m.body) && <div className={`whitespace-pre-wrap break-words ${!m.deleted && isBigEmoji(m.body) ? "text-5xl leading-tight" : "text-[15px]"}`}>{m.deleted ? "🚫 Správa bola odstránená" : m.body}</div>}
                   <div className="text-[10px] opacity-60 text-right mt-0.5">
                     {hm(m.at)}{mine && !isLeague && !m.deleted && <span className={allRead(m) ? "text-sky-300 opacity-100" : ""}> {allRead(m) ? "✓✓" : "✓"}</span>}
                   </div>
@@ -372,14 +408,25 @@ function Thread(props: {
         </div>
       )}
       {canWrite ? (
-        <div className="flex items-end gap-2 p-3 border-t border-slate-800 bg-slate-900">
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} placeholder="Správa"
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(pointer:fine)").matches) { e.preventDefault(); void send(); } }}
-            className="flex-1 resize-none max-h-32 rounded-2xl bg-slate-800 px-4 py-2.5 text-base outline-none" />
-          <button onClick={send} disabled={!text.trim() || sending} className="w-11 h-11 rounded-full bg-blue-600 disabled:opacity-40 text-lg" aria-label="Odoslať">➤</button>
+        <div className="border-t border-slate-800 bg-slate-900">
+          {uploading && <div className="px-4 pt-2 text-xs text-slate-400">Nahrávam obrázok…</div>}
+          <div className="flex items-end gap-1.5 p-3">
+            <button onClick={() => setTray(tray === "emoji" ? null : "emoji")} aria-label="Emoji" className={`w-10 h-11 text-2xl ${tray === "emoji" ? "text-blue-400" : "text-slate-400"}`}>☺︎</button>
+            <button onClick={() => fileRef.current?.click()} aria-label="Fotka" className="w-10 h-11 text-xl text-slate-400">🖼</button>
+            {boot.gif && <button onClick={() => setTray(tray === "gif" ? null : "gif")} aria-label="GIF" className={`h-11 px-1.5 text-xs font-bold ${tray === "gif" ? "text-blue-400" : "text-slate-400"}`}>GIF</button>}
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void sendFile(f); }} />
+            <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} placeholder="Správa" onFocus={() => setTray(null)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(pointer:fine)").matches) { e.preventDefault(); void send(); } }}
+              className="flex-1 min-w-0 resize-none max-h-32 rounded-2xl bg-slate-800 px-4 py-2.5 text-base outline-none" />
+            <button onClick={() => send()} disabled={!text.trim() || sending} className="w-11 h-11 rounded-full bg-blue-600 disabled:opacity-40 text-lg" aria-label="Odoslať">➤</button>
+          </div>
+          {tray === "emoji" && <div className="border-t border-slate-800"><EmojiPicker onPick={insertEmoji} /></div>}
+          {tray === "gif" && <div className="border-t border-slate-800 pt-3 max-h-[50vh] overflow-y-auto"><GifPicker onPick={(u) => void send(u)} /></div>}
         </div>
       ) : <div className="p-4 text-center text-sm text-amber-300 bg-slate-900 border-t border-slate-800">Komisár ti dočasne zakázal písať do ligového kanála.</div>}
 
+      {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
       {info && room && <GroupInfo boot={boot} teamMap={teamMap} room={room} onClose={() => setInfo(false)} onChanged={onGroupChanged} />}
       {menu && (
         <Sheet title="Správa" onClose={() => setMenu(null)}>
@@ -447,6 +494,9 @@ function Settings({ boot, teamMap, onClose, reload }: { boot: Boot; teamMap: Map
         {push === "off" && <button onClick={enablePush} className="rounded-lg bg-blue-600 px-4 py-2 text-sm">Zapnúť</button>}
         {push === "on" && <button onClick={disablePush} className="rounded-lg bg-slate-700 px-4 py-2 text-sm">Vypnúť</button>}
       </div>
+      <PictureRow label="Moja fotka v chate" hasImage={!!boot.me.avatarUrl}
+        preview={<Logo t={boot.me} size={44} />}
+        onSet={async (url) => { await fetch("/api/im/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ avatarUrl: url }) }); await reload(); }} />
       <div className={row}>
         <div className="flex-1 text-sm text-slate-400">Súkromné správy vidíte iba vy dvaja. Ani komisár ich nečíta.</div>
       </div>
@@ -457,6 +507,9 @@ function Settings({ boot, teamMap, onClose, reload }: { boot: Boot; teamMap: Map
             <div className="flex-1"><div>Chat zapnutý pre všetkých GM</div><div className="text-xs text-slate-500">Vypnutý = vidí ho len admin</div></div>
             <button onClick={() => adminPost({ action: "enable", enabled: !admin.enabled })} className={`rounded-lg px-4 py-2 text-sm ${admin.enabled ? "bg-green-600" : "bg-slate-700"}`}>{admin.enabled ? "ZAP" : "VYP"}</button>
           </div>
+          <PictureRow label="Obrázok ligového kanála" hasImage={!!boot.rooms.find((r) => r.kind === "league")?.imageUrl}
+            preview={<RoomIcon r={boot.rooms.find((r) => r.kind === "league") ?? { kind: "league", imageUrl: null }} size={44} />}
+            onSet={(url) => adminPost({ action: "leagueImage", image: url })} />
           <div className="px-5 py-2 text-xs text-slate-500">Umlčať GM v ligovom kanáli:</div>
           {boot.teams.filter((t) => t.id !== boot.me.id).map((t) => {
             const m = admin.mutes.find((x) => x.teamId === t.id);
@@ -528,6 +581,9 @@ function GroupInfo({ boot, teamMap, room, onClose, onChanged }: { boot: Boot; te
   return (
     <Sheet title="Skupina" onClose={onClose}>
       {owner ? (
+        <PictureRow label="Obrázok skupiny" hasImage={!!room.imageUrl} preview={<RoomIcon r={room} size={44} />} onSet={(url) => patch({ image: url })} />
+      ) : <div className="px-5 pt-4 flex justify-center"><RoomIcon r={room} size={72} /></div>}
+      {owner ? (
         <div className="px-5 py-3 flex gap-2">
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} className="flex-1 rounded-xl bg-slate-800 px-4 py-2.5 outline-none" />
           <button onClick={() => patch({ rename: name })} disabled={!name.trim() || name === room.name} className="rounded-xl bg-blue-600 disabled:opacity-40 px-4 text-sm">Uložiť</button>
@@ -552,5 +608,27 @@ function GroupInfo({ boot, teamMap, room, onClose, onChanged }: { boot: Boot; te
       ) : <button onClick={() => setAdding(true)} className="w-full text-left px-5 py-3 mt-1 hover:bg-slate-800 text-blue-400">＋ Pridať členov</button>)}
       <button onClick={() => { if (confirm("Naozaj opustiť skupinu?")) void patch({ leave: true }, true); }} className="w-full text-left px-5 py-3 mt-2 hover:bg-slate-800 text-red-400">Opustiť skupinu</button>
     </Sheet>
+  );
+}
+
+// Small "change picture" row: pick → crop square + shrink in the browser → upload → onSet(url | null)
+function PictureRow({ label, preview, hasImage, onSet }: { label: string; preview: React.ReactNode; hasImage: boolean; onSet: (url: string | null) => Promise<void> }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  async function pick(f: File) {
+    setBusy(true); setErr("");
+    const url = await uploadImage(await prepareImage(f, { max: 384, square: true }));
+    if (!url) setErr("Nahranie zlyhalo (PNG/JPG/WEBP/GIF, max 8 MB)"); else await onSet(url);
+    setBusy(false);
+  }
+  return (
+    <div className="px-5 py-3 flex items-center gap-3">
+      {preview}
+      <div className="flex-1 min-w-0"><div className="text-sm">{label}</div>{err && <div className="text-xs text-red-400">{err}</div>}</div>
+      <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void pick(f); }} />
+      <button onClick={() => ref.current?.click()} disabled={busy} className="rounded-lg bg-blue-600 disabled:opacity-50 px-3 py-1.5 text-xs">{busy ? "…" : "Zmeniť"}</button>
+      {hasImage && <button onClick={() => void onSet(null)} disabled={busy} className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs">Odstrániť</button>}
+    </div>
   );
 }
