@@ -430,6 +430,11 @@ function Thread(props: {
   const fileRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
   const [attach, setAttach] = useState(false);
+  const [pending, setPending] = useState<File | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  useEffect(() => { if (!pending || !pending.type.startsWith("image/")) { setPendingUrl(null); return; } const u = URL.createObjectURL(pending); setPendingUrl(u); return () => URL.revokeObjectURL(u); }, [pending]);
+  const DOC_EXT = /\.(pdf|docx?|xlsx?|pptx?|csv|txt|zip)$/i;
+  function takeFile(f: File | undefined | null) { if (f && (f.type.startsWith("image/") || DOC_EXT.test(f.name))) setPending(f); }
   const [pollNew, setPollNew] = useState(false);
   const [pins, setPins] = useState<Msg[]>([]);
   const [pinList, setPinList] = useState(false);
@@ -597,7 +602,7 @@ function Thread(props: {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 bg-slate-950">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 bg-slate-950" onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }} onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); takeFile(f); } }}>
         {missed && missed.n >= 8 && sum?.state !== "hidden" && (
           <div className="sticky top-0 z-[5] mb-2">
             {sum?.state === "done" ? (
@@ -634,8 +639,9 @@ function Thread(props: {
                 onTouchStart={(e) => { swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, id: m.id }; }}
                 onTouchEnd={(e) => { const s0 = swipe.current; swipe.current = null; if (!s0 || m.deleted) return; const dx = e.changedTouches[0].clientX - s0.x, dy = Math.abs(e.changedTouches[0].clientY - s0.y); if (dx > 70 && dy < 40) { setReply(m); setEditing(null); taRef.current?.focus(); } }}>
                 {multi && !mine && (showName ? <Logo t={t} size={28} /> : <div className="w-7 shrink-0" />)}
-                <button onClick={() => !m.deleted && setMenu(m)}
-                  className={`max-w-[80%] text-left rounded-2xl px-3 py-2 ${mine ? "bg-blue-600 text-white rounded-br-md" : "bg-slate-800 rounded-bl-md"} ${m.deleted ? "opacity-60 italic" : ""}`}>
+                <div role="button" tabIndex={0} onClick={() => { if (m.deleted || window.getSelection()?.toString()) return; setMenu(m); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget && !m.deleted) setMenu(m); }}
+                  className={`max-w-[80%] text-left select-text cursor-pointer rounded-2xl px-3 py-2 ${mine ? "bg-blue-600 text-white rounded-br-md" : "bg-slate-800 rounded-bl-md"} ${m.deleted ? "opacity-60 italic" : ""}`}>
                   {showName && <div className="text-[11px] font-semibold text-blue-300 mb-0.5">{t?.gmNickname ?? t?.code ?? "GM"} · {t?.code}</div>}
                   {m.replyTo && !m.deleted && (
                     <div onClick={(e) => { e.stopPropagation(); jumpTo(m.replyTo!.id); }} className="border-l-2 border-white/40 pl-2 mb-1 text-xs opacity-80 cursor-pointer">
@@ -673,7 +679,7 @@ function Thread(props: {
                   <div className="text-[10px] opacity-60 text-right mt-0.5">
                     {m.edited && !m.deleted && <span>upravené · </span>}{hm(m.at)}{mine && !isLeague && !m.deleted && <span className={allRead(m) ? "text-sky-300 opacity-100" : ""}> {allRead(m) ? "✓✓" : "✓"}</span>}
                   </div>
-                </button>
+                </div>
                 {!m.deleted && <button onClick={() => void react(m, "❤️")} aria-label="Páči sa mi" className={`shrink-0 w-7 h-7 rounded-full text-sm hover:bg-slate-800 opacity-40 group-hover:opacity-100 ${mine ? "order-first" : ""}`}>{m.reactions.some((rc) => rc.emoji === "❤️" && rc.teams.includes(boot.me.id)) ? "❤️" : "🤍"}</button>}
                 {!m.deleted && <button onClick={() => { setReply(m); setEditing(null); taRef.current?.focus(); }} aria-label="Odpovedať" className={`shrink-0 w-7 h-7 rounded-full text-sm text-slate-500 hover:text-white hover:bg-slate-800 opacity-40 group-hover:opacity-100 ${mine ? "order-first" : ""}`}>↩︎</button>}
               </div>
@@ -721,6 +727,7 @@ function Thread(props: {
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; e.target.accept = "image/png,image/jpeg,image/webp,image/gif"; if (f) void sendFile(f); }} />
             <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} placeholder="Správa" onFocus={() => setTray(null)}
+              onPaste={(e) => { const f = [...e.clipboardData.files][0]; if (f) { e.preventDefault(); takeFile(f); } }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(pointer:fine)").matches) { e.preventDefault(); void send(); } }}
               className="flex-1 min-w-0 resize-none max-h-32 rounded-2xl bg-slate-800 px-4 py-2.5 text-base outline-none" />
             {text.trim() || editing
@@ -733,6 +740,17 @@ function Thread(props: {
         </div>
       ) : <div className="p-4 text-center text-sm text-amber-300 bg-slate-900 border-t border-slate-800">Komisár ti dočasne zakázal písať do ligového kanála.</div>}
 
+      {pending && (
+        <Sheet title="Odoslať súbor?" onClose={() => setPending(null)}>
+          <div className="px-5 py-3">
+            {pendingUrl ? <img src={pendingUrl} alt="" className="max-h-72 w-full object-contain rounded-xl bg-slate-800" /> : <div className="flex items-center gap-3 rounded-xl bg-slate-800 px-4 py-3"><span className="text-3xl">{fileIcon(pending.name)}</span><span className="min-w-0 flex-1"><span className="block text-sm truncate">{pending.name}</span><span className="block text-xs text-slate-500">{fmtSize(pending.size)}</span></span></div>}
+          </div>
+          <div className="px-5 pb-2 flex gap-2">
+            <button onClick={() => setPending(null)} className="flex-1 rounded-xl bg-slate-800 py-3">Zrušiť</button>
+            <button onClick={() => { const f = pending; setPending(null); void (f.type.startsWith("image/") ? sendFile(f) : sendDoc(f)); }} className="flex-1 rounded-xl bg-blue-600 text-white py-3 font-medium">Odoslať</button>
+          </div>
+        </Sheet>
+      )}
       {attach && (
         <Sheet title="Pripojiť" onClose={() => setAttach(false)}>
           <button onClick={() => { setAttach(false); if (fileRef.current) fileRef.current.accept = "image/png,image/jpeg,image/webp,image/gif"; fileRef.current?.click(); }} className="w-full text-left px-5 py-3.5 hover:bg-slate-800 flex gap-3"><span>🖼</span>Fotka alebo GIF zo zariadenia</button>
