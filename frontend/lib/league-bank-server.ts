@@ -69,14 +69,17 @@ export async function playerFineToBank(teamId: number | null, amount: number, no
 type Counts = { F: number; D: number; G: number };
 /** Suspension state AS OF a game: `atGame` = players who sat out that very game but are no longer suspended now
  *  (the review after the sim already counted it toward their ban); `newlyIssued` = players banned by a ruling made
- *  AFTER that game (they played it — the ban only bites the next one). Without it the live `suspendedGames` is used. */
-export type SuspensionAsOf = { atGame: Set<number>; newlyIssued: Set<number> };
+ *  AFTER that game (they played it — the ban only bites the next one); `injuredToday` = players hurt in that very game
+ *  (they dressed for it — only players injured BEFORE it are out). Without it the live state is used. */
+export type SuspensionAsOf = { atGame: Set<number>; newlyIssued: Set<number>; injuredToday: Set<number> };
 
 async function sideCheck(teamId: number, rosterType: "NHL" | "AHL", asOf?: SuspensionAsOf): Promise<{ total: number; counts: Counts }> {
-  const rows = await prisma.player.findMany({ where: { teamId, rosterType }, select: { id: true, position: true, isGoalie: true, scratched: true, suspendedGames: true } });
+  const rows = await prisma.player.findMany({ where: { teamId, rosterType }, select: { id: true, position: true, isGoalie: true, scratched: true, suspendedGames: true, injuryDaysLeft: true } });
   const counts: Counts = { F: 0, D: 0, G: 0 };
-  // a suspended player neither dresses nor counts toward the roster limit
-  const eligible = rows.filter((p) => !((p.suspendedGames > 0 && !asOf?.newlyIssued.has(p.id)) || asOf?.atGame.has(p.id)));
+  // a suspended player neither dresses nor counts toward the roster limit; neither does an injured one
+  // (a player hurt in TODAY's game did dress for it — only an injury from before the game keeps him out)
+  const eligible = rows.filter((p) => !((p.suspendedGames > 0 && !asOf?.newlyIssued.has(p.id)) || asOf?.atGame.has(p.id)
+    || (p.injuryDaysLeft > 0 && !asOf?.injuredToday.has(p.id))));
   for (const p of eligible) if (!p.scratched) counts[posGroup(p.position, p.isGoalie)]++;
   return { total: eligible.length, counts };
 }
@@ -170,6 +173,8 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
     where: { kind: "SUSPENSION", OR: [{ status: "ACTIVE" }, { lastServedAt: { gte: dayStart, lt: dayEnd } }] },
     select: { playerId: true, teamId: true, status: true, createdAt: true, lastServedAt: true },
   });
+  // players injured in today's game(s) — Player.injuredAt is the game date
+  const hurtToday = new Set((await prisma.player.findMany({ where: { injuredAt: { gte: dayStart, lt: dayEnd } }, select: { id: true } })).map((p) => p.id));
   const asOfFor = (clubId: number): SuspensionAsOf => {
     const cut = gameAt.get(clubId);
     const atGame = new Set<number>(), newlyIssued = new Set<number>(), activeBefore = new Set<number>();
@@ -181,7 +186,7 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
       if (!before && s.status === "ACTIVE") newlyIssued.add(s.playerId);
     }
     for (const id of activeBefore) newlyIssued.delete(id); // also serving an older ban → still out
-    return { atGame, newlyIssued };
+    return { atGame, newlyIssued, injuredToday: hurtToday };
   };
   const ahlParentsPlayed = new Set<number>();
   if (ahlTeamsPlayed.size) {

@@ -25,7 +25,7 @@ export type RosterComplianceResult =
 
 const countDressed = async (teamId: number, rosterType: "NHL" | "AHL"): Promise<SideCounts> => {
   const dressed = await prisma.player.findMany({
-    where: { teamId, rosterType, scratched: false, suspendedGames: 0 }, // a suspended player can't dress — he isn't counted
+    where: { teamId, rosterType, scratched: false, suspendedGames: 0, injuryDaysLeft: { lte: 0 } }, // a suspended or injured player can't dress — he isn't counted
     select: { position: true, isGoalie: true },
   });
   const counts: SideCounts = { F: 0, D: 0, G: 0 };
