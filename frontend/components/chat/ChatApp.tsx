@@ -461,7 +461,7 @@ function Thread(props: {
             <button onClick={() => send()} disabled={!text.trim() || sending} className="w-11 h-11 rounded-full bg-blue-600 disabled:opacity-40 text-lg" aria-label="Odoslať">➤</button>
           </div>
           {tray === "emoji" && <div className="border-t border-slate-800"><EmojiPicker onPick={insertEmoji} /></div>}
-          {tray === "gif" && <div className="border-t border-slate-800 pt-3 max-h-[50vh] overflow-y-auto"><GifPicker search={boot.gif} roomId={room?.id ?? null} onPick={(u) => void send(u)} onUpload={() => { if (fileRef.current) { fileRef.current.accept = "image/gif"; fileRef.current.click(); } }} /></div>}
+          {tray === "gif" && <div className="border-t border-slate-800 pt-2 max-h-[240px] overflow-y-auto"><GifPicker search={boot.gif} roomId={room?.id ?? null} onPick={(u) => void send(u)} onUpload={() => { if (fileRef.current) { fileRef.current.accept = "image/gif"; fileRef.current.click(); } }} /></div>}
         </div>
       ) : <div className="p-4 text-center text-sm text-amber-300 bg-slate-900 border-t border-slate-800">Komisár ti dočasne zakázal písať do ligového kanála.</div>}
 

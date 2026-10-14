@@ -45,7 +45,7 @@ export function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
     })();
     return () => { alive = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  return <div ref={host} className="w-full [&_em-emoji-picker]:w-full [&_em-emoji-picker]:max-w-none [&_em-emoji-picker]:h-[380px]" />;
+  return <div ref={host} className="w-full [&_em-emoji-picker]:w-full [&_em-emoji-picker]:max-w-none [&_em-emoji-picker]:h-[290px]" />;
 }
 
 type Gif = { id: string; preview: string; url: string };
@@ -72,7 +72,7 @@ export function GifPicker({ onPick, search, roomId, onUpload }: { onPick: (url: 
         <button onClick={onUpload} className="w-full rounded-xl bg-blue-600 hover:bg-blue-500 py-2.5 text-sm font-medium mb-3">⬆︎ Nahrať GIF zo zariadenia</button>
         {own == null && <p className="text-center text-slate-500 text-sm py-4">Načítavam…</p>}
         {own && own.length > 0 && <div className="text-xs text-slate-500 mb-2">GIFy z tohto chatu — ťukni a pošli znova</div>}
-        <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+        <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-1">
           {own?.map((u) => <button key={u} onClick={() => onPick(u)} className="aspect-square overflow-hidden rounded-lg bg-slate-800"><img src={u} alt="" loading="lazy" className="w-full h-full object-cover" /></button>)}
         </div>
         {own?.length === 0 && <p className="text-center text-slate-500 text-xs py-3">Vyhľadávanie GIFov (GIPHY) sa zapne po nastavení kľúča na serveri. Zatiaľ môžeš nahrať vlastný GIF.</p>}
@@ -81,10 +81,10 @@ export function GifPicker({ onPick, search, roomId, onUpload }: { onPick: (url: 
   }
   return (
     <div className="px-4 pb-2">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Hľadať GIF (napr. gól, party)" className="w-full rounded-xl bg-slate-800 px-4 py-2.5 text-base outline-none mb-3" />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Hľadať GIF (napr. gól, party)" className="w-full rounded-xl bg-slate-800 px-4 py-2 text-base outline-none mb-2" />
       {gifs == null && <p className="text-center text-slate-500 text-sm py-6">Načítavam…</p>}
       {gifs?.length === 0 && <p className="text-center text-slate-500 text-sm py-6">Nič sa nenašlo</p>}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1">
         {gifs?.map((g) => <button key={g.id} onClick={() => onPick(g.url)} className="aspect-square overflow-hidden rounded-lg bg-slate-800"><img src={g.preview} alt="" loading="lazy" className="w-full h-full object-cover" /></button>)}
       </div>
       <p className="text-[10px] text-slate-600 text-right mt-2">Powered by GIPHY</p>
