@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { MAX_LEN, canAccessRoom, dmRoomId, isAttachableImage, isMuted, isOwnFile, isOwnVoice, pushToTeams, wire, type WireMessage } from "./server";
+import { MAX_LEN, muteActive, canAccessRoom, dmRoomId, isAttachableImage, isMuted, isOwnFile, isOwnVoice, pushToTeams, wire, type WireMessage } from "./server";
 
 export type PostInput = {
   roomId?: number; toTeamId?: number; body?: string; replyToId?: number; imageUrl?: string | null;
@@ -61,7 +61,7 @@ export async function postMessage(me: number, b: PostInput): Promise<PostResult>
     title = `# ${room?.name || "League"} · ${who}`;
     targets = (await prisma.imPushSub.findMany({ where: { teamId: { not: me } }, select: { teamId: true }, distinct: ["teamId"] })).map((s) => s.teamId);
   }
-  const mutedSet = new Set((await prisma.imRead.findMany({ where: { roomId, muted: true, teamId: { in: targets } }, select: { teamId: true } })).map((r) => r.teamId));
+  const mutedSet = new Set((await prisma.imRead.findMany({ where: { roomId, muted: true, teamId: { in: targets } }, select: { teamId: true, muted: true, mutedUntil: true } })).filter(muteActive).map((r) => r.teamId));
   targets = targets.filter((t) => !mutedSet.has(t));
   const preview = voice ? "🎤 Hlasová správa" : poll ? `📊 ${poll.question}` : file && !body ? `📎 ${file.name}` : body ? body.slice(0, 140) : /\.gif|giphy/i.test(imageUrl ?? "") ? "GIF" : "📷 Fotka";
   void pushToTeams(targets, { title, body: preview, url: "/chat", tag: `room-${roomId}` }).catch(() => {});

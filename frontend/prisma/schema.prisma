@@ -2239,6 +2239,7 @@ model ImRead {
   teamId     Int
   lastReadId Int     @default(0)
   muted      Boolean @default(false) // notifications off for this chat (no push)
+  mutedUntil DateTime? // null with muted=true → muted forever; a future date → timed mute
   clearedId  Int     @default(0) // "delete conversation" for me: messages up to this id are hidden from me only
   room       ImRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
 

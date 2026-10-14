@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession } from "@/lib/auth";
-import { canAccessRoom, chatEnabled } from "@/lib/im/server";
+import { canAccessRoom, chatEnabled, muteActive } from "@/lib/im/server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const roomId = Number(sp.get("roomId"));
   if (!me || !roomId || !(await chatEnabled()) || !(await canAccessRoom(me, roomId))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  const rd = await prisma.imRead.findUnique({ where: { roomId_teamId: { roomId, teamId: me } }, select: { clearedId: true, muted: true } });
+  const rd = await prisma.imRead.findUnique({ where: { roomId_teamId: { roomId, teamId: me } }, select: { clearedId: true, muted: true, mutedUntil: true } });
   const after = rd?.clearedId ?? 0;
   const rows = await prisma.imMessage.findMany({
     where: { roomId, id: { gt: after }, deletedAt: null, kind: { not: "system" }, OR: [{ imageUrl: { not: null } }, { fileUrl: { not: null } }, { body: { contains: "http" } }] },
@@ -30,5 +30,5 @@ export async function GET(req: Request) {
   if (list === "media") return NextResponse.json({ items: media.slice(0, 300) });
   if (list === "gif") return NextResponse.json({ items: gifs.slice(0, 300) });
   if (list === "links") return NextResponse.json({ items: links.slice(0, 300) });
-  return NextResponse.json({ muted: !!rd?.muted, counts: { media: media.length, gif: gifs.length, links: links.length, files: files.length }, preview: media.slice(0, 12) });
+  return NextResponse.json({ muted: muteActive(rd), mutedUntil: muteActive(rd) ? rd!.mutedUntil?.toISOString() ?? null : null, counts: { media: media.length, gif: gifs.length, links: links.length, files: files.length }, preview: media.slice(0, 12) });
 }

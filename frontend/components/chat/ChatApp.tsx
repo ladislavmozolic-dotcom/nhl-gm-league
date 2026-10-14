@@ -9,7 +9,10 @@ type TeamLite = { id: number; code: string | null; name: string; logoUrl: string
 type Poll = { id: number; question: string; multi: boolean; closed: boolean; options: { id: number; text: string; voters: number[] }[] };
 type FileAtt = { url: string; name: string; size: number };
 type Msg = { kind: string; voice: { url: string; secs: number } | null; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
-type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
+type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; mutedUntil: string | null; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
+const roomMuted = (r?: { muted: boolean; mutedUntil: string | null } | null) => !!r?.muted && (!r.mutedUntil || new Date(r.mutedUntil) > new Date());
+const muteLabel = (until: string | null) => (!until ? "Navždy" : `do ${new Date(until).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`);
+const MUTE_OPTIONS: { label: string; hours: number | null }[] = [{ label: "1 hodinu", hours: 1 }, { label: "8 hodín", hours: 8 }, { label: "1 deň", hours: 24 }, { label: "1 týždeň", hours: 168 }, { label: "Navždy", hours: null }];
 type Boot = { me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null; gif: boolean };
 
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" });
@@ -139,7 +142,7 @@ export default function ChatApp() {
         // live alert for messages from others: sound + in-app banner (not for muted chats / own / system lines)
         const b0 = bootRef.current;
         if (b0 && document.visibilityState === "visible") {
-          const incoming = list.filter((m) => m.kind !== "system" && m.fromTeamId !== b0.me.id && !(b0.rooms.find((r) => r.id === m.roomId)?.muted));
+          const incoming = list.filter((m) => m.kind !== "system" && m.fromTeamId !== b0.me.id && !roomMuted(b0.rooms.find((r) => r.id === m.roomId)));
           const m = incoming[incoming.length - 1];
           if (m) {
             const pr = prefsRef.current;
@@ -275,7 +278,8 @@ export default function ChatApp() {
                     <span className={`text-sm truncate flex-1 ${r.unread ? "text-slate-200" : "text-slate-500"}`}>
                       {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : r.last.voice ? `${lastMine ? "Ty: " : ""}🎤 Hlasová správa` : r.last.poll ? `${lastMine ? "Ty: " : ""}📊 ${r.last.poll.question}` : !r.last.body && r.last.file ? `${lastMine ? "Ty: " : ""}📎 ${r.last.file.name}` : !r.last.body && r.last.imageUrl ? `${lastMine ? "Ty: " : ""}${/\.gif|giphy/i.test(r.last.imageUrl) ? "GIF" : "📷 Fotka"}` : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
                     </span>
-                    {r.unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-blue-600 text-[11px] font-bold flex items-center justify-center">{r.unread}</span>}
+                    {roomMuted(r) && <span className="text-xs text-slate-500" title="Stlmené">🔕</span>}
+                    {r.unread > 0 && <span className={`min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${roomMuted(r) ? "bg-slate-600" : "bg-blue-600"}`}>{r.unread}</span>}
                   </div>
                 </div>
               </button>
@@ -875,7 +879,7 @@ function PictureRow({ label, preview, hasImage, onSet }: { label: string; previe
 }
 
 type MediaItem = { id: number; url: string; at: string; from: number; name?: string; size?: number };
-type InfoData = { muted: boolean; counts: { media: number; gif: number; links: number; files?: number }; preview: MediaItem[] };
+type InfoData = { muted: boolean; mutedUntil: string | null; counts: { media: number; gif: number; links: number; files?: number }; preview: MediaItem[] };
 
 // Viber-style chat info: hero picture + name, shared media / GIFs / links, participants, mute, leave/delete.
 function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }: {
@@ -925,9 +929,12 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
     if ("error" in up) setErr(up.error); else await setPicture(up.url);
     setBusy(false);
   }
-  async function mute(v: boolean) {
-    setInfo((x) => x && { ...x, muted: v });
-    await fetch("/api/im/mute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomId: room.id, muted: v }) });
+  const [muteSheet, setMuteSheet] = useState(false);
+  async function mute(v: boolean, hours: number | null = null) {
+    setMuteSheet(false);
+    const until = v && hours ? new Date(Date.now() + hours * 3600_000).toISOString() : null;
+    setInfo((x) => x && { ...x, muted: v, mutedUntil: until });
+    await fetch("/api/im/mute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomId: room.id, muted: v, hours }) });
     await onChanged(false);
   }
   async function clearChat() {
@@ -1035,10 +1042,17 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
             ))}
 
             {/* mute */}
-            <div className="mt-3 px-5 py-4 border-y border-slate-800 flex items-center gap-3">
-              <div className="flex-1"><div className="text-slate-200">Stlmiť chat</div><div className="text-xs text-slate-500">Žiadne notifikácie z tohto chatu</div></div>
-              <button onClick={() => mute(!info?.muted)} aria-pressed={!!info?.muted} className={`w-12 h-7 rounded-full p-0.5 transition-colors ${info?.muted ? "bg-blue-600" : "bg-slate-700"}`}><span className={`block w-6 h-6 rounded-full bg-white transition-transform ${info?.muted ? "translate-x-5" : ""}`} /></button>
-            </div>
+            <button onClick={() => setMuteSheet(true)} className="mt-3 w-full px-5 py-4 border-y border-slate-800 flex items-center gap-3 text-left hover:bg-slate-900">
+              <div className="flex-1"><div className="text-slate-200">{info?.muted ? "🔕 Stlmené" : "Stlmiť chat"}</div><div className="text-xs text-slate-500">{info?.muted ? `Notifikácie vypnuté ${muteLabel(info.mutedUntil)}. Ťukni pre zmenu.` : "Vypni notifikácie z tohto chatu na hodinu, deň alebo navždy"}</div></div>
+              <span className="text-slate-500">›</span>
+            </button>
+            {muteSheet && (
+              <Sheet title="Stlmiť chat" onClose={() => setMuteSheet(false)}>
+                <p className="px-5 pt-1 pb-2 text-xs text-slate-500">Správy sa ďalej ukladajú a počítajú, ale bez zvuku, bannera a push notifikácie.</p>
+                {MUTE_OPTIONS.map((o) => <button key={o.label} onClick={() => void mute(true, o.hours)} className="w-full text-left px-5 py-3.5 hover:bg-slate-800">{o.hours ? `Na ${o.label}` : "Navždy"}</button>)}
+                {info?.muted && <button onClick={() => void mute(false)} className="w-full text-left px-5 py-3.5 hover:bg-slate-800 text-blue-400">🔔 Zrušiť stlmenie</button>}
+              </Sheet>
+            )}
 
             {isGroup && <button onClick={() => { if (confirm("Naozaj opustiť skupinu?")) void patch({ leave: true }, true); }} className={`${row} text-red-400`}>Opustiť skupinu</button>}
             {!isLeague && <button onClick={clearChat} className={`${row} text-red-400`}>🗑 {isGroup ? "Vymazať históriu (len u mňa)" : "Vymazať konverzáciu (len u mňa)"}</button>}

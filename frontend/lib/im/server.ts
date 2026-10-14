@@ -137,5 +137,7 @@ export async function leaveGroup(roomId: number, teamId: number) {
 
 const FILE_RE = /^\/uploads\/chat\/files\/[a-f0-9]{16}\.(pdf|docx?|xlsx?|pptx?|csv|txt|zip)$/;
 const VOICE_RE = /^\/uploads\/chat\/voice\/[a-f0-9]{16}\.wav$/;
+/** Is a chat currently muted for this member? (timed mutes expire on their own) */
+export const muteActive = (r: { muted: boolean; mutedUntil: Date | null } | null | undefined) => !!r?.muted && (!r.mutedUntil || r.mutedUntil > new Date());
 export const isOwnVoice = (u: unknown): u is string => typeof u === "string" && VOICE_RE.test(u);
 export const isOwnFile = (u: unknown): u is string => typeof u === "string" && FILE_RE.test(u);
