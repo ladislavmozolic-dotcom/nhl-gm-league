@@ -226,3 +226,19 @@ test("V3 power plays end with a recap (length, shots, goals); V2 keeps the plain
   }
   assert.ok(ends > 30, `enough power plays to check (${ends})`);
 });
+
+test("V3 a player doesn't throw two in-play hits within a few seconds", () => {
+  let hits = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const r = run(seed, ENGINE_V3);
+    const last = new Map<number, number>();
+    for (const e of (r.events ?? []).filter((x) => x.type === "HIT").sort((a, b) => (a.period - b.period) || (a.seconds - b.seconds) || (a.seq - b.seq))) {
+      const t = (e.period - 1) * 1200 + e.seconds;
+      const prev = last.get(e.playerId!);
+      // (a hit that hurts somebody is created by the injury roll itself, not the in-play dice, so only count ordinary neighbours)
+      if (prev != null && !(r.events ?? []).some((i) => (i.type === "INJURY" || i.type === "KNOCK") && i.period === e.period && i.seconds === e.seconds && i.playerId === e.targetId)) assert.ok(t - prev >= 6 || t === prev, `${e.playerName} hit again after ${t - prev}s`);
+      last.set(e.playerId!, t); hits++;
+    }
+  }
+  assert.ok(hits > 500, `plenty of hits checked (${hits})`);
+});

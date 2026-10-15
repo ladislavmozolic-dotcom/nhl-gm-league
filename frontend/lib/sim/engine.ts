@@ -1869,6 +1869,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
   const delayedSeen = new Set<Penalty>();
   // V3: a foul is called ON somebody — when a pre-rolled penalty starts, name the opposing player it was committed against
   const lastCarrierOf: Record<number, SimSkater> = {};
+  const lastHitAt: Record<number, number> = {}; // V3: a player doesn't throw two hits in the same few seconds
   const victimNamed = new Set<Penalty>();
   const FOUL_ON = new Set(["Tripping", "Hooking", "Slashing", "Holding", "Interference", "Cross-checking", "Roughing", "High-sticking", "Boarding", "Elbowing"]);
   const regulation = period <= 3;
@@ -2359,9 +2360,10 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     const dman = pickByAttr(rng, dPool, (s) => s.attrs.df ?? 50) ?? dPool[0] ?? carrier;
     // V3: a hit is thrown in the play — by a defender on the man with the puck, at this very second
     if (hitMean && rng.chance(hitMean[def.id] / HIT_DEF_TICKS)) {
-      const hp = onIceD(def).concat(onIceF(def));
+      const hp = onIceD(def).concat(onIceF(def)).filter((x) => tick - (lastHitAt[x.id] ?? -99) >= 6);
       const hitter = hp.length ? hp[rng.weighted(hp.map((x) => x.hitting * x.iceTime * physFactor(x.weight)))] : null;
       if (hitter) {
+        lastHitAt[hitter.id] = tick;
         st.lines[def.id][hitter.id].hits++; st.box[def.id].hits++;
         st.lastHit = { hitterId: hitter.id, hitterTeamId: def.id, targetId: carrier.id, targetName: carrier.name, absT: base + tick };
         st.sink.emit({ period, seconds: tick, type: "HIT", teamId: def.id, teamCode: def.code ?? undefined, playerId: hitter.id, playerName: hitter.name, targetId: carrier.id, targetName: carrier.name, zone: "OFF", sector: pickZone(rng, HIT_ZONES), importance: "NOTABLE" });
