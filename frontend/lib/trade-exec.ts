@@ -4,6 +4,7 @@
 // can call the SAME validated executor. Nothing here is a server action, so none of
 // it is remotely invokable by a client — the auth checks stay in the action layer.
 
+import { postTradeToChat, postTradeGroupToChat } from "@/lib/im/trade-post";
 import { assertTradeWindowOpen } from "./trade-deadline";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -449,6 +450,7 @@ export async function executeAcceptedTrade(tradeId: number) {
     data: { type: "TRADE", tradeId, message: `${fromTeam.name} traded ${fromNames.join(", ") || "future considerations"} to ${toTeam.name} for ${toNames.join(", ") || "future considerations"}.` },
   }));
   await prisma.$transaction(ops);
+  void postTradeToChat(tradeId); // announce the executed trade in the chat (no-op unless the commissioner chose a trade chat)
   // a structured conditional-pick clause was captured at proposal time
   // (createTradeRecord) but its two candidate picks only lock now, once the
   // deal has actually gone through and pickA has really moved to the
@@ -574,5 +576,6 @@ export async function executeTradeGroup(groupId: number) {
   allOps.push(prisma.tradeGroup.update({ where: { id: groupId }, data: { status: "ACCEPTED", respondedAt: new Date() } }));
   allOps.push(prisma.transaction.create({ data: { type: "TRADE", message: `3-team trade (${teams.map((t) => t.name).join(", ")}): ${legSummaries.join("; ")}.` } }));
   await prisma.$transaction(allOps);
+  void postTradeGroupToChat(groupId);
   return { teamNames: teams.map((t) => t.name), nameOf };
 }

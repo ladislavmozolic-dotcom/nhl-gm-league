@@ -3,7 +3,7 @@
 import InstallBanner from "./InstallBanner";
 import { PushBanner, usePush, type PushApi } from "./push";
 import { DEFAULT_PREFS, SOUNDS, loadPrefs, playSound, savePrefs, unlockAudio, type Prefs, type SoundId, type Theme } from "./sound";
-import { EmojiPicker, GifPicker, Lightbox, VOICE_MAX_SECS, emoticonize, VoicePlayer, fileIcon, fmtSecs, fmtSize, isBigEmoji, prepareImage, startRecording, uploadFile, uploadImage, uploadVoice, type Recorder } from "./media";
+import { EmojiPicker, GifPicker, Lightbox, VOICE_MAX_SECS, emoticonize, linkify, VoicePlayer, fileIcon, fmtSecs, fmtSize, isBigEmoji, prepareImage, startRecording, uploadFile, uploadImage, uploadVoice, type Recorder } from "./media";
 import { useLayoutEffect, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null; avatarUrl: string | null };
@@ -338,7 +338,7 @@ export default function ChatApp() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-sm truncate flex-1 ${r.unread ? "text-slate-200" : "text-slate-500"}`}>
-                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : r.last.voice ? `${lastMine ? "Ty: " : ""}🎤 Hlasová správa` : r.last.poll ? `${lastMine ? "Ty: " : ""}📊 ${r.last.poll.question}` : !r.last.body && r.last.file ? `${lastMine ? "Ty: " : ""}📎 ${r.last.file.name}` : !r.last.body && r.last.imageUrl ? `${lastMine ? "Ty: " : ""}${/\.gif|giphy/i.test(r.last.imageUrl) ? "GIF" : "📷 Fotka"}` : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
+                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : r.last.voice ? `${lastMine ? "Ty: " : ""}🎤 Hlasová správa` : r.last.poll ? `${lastMine ? "Ty: " : ""}📊 ${r.last.poll.question}` : !r.last.body && r.last.file ? `${lastMine ? "Ty: " : ""}📎 ${r.last.file.name}` : !r.last.body && r.last.imageUrl ? `${lastMine ? "Ty: " : ""}${/\.gif|giphy/i.test(r.last.imageUrl) ? "GIF" : "📷 Fotka"}` : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" && r.last.kind !== "trade" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
                     </span>
                     {roomMuted(r) && <span className="text-xs text-slate-500" title="Stlmené">🔕</span>}
                     {r.unread > 0 && <span className={`min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${roomMuted(r) ? "bg-slate-600" : "bg-blue-600"}`}>{r.unread}</span>}
@@ -656,7 +656,24 @@ function Thread(props: {
           return (
             <div key={m.id}>
               {showDay && <div className="text-center my-3"><span className="text-[11px] text-slate-400 bg-slate-800/70 rounded-full px-3 py-1">{day}</span></div>}
-              {m.kind === "system" ? (
+              {m.kind === "trade" ? (
+                <div id={`msg-${m.id}`} onDoubleClick={() => { window.getSelection()?.removeAllRanges(); setMenu(m); }} onContextMenu={(e) => { e.preventDefault(); setMenu(m); }}
+                  onClick={() => { if (!window.getSelection()?.toString() && window.matchMedia("(pointer: coarse)").matches) setMenu(m); }}
+                  className={`my-3 mx-auto w-full sm:w-[480px] max-w-full select-text cursor-pointer rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 transition-colors duration-500 ${flash === m.id ? "ring-2 ring-blue-500" : ""}`}>
+                  <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{linkify(m.body)}</div>
+                  {m.reactions.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {m.reactions.map((rc) => (
+                        <span key={rc.emoji} onClick={(e) => { e.stopPropagation(); void react(m, rc.emoji); }} title={rc.teams.map((id) => teamMap.get(id)?.code).filter(Boolean).join(", ")}
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs cursor-pointer ${rc.teams.includes(boot.me.id) ? "bg-amber-500/30 ring-1 ring-amber-400" : "bg-black/20"}`}>
+                          <span className="text-sm leading-none">{rc.emoji}</span>{rc.teams.length > 1 && <span className="opacity-80">{rc.teams.length}</span>}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-[10px] opacity-60 text-right mt-1">{hm(m.at)}</div>
+                </div>
+              ) : m.kind === "system" ? (
                 <div className="text-center my-2"><span className="text-[11px] text-slate-400 bg-slate-800/60 rounded-full px-3 py-1 inline-block max-w-[90%]">{m.body}</span></div>
               ) : (
               <div id={`msg-${m.id}`} className={`group flex gap-2 items-center rounded-xl transition-colors duration-500 ${flash === m.id ? "bg-blue-500/20" : ""} ${mine ? "justify-end" : "justify-start"}`}
@@ -688,7 +705,7 @@ function Thread(props: {
                     </a>
                   )}
                   {m.poll && !m.deleted && <PollCard m={m} me={boot.me.id} teamMap={teamMap} onVote={(oid) => void vote(m, oid)} onClose={() => void closePoll(m)} />}
-                  {(m.deleted || (m.body && !m.poll)) && <div className={`whitespace-pre-wrap break-words ${!m.deleted && isBigEmoji(emoticonize(m.body)) ? "text-5xl leading-tight" : "text-[15px]"}`}>{m.deleted ? "🚫 Správa bola odstránená" : emoticonize(m.body)}</div>}
+                  {(m.deleted || (m.body && !m.poll)) && <div className={`whitespace-pre-wrap break-words ${!m.deleted && isBigEmoji(emoticonize(m.body)) ? "text-5xl leading-tight" : "text-[15px]"}`}>{m.deleted ? "🚫 Správa bola odstránená" : linkify(emoticonize(m.body))}</div>}
                   {m.reactions.length > 0 && !m.deleted && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {m.reactions.map((rc) => {
@@ -862,7 +879,8 @@ function Thread(props: {
 function Settings({ boot, teamMap, onClose, reload, prefs, setPrefs, pushApi }: { boot: Boot; teamMap: Map<number, TeamLite>; onClose: () => void; reload: () => Promise<void>; prefs: Prefs; setPrefs: (p: Prefs) => void; pushApi: PushApi }) {
   const push = pushApi.state;
   const [testMsg, setTestMsg] = useState("");
-  const [admin, setAdmin] = useState<{ enabled: boolean; mutes: { teamId: number; until: string | null }[] } | null>(null);
+  const [admin, setAdmin] = useState<{ enabled: boolean; mutes: { teamId: number; until: string | null }[]; tradeRoomId: number | null; groups: { id: number; name: string | null }[] } | null>(null);
+  const [tradeMsg, setTradeMsg] = useState("");
   const loadAdmin = useCallback(async () => { if (boot.admin) { const r = await fetch("/api/im/admin"); if (r.ok) setAdmin(await r.json()); } }, [boot.admin]);
 
   useEffect(() => {
@@ -935,6 +953,18 @@ function Settings({ boot, teamMap, onClose, reload, prefs, setPrefs, pushApi }: 
           <PictureRow label="Obrázok ligového kanála" hasImage={!!boot.rooms.find((r) => r.kind === "league")?.imageUrl}
             preview={<RoomIcon r={boot.rooms.find((r) => r.kind === "league") ?? { kind: "league", imageUrl: null }} size={44} />}
             onSet={(url) => adminPost({ action: "leagueImage", image: url })} />
+          <div className="px-5 pt-3 pb-1 text-xs uppercase tracking-wide text-slate-500">Obchody → chat</div>
+          <div className="px-5 pb-2 text-xs text-slate-500">Po schválení obchodu oboma GM (pri nováčikoch aj komisiou) sa sem pošle jedna karta: kto za koho, hráči, picky, hotovosť, podmienky.</div>
+          <div className="px-5 pb-2 flex gap-2">
+            <select value={admin.tradeRoomId ?? ""} onChange={(e) => adminPost({ action: "tradeRoom", roomId: e.target.value ? Number(e.target.value) : null })} className="flex-1 min-w-0 rounded-xl bg-slate-800 px-3 py-2.5 text-sm outline-none">
+              <option value="">Vypnuté</option>
+              {boot.rooms.filter((r) => r.kind === "league").map((r) => <option key={r.id} value={r.id}>{r.name || "# Liga"} (ligový kanál)</option>)}
+              {admin.groups.map((g) => <option key={g.id} value={g.id}>{g.name ?? "Skupina"}</option>)}
+            </select>
+            <button disabled={!admin.tradeRoomId} onClick={async () => { const r = await fetch("/api/im/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "tradeTest" }) }); setTradeMsg(r.ok ? "Skúšobná karta poslaná." : "Nepodarilo sa."); }} className="rounded-xl bg-slate-700 disabled:opacity-40 px-3 text-sm whitespace-nowrap">Skúška</button>
+          </div>
+          {tradeMsg && <p className="px-5 pb-2 text-xs text-slate-400">{tradeMsg}</p>}
+          {admin.groups.length === 0 && <p className="px-5 pb-2 text-[11px] text-slate-600">Skupinu (napr. „Trade komisia“) vytvor cez ＋ → Nová skupina a pridaj do nej členov komisie — potom ju tu vyberieš.</p>}
           <div className="px-5 py-2 text-xs text-slate-500">Umlčať GM v ligovom kanáli:</div>
           {boot.teams.filter((t) => t.id !== boot.me.id).map((t) => {
             const m = admin.mutes.find((x) => x.teamId === t.id);

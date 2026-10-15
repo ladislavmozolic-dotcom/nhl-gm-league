@@ -215,3 +215,12 @@ const EMOTICONS: Record<string, string> = {
 const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const EMOTICON_RE = new RegExp(`(^|\\s)(${Object.keys(EMOTICONS).sort((a, b) => b.length - a.length).map(esc).join("|")})(?=$|\\s|[.,!?)])`, "g");
 export const emoticonize = (s: string) => s.replace(EMOTICON_RE, (_m, pre: string, e: string) => pre + EMOTICONS[e]);
+
+// Clickable links inside message text (http/https only; opens in a new tab).
+export function linkify(text: string): React.ReactNode[] {
+  return text.split(/(https?:\/\/[^\s<>"']+)/g).map((part, i) =>
+    /^https?:\/\//.test(part)
+      ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="underline underline-offset-2 break-all">{part}</a>
+      : part,
+  );
+}

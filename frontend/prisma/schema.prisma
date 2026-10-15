@@ -2147,6 +2147,7 @@ model LiveRound {
 model ImSettings {
   id        Int      @id @default(1)
   enabled   Boolean  @default(false) // master switch — chat is invisible until the commissioner turns it on
+  tradeRoomId Int? // chat (group or league channel) that receives an automatic card for every executed trade
   updatedAt DateTime @updatedAt
 }
 

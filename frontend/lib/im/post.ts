@@ -67,3 +67,16 @@ export async function postMessage(me: number, b: PostInput): Promise<PostResult>
   void pushToTeams(targets, { title, body: preview, url: "/chat", tag: `room-${roomId}` }).catch(() => {});
   return { ok: true, roomId, message: (await wire([msg]))[0] };
 }
+
+/** Post a system-generated message (e.g. an executed-trade card) into a room — no sender, notifies every member. */
+export async function postSystemToRoom(roomId: number, kind: "trade" | "system", body: string, pushTitle: string) {
+  const room = await prisma.imRoom.findUnique({ where: { id: roomId }, select: { id: true, kind: true } });
+  if (!room) return;
+  const msg = await prisma.imMessage.create({ data: { roomId, fromTeamId: 0, body: body.slice(0, MAX_LEN), kind } });
+  await prisma.imRoom.update({ where: { id: roomId }, data: { lastMessageAt: msg.createdAt } });
+  let targets: number[] = [];
+  if (room.kind === "group") targets = (await prisma.imMember.findMany({ where: { roomId }, select: { teamId: true } })).map((m) => m.teamId);
+  else if (room.kind === "league") targets = (await prisma.imPushSub.findMany({ select: { teamId: true }, distinct: ["teamId"] })).map((s) => s.teamId);
+  const mutedSet = new Set((await prisma.imRead.findMany({ where: { roomId, muted: true, teamId: { in: targets } }, select: { teamId: true, muted: true, mutedUntil: true } })).filter(muteActive).map((r) => r.teamId));
+  void pushToTeams(targets.filter((t) => !mutedSet.has(t)), { title: pushTitle, body: body.split("\n")[0].slice(0, 140), url: "/chat", tag: `room-${roomId}` }).catch(() => {});
+}
