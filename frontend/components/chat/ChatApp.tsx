@@ -341,7 +341,7 @@ export default function ChatApp() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-sm truncate flex-1 ${r.unread ? "text-slate-200" : "text-slate-500"}`}>
-                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : r.last.voice ? `${lastMine ? "Ty: " : ""}🎤 Hlasová správa` : r.last.poll ? `${lastMine ? "Ty: " : ""}📊 ${r.last.poll.question}` : !r.last.body && r.last.file ? `${lastMine ? "Ty: " : ""}📎 ${r.last.file.name}` : !r.last.body && r.last.imageUrl ? `${lastMine ? "Ty: " : ""}${/\.gif|giphy/i.test(r.last.imageUrl) ? "GIF" : "📷 Fotka"}` : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" && r.last.kind !== "trade" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
+                      {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : r.last.voice ? `${lastMine ? "Ty: " : ""}🎤 Hlasová správa` : r.last.imageUrl && r.last.body ? `${lastMine ? "Ty: " : ""}📷 ${r.last.body}` : r.last.poll ? `${lastMine ? "Ty: " : ""}📊 ${r.last.poll.question}` : !r.last.body && r.last.file ? `${lastMine ? "Ty: " : ""}📎 ${r.last.file.name}` : !r.last.body && r.last.imageUrl ? `${lastMine ? "Ty: " : ""}${/\.gif|giphy/i.test(r.last.imageUrl) ? "GIF" : "📷 Fotka"}` : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" && r.last.kind !== "trade" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
                     </span>
                     {roomMuted(r) && <span className="text-xs text-slate-500" title="Stlmené">🔕</span>}
                     {r.mentioned && r.unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-black text-[11px] font-bold flex items-center justify-center" title="Označili ťa">@</span>}
@@ -465,7 +465,8 @@ function Thread(props: {
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   useEffect(() => { if (!pending || !pending.type.startsWith("image/")) { setPendingUrl(null); return; } const u = URL.createObjectURL(pending); setPendingUrl(u); return () => URL.revokeObjectURL(u); }, [pending]);
   const DOC_EXT = /\.(pdf|docx?|xlsx?|pptx?|csv|txt|zip)$/i;
-  function takeFile(f: File | undefined | null) { if (f && (f.type.startsWith("image/") || DOC_EXT.test(f.name))) setPending(f); }
+  const [caption, setCaption] = useState("");
+  function takeFile(f: File | undefined | null) { if (f && (f.type.startsWith("image/") || DOC_EXT.test(f.name))) { setCaption(text); setText(""); setMq(null); setPending(f); } }
   const [pollNew, setPollNew] = useState(false);
   const [pins, setPins] = useState<Msg[]>([]);
   const [pinList, setPinList] = useState(false);
@@ -547,8 +548,8 @@ function Thread(props: {
   const readBy = (m: Msg) => audience.filter((t) => (reads[t] ?? 0) >= m.id);
   const allRead = (m: Msg) => audience.length > 0 && readBy(m).length === audience.length;
 
-  async function send(imageUrl?: string, file?: FileAtt, voice?: { url: string; secs: number }) {
-    const body = imageUrl || file || voice ? "" : emoticonize(text.trim());
+  async function send(imageUrl?: string, file?: FileAtt, voice?: { url: string; secs: number }, caption?: string) {
+    const body = voice ? "" : imageUrl || file ? emoticonize((caption ?? "").trim()) : emoticonize(text.trim());
     if ((!body && !imageUrl && !file && !voice) || sending) return;
     setSending(true); setError("");
     if (editing) {
@@ -570,20 +571,20 @@ function Thread(props: {
     onSent(j.roomId, j.message);
   }
 
-  async function sendFile(f: File) {
+  async function sendFile(f: File, caption?: string) {
     setUploading(true); setError("");
     const up = await uploadImage(await prepareImage(f, { max: 1600 }));
     setUploading(false);
     if ("error" in up) { setError(up.error); return; }
-    await send(up.url);
+    await send(up.url, undefined, undefined, caption);
   }
 
-  async function sendDoc(f: File) {
+  async function sendDoc(f: File, caption?: string) {
     setUploading(true); setError("");
     const up = await uploadFile(f);
     setUploading(false);
     if ("error" in up) { setError(up.error); return; }
-    await send(undefined, up);
+    await send(undefined, up, undefined, caption);
   }
   async function createPoll(question: string, options: string[], multi: boolean) {
     const r = await fetch("/api/im/poll", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(room ? { roomId: room.id } : { toTeamId: dmTeamId }), question, options, multi }) });
@@ -809,9 +810,9 @@ function Thread(props: {
             <button onClick={() => { setTray(null); setAttach(true); }} aria-label="Pripojiť" className="w-9 h-11 text-2xl text-slate-400">＋</button>
             {<button onClick={() => setTray(tray === "gif" ? null : "gif")} aria-label="GIF" className={`h-11 px-1.5 text-xs font-bold ${tray === "gif" ? "text-blue-400" : "text-slate-400"}`}>GIF</button>}
             <input ref={docRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.zip" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void sendDoc(f); }} />
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; takeFile(f); }} />
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; e.target.accept = "image/png,image/jpeg,image/webp,image/gif"; if (f) void sendFile(f); }} />
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; e.target.accept = "image/png,image/jpeg,image/webp,image/gif"; takeFile(f); }} />
             <textarea ref={taRef} value={text} onChange={(e) => { setText(e.target.value); detectMention(e.target.value, e.target.selectionStart); }} rows={1} maxLength={2000} placeholder="Správa" onFocus={() => setTray(null)}
               onPaste={(e) => { const f = [...e.clipboardData.files][0]; if (f) { e.preventDefault(); takeFile(f); } }}
               onKeyDown={(e) => { if (mq && (e.key === "Enter" || e.key === "Tab") && (mqList[0] || showAllOpt)) { e.preventDefault(); pickMention(mqList[0] ?? "all"); return; } if (e.key === "Escape" && mq) { setMq(null); return; } if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(pointer:fine)").matches) { e.preventDefault(); void send(); } }}
@@ -827,13 +828,17 @@ function Thread(props: {
       ) : <div className="p-4 text-center text-sm text-amber-300 bg-slate-900 border-t border-slate-800">Komisár ti dočasne zakázal písať do ligového kanála.</div>}
 
       {pending && (
-        <Sheet title="Odoslať súbor?" onClose={() => setPending(null)}>
+        <Sheet title={pending.type.startsWith("image/") ? "Odoslať fotku?" : "Odoslať súbor?"} onClose={() => { setPending(null); setCaption(""); }}>
           <div className="px-5 py-3">
             {pendingUrl ? <img src={pendingUrl} alt="" className="max-h-72 w-full object-contain rounded-xl bg-slate-800" /> : <div className="flex items-center gap-3 rounded-xl bg-slate-800 px-4 py-3"><span className="text-3xl">{fileIcon(pending.name)}</span><span className="min-w-0 flex-1"><span className="block text-sm truncate">{pending.name}</span><span className="block text-xs text-slate-500">{fmtSize(pending.size)}</span></span></div>}
           </div>
+          <div className="px-5 pb-3">
+            <input value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={1000} autoFocus placeholder="Pridať komentár…" className="w-full rounded-xl bg-slate-800 px-4 py-2.5 text-base outline-none"
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const f = pending, c = caption; setPending(null); setCaption(""); void (f.type.startsWith("image/") ? sendFile(f, c) : sendDoc(f, c)); } }} />
+          </div>
           <div className="px-5 pb-2 flex gap-2">
-            <button onClick={() => setPending(null)} className="flex-1 rounded-xl bg-slate-800 py-3">Zrušiť</button>
-            <button onClick={() => { const f = pending; setPending(null); void (f.type.startsWith("image/") ? sendFile(f) : sendDoc(f)); }} className="flex-1 rounded-xl bg-blue-600 text-white py-3 font-medium">Odoslať</button>
+            <button onClick={() => { setPending(null); setCaption(""); }} className="flex-1 rounded-xl bg-slate-800 py-3">Zrušiť</button>
+            <button onClick={() => { const f = pending, c = caption; setPending(null); setCaption(""); void (f.type.startsWith("image/") ? sendFile(f, c) : sendDoc(f, c)); }} className="flex-1 rounded-xl bg-blue-600 text-white py-3 font-medium">Odoslať</button>
           </div>
         </Sheet>
       )}
