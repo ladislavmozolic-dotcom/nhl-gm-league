@@ -459,8 +459,8 @@ export function v3DefenseAssistWeight(skater: SimSkater, onIceDefense: SimSkater
 function pickAssists(st: SimState, onIce: SimSkater[], scorerId: number, creator?: SimSkater | null): number[] {
   const rng = st.rng;
   const roll = rng.next();
-  // ~1.6 assists per goal (NHL-realistic): mostly 2, occasionally unassisted
-  const n = roll < 0.08 ? 0 : roll < 0.30 ? 1 : 2;
+  // ~1.75 assists per goal: 5% unassisted, 15% one assist, 80% two
+  const n = roll < 0.05 ? 0 : roll < 0.20 ? 1 : 2;
   if (n === 0) return [];
   // assists come ONLY from the players who were on the ice for the goal
   const pool = onIce.filter((s) => s.id !== scorerId);
