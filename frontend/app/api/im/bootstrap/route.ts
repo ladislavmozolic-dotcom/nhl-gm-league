@@ -23,7 +23,7 @@ export async function GET() {
   const profiles = await prisma.imProfile.findMany({ select: { teamId: true, avatarUrl: true } });
   const av = new Map(profiles.map((p) => [p.teamId, p.avatarUrl]));
   const withAv = <T extends { id: number }>(t: T) => ({ ...t, avatarUrl: av.get(t.id) ?? null });
-  const rooms = await prisma.imRoom.findMany({ where: { id: { in: roomIds } }, select: { id: true, kind: true, dmKey: true, name: true, imageUrl: true, createdById: true, members: { select: { teamId: true } } } });
+  const rooms = await prisma.imRoom.findMany({ where: { id: { in: roomIds } }, select: { id: true, kind: true, dmKey: true, name: true, imageUrl: true, bg: true, font: true, createdById: true, members: { select: { teamId: true } } } });
   const reads = await prisma.imRead.findMany({ where: { teamId: me, roomId: { in: roomIds } } });
   const readMap = new Map(reads.map((r) => [r.roomId, r.lastReadId]));
   const clearedMap = new Map(reads.map((r) => [r.roomId, r.clearedId]));
@@ -36,7 +36,7 @@ export async function GET() {
     let otherTeamId: number | null = null;
     if (r.kind === "dm" && r.dmKey) otherTeamId = r.dmKey.split("-").map(Number).find((x) => x !== me) ?? null;
     const lastW = last ? (await wire([last]))[0] : null;
-    return { lastReadId: readMap.get(r.id) ?? 0, muted: muteActive(mutedMap.get(r.id)), mutedUntil: muteActive(mutedMap.get(r.id)) ? mutedMap.get(r.id)!.mutedUntil?.toISOString() ?? null : null, id: r.id, kind: r.kind, otherTeamId, unread, last: lastW, name: r.name, imageUrl: r.imageUrl, createdById: r.createdById, members: r.members.map((m) => m.teamId) };
+    return { lastReadId: readMap.get(r.id) ?? 0, muted: muteActive(mutedMap.get(r.id)), mutedUntil: muteActive(mutedMap.get(r.id)) ? mutedMap.get(r.id)!.mutedUntil?.toISOString() ?? null : null, id: r.id, kind: r.kind, otherTeamId, unread, last: lastW, name: r.name, imageUrl: r.imageUrl, bg: r.bg, font: r.font, createdById: r.createdById, members: r.members.map((m) => m.teamId) };
   }));
   return NextResponse.json({
     tradeRoomId: admin ? (await prisma.imSettings.findUnique({ where: { id: 1 }, select: { tradeRoomId: true } }))?.tradeRoomId ?? null : null,

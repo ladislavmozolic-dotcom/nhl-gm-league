@@ -2157,6 +2157,8 @@ model ImRoom {
   dmKey         String?     @unique // "<lowTeamId>-<highTeamId>" for a dm room
   name          String? // group name
   imageUrl      String? // custom chat picture (group / league channel)
+  bg            String? // chat background preset key (see components/chat/looks.ts)
+  font          String? // chat font preset key
   pinsAt        DateTime? // last time the pinned list changed (drives live refresh)
   createdById   Int? // group owner (can rename / add / remove members)
   members       ImMember[]

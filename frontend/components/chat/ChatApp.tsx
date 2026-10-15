@@ -1,6 +1,7 @@
 "use client";
 
 import InstallBanner from "./InstallBanner";
+import { BACKGROUNDS, FONTS } from "./looks";
 import { PushBanner, usePush, type PushApi } from "./push";
 import { DEFAULT_PREFS, SOUNDS, loadPrefs, playSound, savePrefs, unlockAudio, type Prefs, type SoundId, type Theme } from "./sound";
 import { EmojiPicker, GifPicker, Lightbox, VOICE_MAX_SECS, emoticonize, linkify, VoicePlayer, fileIcon, fmtSecs, fmtSize, isBigEmoji, prepareImage, startRecording, uploadFile, uploadImage, uploadVoice, type Recorder } from "./media";
@@ -13,7 +14,7 @@ type Reaction = { emoji: string; teams: number[] };
 const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
 const MORE_REACTIONS = ["🔥", "🏒", "🥅", "🎉", "👏", "🍆", "👎", "🙏"];
 type Msg = { reactions: Reaction[]; kind: string; voice: { url: string; secs: number } | null; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
-type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; mutedUntil: string | null; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
+type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; mutedUntil: string | null; bg: string | null; font: string | null; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
 const attending = () => typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
 const roomMuted = (r?: { muted: boolean; mutedUntil: string | null } | null) => !!r?.muted && (!r.mutedUntil || new Date(r.mutedUntil) > new Date());
 const muteLabel = (until: string | null) => (!until ? "Navždy" : `do ${new Date(until).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`);
@@ -452,6 +453,7 @@ function Thread(props: {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
+  const look = room ? { bg: BACKGROUNDS[room.bg ?? "none"] ?? BACKGROUNDS.none, font: FONTS[room.font ?? "default"] ?? FONTS.default } : null;
   const [attach, setAttach] = useState(false);
   const [pending, setPending] = useState<File | null>(null);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -612,7 +614,7 @@ function Thread(props: {
         <button onClick={onBack} className="md:hidden w-10 h-10 text-2xl text-slate-300" aria-label="Späť">‹</button>
         <button onClick={() => room && setInfo(true)} className={`flex items-center gap-3 min-w-0 flex-1 text-left ${room ? "" : "cursor-default"}`}>
           {room && room.kind !== "dm" ? <RoomIcon r={room} size={40} /> : <Logo t={other} size={40} />}
-          <div className="min-w-0"><div className="font-semibold truncate">{title}</div><div className="text-xs text-slate-500 truncate">{isLeague ? "Verejný kanál celej ligy" : isGroup ? `${room!.members.length} členov · ${room!.members.map((id) => teamMap.get(id)?.code).filter(Boolean).join(", ")}` : other?.gmNickname ?? "Súkromná konverzácia"}</div></div>
+          <div className="min-w-0"><div className="font-semibold truncate" style={{ fontFamily: look?.font.title || undefined, fontSize: look?.font.title ? "1.1rem" : undefined }}>{title}</div><div className="text-xs text-slate-500 truncate">{isLeague ? "Verejný kanál celej ligy" : isGroup ? `${room!.members.length} členov · ${room!.members.map((id) => teamMap.get(id)?.code).filter(Boolean).join(", ")}` : other?.gmNickname ?? "Súkromná konverzácia"}</div></div>
         </button>
         {room && <button onClick={() => setInfo(true)} aria-label="Informácie" className="w-10 h-10 rounded-full text-xl text-blue-400 hover:bg-slate-800">ⓘ</button>}
       </header>
@@ -626,7 +628,7 @@ function Thread(props: {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 bg-slate-950" onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }} onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); takeFile(f); } }}>
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 bg-slate-950" style={{ backgroundImage: look?.bg.css || undefined, backgroundAttachment: "local", fontFamily: look?.font.body || undefined }} onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }} onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); takeFile(f); } }}>
         {missed && missed.n >= 8 && sum?.state !== "hidden" && (
           <div className="sticky top-0 z-[5] mb-2">
             {sum?.state === "done" ? (
@@ -1097,6 +1099,13 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
     setBusy(false);
   }
   const [muteSheet, setMuteSheet] = useState(false);
+  const [bgSel, setBgSel] = useState(room.bg ?? "none");
+  const [fontSel, setFontSel] = useState(room.font ?? "default");
+  async function saveLook(bg: string, font: string) {
+    setBgSel(bg); setFontSel(font);
+    await fetch("/api/im/look", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomId: room.id, bg, font }) });
+    await onChanged(false);
+  }
   const [tradeOn, setTradeOn] = useState(boot.tradeRoomId === room.id);
   async function toggleTrade(v: boolean) {
     setTradeOn(v);
@@ -1214,6 +1223,25 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
               </div>
             ))}
 
+            {room.kind !== "dm" && (boot.admin || owner) && (
+              <div className="mt-3 px-5 py-4 border-t border-slate-800">
+                <div className="text-slate-200 mb-1">🎨 Vzhľad chatu</div>
+                <div className="text-xs text-slate-500 mb-3">Pozadie a písmo vidia všetci v tomto chate.</div>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {Object.entries(BACKGROUNDS).map(([k, v]) => (
+                    <button key={k} title={v.label} aria-label={v.label} onClick={() => void saveLook(k, fontSel)} className={`w-11 h-11 rounded-full ${bgSel === k ? "ring-2 ring-offset-2 ring-blue-500 ring-offset-slate-950" : "border border-slate-600"}`} style={{ background: v.swatch }} />
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(FONTS).map(([k, v]) => (
+                    <button key={k} onClick={() => void saveLook(bgSel, k)} className={`rounded-xl border px-3 py-2.5 text-left ${fontSel === k ? "border-blue-500 bg-blue-600/15" : "border-slate-700 hover:bg-slate-800"}`}>
+                      <div className="text-lg leading-tight" style={{ fontFamily: v.title || undefined }}>{v.label}</div>
+                      <div className="text-sm text-slate-400" style={{ fontFamily: v.body || undefined }}>Ahoj, čau!</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* mute */}
             <button onClick={() => setMuteSheet(true)} className="mt-3 w-full px-5 py-4 border-y border-slate-800 flex items-center gap-3 text-left hover:bg-slate-900">
               <div className="flex-1"><div className="text-slate-200">{info?.muted ? "🔕 Stlmené" : "Stlmiť chat"}</div><div className="text-xs text-slate-500">{info?.muted ? `Notifikácie vypnuté ${muteLabel(info.mutedUntil)}. Ťukni pre zmenu.` : "Vypni notifikácie z tohto chatu na hodinu, deň alebo navždy"}</div></div>
