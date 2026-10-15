@@ -1,5 +1,6 @@
 "use server";
 
+import { postTradeGroupToChat } from "@/lib/im/trade-post";
 import { assertTradeWindowOpen } from "@/lib/trade-deadline";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
@@ -166,6 +167,7 @@ export async function respondToTradeGroupAction(groupId: number, accept: boolean
       prisma.tradeGroup.update({ where: { id: groupId }, data: { status: "AWAITING_COMMISH" } }),
       prisma.trade.updateMany({ where: { groupId }, data: { status: "AWAITING_COMMISH" } }),
     ]);
+    void postTradeGroupToChat(groupId, "awaiting");
     await notifyCommissionGroup(`🕵️ 3-team trade group #${groupId} (${teams.map((t) => t.name).join(", ")}) — a rookie GM deal is awaiting commission review.`);
     revalidatePath("/trades"); revalidatePath("/trades/commish"); revalidatePath("/messages");
     return { status: "AWAITING_COMMISH" as const };

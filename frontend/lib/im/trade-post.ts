@@ -42,36 +42,37 @@ async function tradeRoom(): Promise<number | null> {
 }
 
 /** An executed 2-team trade → one card in the chosen chat. Best-effort: never throws into the trade flow. */
-export async function postTradeToChat(tradeId: number): Promise<void> {
+export async function postTradeToChat(tradeId: number, mode: "done" | "awaiting" = "done"): Promise<void> {
   try {
     const roomId = await tradeRoom(); if (!roomId) return;
     const leg = await describeLeg(tradeId); if (!leg) return;
     const n = await gmNames([leg.fromId, leg.toId]);
     const body = [
-      "🔄 OBCHOD SCHVÁLENÝ",
+      mode === "awaiting" ? "⏳ OBCHOD ČAKÁ NA SCHVÁLENIE KOMISIE" : "🔄 OBCHOD SCHVÁLENÝ",
+      ...(mode === "awaiting" ? ["Oba tímy súhlasili, o výsledku rozhodne komisia."] : []),
       `${label(n.get(leg.fromId))}  ⇄  ${label(n.get(leg.toId))}`, "",
       `${n.get(leg.fromId)?.name ?? "?"} dáva:`, ...(leg.fromLines.length ? leg.fromLines : ["• budúce úvahy"]), "",
       `${n.get(leg.toId)?.name ?? "?"} dáva:`, ...(leg.toLines.length ? leg.toLines : ["• budúce úvahy"]),
       ...(leg.condition ? ["", `Podmienka: ${leg.condition}`] : []), "",
       `Detail: ${SITE}/trades/${tradeId}`,
     ].join("\n");
-    await postSystemToRoom(roomId, "trade", body, "🔄 Nový obchod");
+    await postSystemToRoom(roomId, "trade", body, mode === "awaiting" ? "⏳ Obchod čaká na komisiu" : "🔄 Nový obchod");
   } catch (e) { console.error("[chat] postTradeToChat failed", e); }
 }
 
 /** An executed 3-team trade (several one-way legs). */
-export async function postTradeGroupToChat(groupId: number): Promise<void> {
+export async function postTradeGroupToChat(groupId: number, mode: "done" | "awaiting" = "done"): Promise<void> {
   try {
     const roomId = await tradeRoom(); if (!roomId) return;
     const legs = (await prisma.trade.findMany({ where: { groupId }, select: { id: true } })).map((l) => l.id);
     const described = (await Promise.all(legs.map(describeLeg))).filter((x): x is Leg => !!x);
     const n = await gmNames([...new Set(described.flatMap((l) => [l.fromId, l.toId]))]);
     const body = [
-      "🔄 3-TÍMOVÝ OBCHOD SCHVÁLENÝ", [...n.values()].map((x) => label(x)).join("  ⇄  "), "",
+      mode === "awaiting" ? "⏳ 3-TÍMOVÝ OBCHOD ČAKÁ NA SCHVÁLENIE KOMISIE" : "🔄 3-TÍMOVÝ OBCHOD SCHVÁLENÝ", [...n.values()].map((x) => label(x)).join("  ⇄  "), "",
       ...described.flatMap((l) => [`${n.get(l.fromId)?.name ?? "?"} → ${n.get(l.toId)?.name ?? "?"}:`, ...(l.fromLines.length ? l.fromLines : ["• budúce úvahy"]), ""]),
       `Detail: ${SITE}/trades`,
     ].join("\n");
-    await postSystemToRoom(roomId, "trade", body, "🔄 Nový 3-tímový obchod");
+    await postSystemToRoom(roomId, "trade", body, mode === "awaiting" ? "⏳ 3-tímový obchod čaká na komisiu" : "🔄 Nový 3-tímový obchod");
   } catch (e) { console.error("[chat] postTradeGroupToChat failed", e); }
 }
 

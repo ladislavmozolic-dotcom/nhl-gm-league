@@ -1,5 +1,6 @@
 "use server";
 
+import { postTradeToChat } from "@/lib/im/trade-post";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getTeamSession, isAdmin, isCommission } from "@/lib/auth";
@@ -625,6 +626,7 @@ export async function respondToTrade(tradeId: number, accept: boolean) {
   const clubs = await prisma.team.findMany({ where: { id: { in: [trade.fromTeamId, trade.toTeamId] } }, select: { id: true, name: true, rookieGm: true } });
   if (clubs.some((c) => c.rookieGm)) {
     await prisma.trade.update({ where: { id: tradeId }, data: { status: "AWAITING_COMMISH", respondedAt: new Date() } });
+    void postTradeToChat(tradeId, "awaiting"); // both GMs agreed → tell the trade chat it needs the commission
     await notifyCommission(`🕵️ Trade #${tradeId} (${clubs.map((c) => c.name).join(" ↔ ")}) — a rookie GM deal is awaiting commission review.`, tradeId);
     const fromName = clubs.find((c) => c.id === trade.fromTeamId)?.name ?? "?";
     for (const tid of [trade.fromTeamId, trade.toTeamId])
