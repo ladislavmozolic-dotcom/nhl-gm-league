@@ -79,3 +79,12 @@ export function periodEndText(label: string, m?: { homeCode?: string; awayCode?:
   const sc = m.score.home === m.score.away ? `tied ${m.score.home}–${m.score.away}` : m.score.home > m.score.away ? `${m.homeCode} ${m.score.home}, ${m.awayCode} ${m.score.away}` : `${m.awayCode} ${m.score.away}, ${m.homeCode} ${m.score.home}`;
   return `End of the ${label} — ${sc}${m.shots ? ` · shots ${m.awayCode} ${m.shots.away}–${m.shots.home} ${m.homeCode}` : ""}${m.hits ? ` · hits ${m.awayCode} ${m.hits.away}–${m.hits.home} ${m.homeCode}` : ""}.`;
 }
+
+/** "COL power play is over — 1:45, 3 shots, no goal." (the plain line when there is no recap) */
+export function ppEndText(who: string, m?: { seconds?: number; shots?: number; goals?: number } | null): string {
+  if (!m || m.seconds == null) return `${who} power play is over.`;
+  const t = `${Math.floor(m.seconds / 60)}:${String(Math.floor(m.seconds % 60)).padStart(2, "0")}`;
+  const shots = `${m.shots ?? 0} shot${m.shots === 1 ? "" : "s"}`;
+  const goal = (m.goals ?? 0) > 0 ? `${m.goals} goal${m.goals === 1 ? "" : "s"}` : "no goal";
+  return `${who} power play is over — ${t}, ${shots}, ${goal}.`;
+}

@@ -145,6 +145,7 @@ type SimState = {
   rivalry: boolean;                 // heated rivalry game — more fights, scrums, misconducts
   pulled: Record<number, boolean>;  // has this team's starter been yanked for the backup
   emptyNet: Record<number, boolean>; // trailing late in reg. — goalie pulled for the extra attacker (both engines)
+  ppMark: Record<number, { abs: number; shots: number; goals: number }>; // V3: where each power play started, for its recap line
   onPp: Record<number, boolean>;    // is this team currently on the power play (for PP_START/PP_END events)
   injured: Set<number>;             // skater ids hurt so far this game — benched for the rest of it, live from the tick they went down
   ejections: { playerId: number; teamId: number; abs: number; applied: boolean }[]; // game misconduct / match penalty → thrown out at abs game-second `abs` (applied into `injured` live)
@@ -2094,9 +2095,13 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       const onPp = curStr[team.id] === "PP";
       if (onPp !== !!st.onPp[team.id]) {
         st.onPp[team.id] = onPp;
+        const absNow = (period - 1) * PERIOD_SECONDS + tick, tb = st.box[team.id];
+        if (st.v3PlayEvents && onPp) st.ppMark[team.id] = { abs: absNow, shots: tb.shots, goals: tb.ppGoals };
+        const mk = st.v3PlayEvents && !onPp ? st.ppMark[team.id] : undefined;
         st.sink.emit({
           period, seconds: tick, type: onPp ? "PP_START" : "PP_END",
           teamId: team.id, teamCode: team.code ?? undefined, importance: "NOTABLE",
+          ...(mk ? { meta: { seconds: absNow - mk.abs, shots: tb.shots - mk.shots, goals: tb.ppGoals - mk.goals } } : {}),
         });
       }
     }
@@ -3324,7 +3329,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     rivalry: CFG.rivalryEnabled && !!opts.rivalry,
     pulled: {},
     emptyNet: {},
-    onPp: {},
+    onPp: {}, ppMark: {},
     injured: new Set(),
     ejections: [],
     shootout: [],

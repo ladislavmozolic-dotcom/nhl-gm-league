@@ -10,7 +10,7 @@ import { fightText, type FightMeta } from "./fight-text";
 import { RNG } from "./rng";
 import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } from "./types";
 import type { SimEvent } from "./events";
-import { RUSH_LABEL, overGlassText, pressureText, periodEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
+import { RUSH_LABEL, overGlassText, pressureText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 const PERIOD_SECONDS = 1200;
 const OT_SECONDS = 300; // 5:00 for regular season OT
@@ -341,7 +341,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
       } else if (e.type === "PP_START") {
         add(p, e.seconds, tId, "change", `${e.teamCode ?? sideOf(e.teamId ?? home.id).name} power play begins.`);
       } else if (e.type === "PP_END") {
-        add(p, e.seconds, tId, "change", `${e.teamCode ?? sideOf(e.teamId ?? home.id).name} power play is over.`);
+        add(p, e.seconds, tId, "change", ppEndText(e.teamCode ?? sideOf(e.teamId ?? home.id).name, e.meta as never));
       } else if (e.type === "MISS") {
         add(p, e.seconds, tId, "miss", `Shot by ${e.playerName ?? "?"}. Shot Misses the Net.`);
       } else if (e.type === "ZONE_ENTRY") {

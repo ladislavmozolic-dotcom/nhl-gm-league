@@ -4,7 +4,7 @@
 import type { SimEvent } from "./events";
 import { goalHow, saveWhere, shotHow } from "./shot-text";
 import { fightText, type FightMeta } from "./fight-text";
-import { RUSH_LABEL, overGlassText, pressureText, periodEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
+import { RUSH_LABEL, overGlassText, pressureText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 export type LiveLine = { seq: number; period: number; seconds: number; teamId?: number; /** set when this line means a skater has left the game */ outPlayerId?: number; /** replaces the period/clock label (e.g. "SO") */ tag?: string; kind: "goal" | "penalty" | "save" | "note" | "period"; major: boolean; text: string };
 
@@ -72,7 +72,7 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
     }
     case "GOALIE_PULL": return { ...base, kind: "note", major: true, text: m<{ pulled?: boolean }>(e)?.pulled ? `${who} pulls the goalie for the extra attacker.` : `${who} goalie is back in net.` };
     case "PP_START": return { ...base, kind: "note", major: false, text: `${who} power play begins.` };
-    case "PP_END": return { ...base, kind: "note", major: false, text: `${who} power play is over.` };
+    case "PP_END": return { ...base, kind: "note", major: false, text: ppEndText(who, m<{ seconds?: number; shots?: number; goals?: number }>(e)) };
     case "KNOCK": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} is shaken up and heads to the room.` };
     case "RETURN": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} is back on the bench.` };
     case "INJURY": return { ...base, outPlayerId: e.playerId, kind: "note", major: true, text: `${e.playerName ?? "?"} is injured and will not return.` };

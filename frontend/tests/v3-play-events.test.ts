@@ -208,3 +208,21 @@ test("V3 fouls are called ON an opposing player, in the play-by-play and the liv
   }
   assert.ok(fouls > 40 && named / fouls > 0.9, `almost every foul names its victim (${named}/${fouls})`);
 });
+
+test("V3 power plays end with a recap (length, shots, goals); V2 keeps the plain line", () => {
+  let ends = 0;
+  for (let seed = 1; seed <= 30; seed++) {
+    const r = run(seed, ENGINE_V3);
+    for (const e of (r.events ?? []).filter((x) => x.type === "PP_END")) {
+      const m = e.meta as { seconds: number; shots: number; goals: number } | undefined;
+      if (!m) continue; // a power play that began in the previous period's final seconds still gets one; skip only the odd carry-over
+      ends++;
+      assert.ok(m.seconds >= 0 && m.seconds <= 720 && m.shots >= 0 && m.goals >= 0 && m.goals <= m.shots, JSON.stringify(m));
+      const t = describeLiveEvent(e)!.text;
+      assert.match(t, /power play is over — \d+:\d\d, \d+ shots?, (no goal|\d+ goals?)\.$/);
+      assert.ok(r.playByPlay.some((l) => l.text === t), "same wording in the play-by-play");
+    }
+    for (const l of run(seed, ENGINE_V2).playByPlay.filter((x) => /power play is over/.test(x.text))) assert.ok(!l.text.includes(" — "), l.text);
+  }
+  assert.ok(ends > 30, `enough power plays to check (${ends})`);
+});
