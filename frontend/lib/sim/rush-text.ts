@@ -72,3 +72,10 @@ export function puckRaceText(m: { won?: "att" | "def"; goalie?: boolean; next?: 
   if (m.goalie) return `${name} comes out to play the dump-in behind the net and ${m.next ? `hands it to ${m.next}` : "starts the breakout"}.`;
   return `${name} gets to the dump-in${dumper ? ` from ${dumper}` : ""} first and the breakout starts.`;
 }
+
+/** "End of the 1st period — COL 2, BOS 1 · shots 12–9 · hits 8–11." (falls back to the plain line without a recap) */
+export function periodEndText(label: string, m?: { homeCode?: string; awayCode?: string; score?: { home: number; away: number }; shots?: { home: number; away: number }; hits?: { home: number; away: number } } | null): string {
+  if (!m || !m.score || !m.homeCode) return `End of the ${label}.`;
+  const sc = m.score.home === m.score.away ? `tied ${m.score.home}–${m.score.away}` : m.score.home > m.score.away ? `${m.homeCode} ${m.score.home}, ${m.awayCode} ${m.score.away}` : `${m.awayCode} ${m.score.away}, ${m.homeCode} ${m.score.home}`;
+  return `End of the ${label} — ${sc}${m.shots ? ` · shots ${m.awayCode} ${m.shots.away}–${m.shots.home} ${m.homeCode}` : ""}${m.hits ? ` · hits ${m.awayCode} ${m.hits.away}–${m.hits.home} ${m.homeCode}` : ""}.`;
+}

@@ -4,7 +4,7 @@
 import type { SimEvent } from "./events";
 import { goalHow, saveWhere, shotHow } from "./shot-text";
 import { fightText, type FightMeta } from "./fight-text";
-import { RUSH_LABEL, overGlassText, pressureText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
+import { RUSH_LABEL, overGlassText, pressureText, periodEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 export type LiveLine = { seq: number; period: number; seconds: number; teamId?: number; /** set when this line means a skater has left the game */ outPlayerId?: number; /** replaces the period/clock label (e.g. "SO") */ tag?: string; kind: "goal" | "penalty" | "save" | "note" | "period"; major: boolean; text: string };
 
@@ -93,7 +93,7 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
       return { ...base, tag: "SO", kind: mm?.result === "goal" ? "goal" : "save", major: mm?.result === "goal", text: `Shootout, round ${mm?.round ?? "?"} — ${who} ${what}.` };
     }
     case "PERIOD_START": return { ...base, kind: "period", major: true, text: `Start of the ${periodLabel(e.period)} period.` };
-    case "PERIOD_END": return { ...base, kind: "period", major: true, text: `End of the ${periodLabel(e.period)} period.` };
+    case "PERIOD_END": return { ...base, kind: "period", major: true, text: periodEndText(`${periodLabel(e.period)} period`, e.meta as never) };
     default: return null;
   }
 }

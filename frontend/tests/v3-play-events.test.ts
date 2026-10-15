@@ -153,3 +153,23 @@ test("V3 goals and saves say how the shot was taken and how it was stopped; V2 k
   assert.ok(goals > 20 && goalsHow === goals, `every goal says how (${goalsHow}/${goals})`);
   assert.ok(saves > 200 && savesHow === saves, `every save says how (${savesHow}/${saves})`);
 });
+
+test("V3 period ends carry a recap (score, shots this period, hits) in the play-by-play and the live feed; V2 keeps the plain line", () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const r = run(seed, ENGINE_V3);
+    const ends = (r.events ?? []).filter((e) => e.type === "PERIOD_END");
+    assert.equal(ends.length, 3, "one recap per regulation period");
+    let shotsSum = 0;
+    for (const e of ends) {
+      const m = e.meta as { score: { home: number; away: number }; shots: { home: number; away: number }; hits: { home: number; away: number } };
+      shotsSum += m.shots.home + m.shots.away;
+      const t = describeLiveEvent(e)!.text;
+      assert.match(t, /^End of the \d(st|nd|rd) period — /);
+      assert.ok(r.playByPlay.some((l) => l.kind === "period" && /^End of the \d(st|nd|rd) period — /.test(l.text) && l.period === e.period), "the play-by-play has the same recap");
+    }
+    const last = ends[2].meta as { score: { home: number; away: number } };
+    assert.ok(last.score.home <= r.home.goals && last.score.away <= r.away.goals, "the recap score never runs ahead of the final");
+    assert.ok(shotsSum > 30 && shotsSum < 120, `shots over three periods look sane (${shotsSum})`);
+    for (const l of run(seed, ENGINE_V2).playByPlay.filter((x) => x.kind === "period" && /^End of the/.test(x.text))) assert.ok(!l.text.includes(" — "), l.text);
+  }
+});

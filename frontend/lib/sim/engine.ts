@@ -3390,6 +3390,14 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     // enough that the same-period residual this leaves is a non-issue); donnybrook
     // Fighting majors resolve their own injury inline.
     if (!st.v3Stoppages) generateHeatEvents(st, period);
+    // V3: the horn — a one-line recap (score, shots this period, hits so far) for the play-by-play and the live feed
+    if (st.v3PlayEvents) {
+      const hb = st.box[home.id], ab = st.box[away.id];
+      st.sink.emit({
+        period, seconds: PERIOD_SECONDS, type: "PERIOD_END", importance: "NOTABLE",
+        meta: { homeCode: home.code ?? home.name, awayCode: away.code ?? away.name, score: { home: hb.goals, away: ab.goals }, shots: { home: hb.shotsByPeriod[period - 1] ?? 0, away: ab.shotsByPeriod[period - 1] ?? 0 }, hits: { home: hb.hits, away: ab.hits } },
+      });
+    }
   }
 
   let winnerId: number;

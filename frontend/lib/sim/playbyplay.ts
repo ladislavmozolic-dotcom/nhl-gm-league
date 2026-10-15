@@ -10,7 +10,7 @@ import { fightText, type FightMeta } from "./fight-text";
 import { RNG } from "./rng";
 import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } from "./types";
 import type { SimEvent } from "./events";
-import { RUSH_LABEL, overGlassText, pressureText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
+import { RUSH_LABEL, overGlassText, pressureText, periodEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 const PERIOD_SECONDS = 1200;
 const OT_SECONDS = 300; // 5:00 for regular season OT
@@ -371,7 +371,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
 
     // no end-of-period line once a sudden-death OT goal has ended the game
     const otEnded = p >= 4 && stream.some((e) => e.period === p && e.type === "GOAL");
-    if (p <= 3 || (p >= 4 && !otEnded)) add(p, pMaxSec, null, "period", `End of the ${label}.`, p <= 3);
+    if (p <= 3 || (p >= 4 && !otEnded)) add(p, pMaxSec, null, "period", periodEndText(label, stream.find((x) => x.period === p && x.type === "PERIOD_END")?.meta as never), p <= 3);
   }
 
   if (result.endedIn === "SO") add(5, 0, null, "period", `Shootout — won by ${sideOf(result.winner).name}.`, true);
