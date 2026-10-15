@@ -2353,7 +2353,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // compare) and amplifies the (narrow) OV gap; scaled by possessionSkillPct —
     // turn it down for more upsets, up for chalk.
     const ovGap = carrierTeam.avgOV - def.avgOV;
-    const teamMult = Math.max(0.68, Math.min(1.32, 1 + ovGap * 0.035 * CFG.possessionSkillPct));
+    const teamMult = Math.max(0.68, Math.min(1.32, 1 + ovGap * 0.035 * CFG.possessionSkillPct * (st.v3Pace && st.v3Dump ? TEAM_EDGE_TUNING.edge : 1)));
 
     // final-skill helper: base × tactics × chemistry × morale × fatigue × score-effect × team edge
     // depth parity: a top-liner's edge (and a depth player's deficit) in the puck battles
@@ -3150,6 +3150,8 @@ const TAKEAWAY_SHARE = 0.17;
 /** V3 pin: after `hold` s of the puck in their zone a team can't change (until `maxShift` s); a gassed defence concedes (`conv`); long possessions shoot more (`shots`); `base` keeps league shots where they were. */
 /** V3 dump-in: share of failed carry-ins that are dumped in instead, how often the attackers win the race, how often the goalie gets there first. */
 export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
+/** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
+export const TEAM_EDGE_TUNING = { edge: 0.55 };
 export const PIN_TUNING = { hold: 6, maxShift: 100, conv: 0.35, shots: 0.25, base: 0.80, keep: 0.25, tire: 0.8, dur: 0.6 };
 export const PACE_TUNING = { dwell: 2, advance: 0.6, shotDwell: 2, shotGap: 3, shotBoost: 1.78 };
 
