@@ -5,6 +5,7 @@
 // offsides, misses) is still RNG colour. Without an event stream (volume model),
 // it falls back to the legacy post-hoc reconstruction.
 
+import { goalHow, saveWhere, shotHow } from "./shot-text";
 import { fightText, type FightMeta } from "./fight-text";
 import { RNG } from "./rng";
 import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } from "./types";
@@ -47,10 +48,11 @@ const centers = (t: SimTeam) => {
 };
 const pool = (t: SimTeam) => [...t.forwards, ...t.defense];
 
-export function generatePlayByPlay(result: GameResult, home: SimTeam, away: SimTeam, stream?: SimEvent[]): PbpEvent[] {
+/** `rich` (V3): shot type / location on goals and shots, how the goalie made the save. V2 keeps its plain wording. */
+export function generatePlayByPlay(result: GameResult, home: SimTeam, away: SimTeam, stream?: SimEvent[], rich = false): PbpEvent[] {
   // narrate directly from the real event stream when it carries shot events.
   if (stream && stream.some((e) => e.type === "SHOT")) {
-    return playByPlayFromEvents(result, home, away, stream);
+    return playByPlayFromEvents(result, home, away, stream, rich);
   }
   return legacyPlayByPlay(result, home, away);
 }
@@ -167,7 +169,7 @@ function legacyPlayByPlay(result: GameResult, home: SimTeam, away: SimTeam): Pbp
 
 // ---- v2: play-by-play built from the real event stream ----------------------
 
-function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, stream: SimEvent[]): PbpEvent[] {
+function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, stream: SimEvent[], st3 = false): PbpEvent[] {
   const rng = new RNG((result.seed ^ 0x27d4eb2f) | 0);
   const sideOf = (teamId: number) => (teamId === home.id ? home : away);
   const oppOf = (teamId: number) => (teamId === home.id ? away : home);
@@ -250,10 +252,12 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         // a real REBOUND event at the same instant (same attacking team) means the
         // puck stayed live — reflect that in the flavour text instead of a coin flip.
         const hadRebound = periodEvents.some((x) => x.type === "REBOUND" && x.seconds === e.seconds && x.teamId === shooterTeamId);
-        add(p, e.seconds, shooterTeamId, "shot", `Shot by ${shooterName}.`);
-        const sm = e.meta as { rush?: string; penaltyShot?: boolean } | undefined;
+        const how = st3 ? shotHow(e.shotType, e.sector) : null;
+        add(p, e.seconds, shooterTeamId, "shot", `Shot by ${shooterName}${how ? ` — ${how}` : ""}.`);
+        const sm = e.meta as { rush?: string; penaltyShot?: boolean; danger?: number | string } | undefined;
         const onWhat = sm?.penaltyShot ? " on the penalty shot" : sm?.rush ? ` on the ${RUSH_LABEL[sm.rush] ?? "rush"}` : "";
-        add(p, e.seconds, e.teamId ?? null, "save", `Stopped by ${e.playerName ?? goalieName(e.teamId ?? home.id)}${onWhat} ${hadRebound ? "with a rebound" : "without a rebound"}.`);
+        const where = st3 ? ` ${saveWhere(sm?.danger, e.seconds * 7 + (e.targetId ?? 0))}` : "";
+        add(p, e.seconds, e.teamId ?? null, "save", `Stopped by ${e.playerName ?? goalieName(e.teamId ?? home.id)}${onWhat}${where} ${hadRebound ? "with a rebound" : "without a rebound"}.`);
       } else if (e.type === "GOAL") {
         const so = (e.meta as { so?: boolean } | undefined)?.so;
         if (so) continue; // shootout handled below
@@ -261,10 +265,11 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const assistNames = ((e.meta as { assistNames?: string[] } | undefined)?.assistNames) ?? [];
         const gm = e.meta as { rush?: string; penaltyShot?: boolean } | undefined;
         const tag = (en ? " (EN)" : e.strength && e.strength !== "EV" ? ` (${e.strength})` : "") + (gm?.penaltyShot ? " (penalty shot)" : gm?.rush ? ` (${RUSH_LABEL[gm.rush] ?? "rush"})` : "");
+        const gh = st3 && !en ? goalHow(e.shotType, e.sector) : "";
         add(p, e.seconds, tId, "shot", `Shot by ${e.playerName ?? "?"}.`);
         const gameOver = p >= 4; // sudden-death OT winner
         add(p, e.seconds, tId, "goal",
-          `GOAL${tag} scored by ${e.playerName ?? "?"}${assistNames.length ? ` assisted by ${assistNames.join(" and ")}` : " unassisted"}.${gameOver ? " Game over." : ""}`, true);
+          `GOAL${tag} scored by ${e.playerName ?? "?"}${gh}${assistNames.length ? `${gh ? "," : ""} assisted by ${assistNames.join(" and ")}` : `${gh ? "," : ""} unassisted`}.${gameOver ? " Game over." : ""}`, true);
         if (!gameOver) {
           const nextFo = stream.find((x) => x.period === p && x.type === "FACEOFF" && x.seconds > e.seconds);
           if (nextFo) add(p, e.seconds + 1, nextFo.teamId ?? null, "faceoff", `${nextFo.playerName ?? "?"} wins face-off versus ${nextFo.targetName ?? "?"} in neutral zone.`);

@@ -3439,7 +3439,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     homeSystem: home.teamTactics,
     awaySystem: away.teamTactics,
   };
-  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all());
+  if (CFG.playByPlayEnabled) result.playByPlay = generatePlayByPlay(result, home, away, st.sink.all(), isV3);
   return result;
 }
 

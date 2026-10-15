@@ -138,3 +138,18 @@ test("V3 fights after a hard hit are an answer for it, same wording live and in 
   }
   assert.ok(revenge >= 4 && revenge < bouts, `some, not all, fights are answers to a hit (${revenge}/${bouts})`);
 });
+
+test("V3 goals and saves say how the shot was taken and how it was stopped; V2 keeps its plain wording", () => {
+  let goalsHow = 0, goals = 0, saves = 0, savesHow = 0;
+  for (let seed = 1; seed <= 25; seed++) {
+    const r = run(seed, ENGINE_V3);
+    for (const l of r.playByPlay.filter((x) => x.kind === "goal" && /^GOAL/.test(x.text) && !/\(EN\)/.test(x.text))) { goals++; if (/scored by .+ with a (slap shot|wrist shot|snap shot|backhand|tip-in|one-timer)/.test(l.text)) goalsHow++; }
+    for (const l of r.playByPlay.filter((x) => x.kind === "save")) { saves++; if (/^Stopped by .+ with the (glove|blocker|pad|skate|stick|chest|shoulder)/.test(l.text)) savesHow++; }
+    const live = (r.events ?? []).filter((e) => e.type === "GOAL" && !(e.meta as { so?: boolean } | undefined)?.so && !(e.meta as { emptyNet?: boolean } | undefined)?.emptyNet);
+    for (const g of live) assert.match(describeLiveEvent(g)!.text, / — .+ with a .+/);
+    const v2 = run(seed, ENGINE_V2);
+    for (const l of v2.playByPlay.filter((x) => x.kind === "goal" || x.kind === "save")) assert.ok(!/ with a (slap|wrist|snap|backhand|tip|one-timer)|with the (glove|blocker|pad)/.test(l.text), `V2 text changed: ${l.text}`);
+  }
+  assert.ok(goals > 20 && goalsHow === goals, `every goal says how (${goalsHow}/${goals})`);
+  assert.ok(saves > 200 && savesHow === saves, `every save says how (${savesHow}/${saves})`);
+});

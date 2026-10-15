@@ -2,6 +2,7 @@
 // (no engine imports) — wording mirrors lib/sim/playbyplay.ts so live and the final report read alike.
 
 import type { SimEvent } from "./events";
+import { goalHow, saveWhere, shotHow } from "./shot-text";
 import { fightText, type FightMeta } from "./fight-text";
 import { RUSH_LABEL, overGlassText, pressureText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
@@ -36,9 +37,14 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
       const mm = m<{ emptyNet?: boolean; assistNames?: string[] }>(e);
       const tag = (mm?.emptyNet ? " (EN)" : e.strength && e.strength !== "EV" ? ` (${e.strength})` : "") + (m<{ penaltyShot?: boolean }>(e)?.penaltyShot ? " (penalty shot)" : m<{ rush?: string }>(e)?.rush ? ` (${RUSH_LABEL[m<{ rush?: string }>(e)!.rush!] ?? "rush"})` : "");
       const a = mm?.assistNames ?? [];
-      return { ...base, kind: "goal", major: true, text: `GOAL${tag} — ${e.playerName ?? "?"}${a.length ? `, assisted by ${a.join(" and ")}` : ", unassisted"}.` };
+      const gh = mm?.emptyNet ? "" : goalHow(e.shotType, e.sector);
+      return { ...base, kind: "goal", major: true, text: `GOAL${tag} — ${e.playerName ?? "?"}${gh}${a.length ? `, assisted by ${a.join(" and ")}` : ", unassisted"}.` };
     }
-    case "SAVE": return { ...base, kind: "save", major: !!m<{ rush?: string }>(e)?.rush, text: `Shot by ${e.targetName ?? "?"} — saved by ${e.playerName ?? "the goalie"}${m<{ rush?: string }>(e)?.rush ? ` on the ${RUSH_LABEL[m<{ rush?: string }>(e)!.rush!] ?? "rush"}` : ""}.` };
+    case "SAVE": {
+      const sm = m<{ rush?: string; danger?: number | string }>(e);
+      const how = shotHow(e.shotType, e.sector);
+      return { ...base, kind: "save", major: !!sm?.rush, text: `Shot by ${e.targetName ?? "?"}${how ? ` (${how})` : ""} — saved by ${e.playerName ?? "the goalie"} ${saveWhere(sm?.danger, e.seconds * 7 + (e.targetId ?? 0))}${sm?.rush ? ` on the ${RUSH_LABEL[sm.rush] ?? "rush"}` : ""}.` };
+    }
     case "PENALTY": {
       const mm = m<{ penalty?: string; minutes?: number; severity?: string; washedOut?: boolean; overGlass?: boolean }>(e);
       if (mm?.penalty === "Fighting") return null; // narrated as a fight
