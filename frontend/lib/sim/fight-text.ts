@@ -6,6 +6,8 @@ export type FightMeta = {
   winnerId?: number | null;
   style?: number;
   hurtNames?: string[];
+  /** the fight is an answer for a hit: who was hit, and who dropped the gloves for it */
+  revenge?: { forName: string; forId?: number; retaliatorId: number };
 };
 
 const DECISIVE = [
@@ -38,5 +40,7 @@ export function fightText(m: FightMeta, aName: string, bName: string, aId?: numb
   else if (m.kind === "decisive") body = `${w} ${DECISIVE[style % DECISIVE.length].replace("{L}", l)}.`;
   else body = `${w} ${EDGE[style % EDGE.length].replace("{L}", l)}.`;
   const hurt = (m.hurtNames ?? []).length ? ` ${(m.hurtNames ?? []).join(" and ")} ${(m.hurtNames ?? []).length > 1 ? "are" : "is"} hurt in the fight.` : "";
-  return `Fight: ${aName} versus ${bName}. ${body} Both receive 5-minute majors.${hurt}`;
+  const who = m.revenge ? (m.revenge.retaliatorId === aId ? aName : bName) : "";
+  const why = m.revenge ? (m.revenge.forId === m.revenge.retaliatorId ? ` ${who} wants a word after that hit.` : ` ${who} answers for the hit on ${m.revenge.forName}.`) : "";
+  return `Fight: ${aName} versus ${bName}.${why} ${body} Both receive 5-minute majors.${hurt}`;
 }

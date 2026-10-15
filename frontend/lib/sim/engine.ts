@@ -183,6 +183,7 @@ type SimState = {
   shooterColdShots: Record<number, number>;  // V3: shots on goal since each skater's last goal this game
   goalieStreak: Record<number, number>;      // V3: consecutive saves since the goalie last allowed a goal
   lastGoalAgainst: Record<number, number>;   // V3: absolute game second of the last goal each goalie allowed
+  lastHit: { hitterId: number; hitterTeamId: number; targetId: number; targetName: string; absT: number } | null; // V3: the latest in-play hit — a bench may answer for it at the next fight
   lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
   officials: { penaltyMult: number; evenUp: number } | null; // tonight's referee crew (null = neutral)
   timeoutUsed: Record<number, boolean>;
@@ -1041,7 +1042,7 @@ function maybeInjureFighter(st: SimState, team: SimTeam, fighter: SimSkater, per
 }
 
 /** V3: the story of one bout — who won (fighting skill, strength, size, luck), how it looked, who got hurt. Penalties/injuries are done by the caller. */
-function fightStory(st: SimState, hTeam: SimTeam, h: SimSkater, a: SimSkater, period: number, at: number) {
+function fightStory(st: SimState, hTeam: SimTeam, h: SimSkater, a: SimSkater, period: number, at: number, revenge?: { forName: string; forId: number; retaliatorId: number }) {
   if (!st.v3FightStory) return;
   const power = (s: SimSkater) => (s.attrs.fg ?? 30) + 0.4 * (s.attrs.st ?? 50) + 0.25 * s.weight;
   const d = power(h) - power(a) + (st.rng.next() - 0.5) * 40;
@@ -1051,7 +1052,7 @@ function fightStory(st: SimState, hTeam: SimTeam, h: SimSkater, a: SimSkater, pe
   st.sink.emit({
     period, seconds: at, type: "FIGHT", teamId: hTeam.id, teamCode: hTeam.code ?? undefined,
     playerId: h.id, playerName: h.name, targetId: a.id, targetName: a.name, importance: "NOTABLE",
-    meta: { kind, winnerId: kind === "draw" ? null : d > 0 ? h.id : a.id, style: st.rng.int(1000), hurtNames: hurt.map((x) => x.name) },
+    meta: { kind, winnerId: kind === "draw" ? null : d > 0 ? h.id : a.id, style: st.rng.int(1000), hurtNames: hurt.map((x) => x.name), ...(revenge ? { revenge } : {}) },
   });
 }
 
@@ -1086,12 +1087,22 @@ function maybeStartFight(st: SimState, home: SimTeam, away: SimTeam, period: num
   const perStoppage = 1 - Math.pow(1 - pGame, 1 / STOPPAGES_PER_GAME);
   if (!st.rng.chance(perStoppage)) return;
 
-  const h = enforcerPick(home), a = enforcerPick(away);
+  let h = enforcerPick(home), a = enforcerPick(away);
+  // V3: a fight that follows a hard hit is somebody answering for it — the hitter drops the gloves with the other bench's enforcer
+  let revenge: { forName: string; forId: number; retaliatorId: number } | undefined;
+  const lh = st.v3FightStory ? st.lastHit : null;
+  if (lh && (period - 1) * PERIOD_SECONDS + tick - lh.absT <= 120 && st.rng.chance(0.45)) {
+    const hitterIsHome = lh.hitterTeamId === home.id;
+    const side = hitterIsHome ? home : away;
+    const hitter = [...side.forwards, ...side.defense].find((x) => x.id === lh.hitterId && !st.injured.has(x.id));
+    if (hitter) { if (hitterIsHome) h = hitter; else a = hitter; revenge = { forName: lh.targetName, forId: lh.targetId, retaliatorId: hitterIsHome ? a.id : h.id }; }
+  }
+  st.lastHit = null;
   addPenalty(st, home, h, period, tick, "Fighting", 5, "Major", false);
   addPenalty(st, away, a, period, tick, "Fighting", 5, "Major", false);
   maybeInjureFighter(st, home, h, period, tick);
   maybeInjureFighter(st, away, a, period, tick);
-  fightStory(st, home, h, a, period, tick);
+  fightStory(st, home, h, a, period, tick, revenge);
 
   // line brawl: a second simultaneous bout + roughing minors + a misconduct (far likelier in a rivalry)
   if (active(home).length && active(away).length && st.rng.chance(st.rivalry ? 0.4 : 0.12)) {
@@ -2331,6 +2342,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       const hitter = hp.length ? hp[rng.weighted(hp.map((x) => x.hitting * x.iceTime * physFactor(x.weight)))] : null;
       if (hitter) {
         st.lines[def.id][hitter.id].hits++; st.box[def.id].hits++;
+        st.lastHit = { hitterId: hitter.id, hitterTeamId: def.id, targetId: carrier.id, targetName: carrier.name, absT: base + tick };
         st.sink.emit({ period, seconds: tick, type: "HIT", teamId: def.id, teamCode: def.code ?? undefined, playerId: hitter.id, playerName: hitter.name, targetId: carrier.id, targetName: carrier.name, zone: "OFF", sector: pickZone(rng, HIT_ZONES), importance: "NOTABLE" });
       }
     }
@@ -3319,6 +3331,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3Rush: isV3 && (opts.experimentalV3?.transitionRush ?? CFG.v3TransitionRush ?? false), // opt-in: Admin → Simulation (the other V3 flags default on)
     shooterGoalAt: {}, shooterColdShots: {},
     goalieStreak: {}, lastGoalAgainst: {},
+    lastHit: null,
     lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
     timeoutUsed: {},

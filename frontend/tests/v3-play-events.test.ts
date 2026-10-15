@@ -119,3 +119,21 @@ test("V3 dump-ins are a race for the puck: both sides win some, the goalie plays
   // the live feed and the play-by-play share one wording
   assert.equal(puckRaceText({ won: "def", goalie: true, next: "B" }, "G", "A"), "G comes out to play the dump-in behind the net and hands it to B.");
 });
+
+test("V3 fights after a hard hit are an answer for it, same wording live and in the play-by-play", () => {
+  let revenge = 0, bouts = 0;
+  for (let seed = 1; seed <= 300; seed++) {
+    const r = simulateGame(makeTeam(1, 64), makeTeam(2, 66), { seed, engineVersion: ENGINE_V3, rivalry: true });
+    for (const f of count(r, "FIGHT")) {
+      bouts++;
+      const m = f.meta as { revenge?: { forName: string; retaliatorId: number } };
+      if (!m.revenge) continue;
+      revenge++;
+      assert.ok(m.revenge.retaliatorId === f.playerId || m.revenge.retaliatorId === f.targetId, "the retaliator is one of the two fighters");
+      const t = describeLiveEvent(f)!.text;
+      assert.ok(/answers for the hit on|wants a word after that hit/.test(t), t);
+      assert.ok(r.playByPlay.some((l) => l.text === t));
+    }
+  }
+  assert.ok(revenge >= 4 && revenge < bouts, `some, not all, fights are answers to a hit (${revenge}/${bouts})`);
+});
