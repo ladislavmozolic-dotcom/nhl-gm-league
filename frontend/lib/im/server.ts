@@ -57,7 +57,7 @@ export function groupReactions(rs: { emoji: string; teamId: number }[]): Reactio
 }
 
 export type WireMessage = {
-  reactions: ReactionWire[];
+  mentions: number[]; mentionAll: boolean; reactions: ReactionWire[];
   kind: string; imageUrl: string | null; voice: { url: string; secs: number } | null; file: { url: string; name: string; size: number } | null; pinned: boolean; poll: PollWire | null;
   edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string;
   replyTo: { id: number; fromTeamId: number; body: string } | null; deleted: boolean;
@@ -85,6 +85,7 @@ export async function wire(rows: ImMessage[]): Promise<WireMessage[]> {
     const rp = r.replyToId != null ? rm.get(r.replyToId) : null;
     return {
       kind: r.kind, imageUrl: r.deletedAt ? null : r.imageUrl, edited: !!r.editedAt && !r.deletedAt, id: r.id, roomId: r.roomId, fromTeamId: r.fromTeamId,
+      mentions: r.deletedAt ? [] : r.mentions, mentionAll: !r.deletedAt && r.mentionAll,
       reactions: r.deletedAt ? [] : groupReactions(rxBy.get(r.id) ?? []),
       voice: !r.deletedAt && r.voiceUrl ? { url: r.voiceUrl, secs: r.voiceSecs ?? 0 } : null,
       file: !r.deletedAt && r.fileUrl ? { url: r.fileUrl, name: r.fileName ?? "súbor", size: r.fileSize ?? 0 } : null,

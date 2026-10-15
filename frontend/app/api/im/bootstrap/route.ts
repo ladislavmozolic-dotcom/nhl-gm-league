@@ -36,7 +36,8 @@ export async function GET() {
     let otherTeamId: number | null = null;
     if (r.kind === "dm" && r.dmKey) otherTeamId = r.dmKey.split("-").map(Number).find((x) => x !== me) ?? null;
     const lastW = last ? (await wire([last]))[0] : null;
-    return { lastReadId: readMap.get(r.id) ?? 0, muted: muteActive(mutedMap.get(r.id)), mutedUntil: muteActive(mutedMap.get(r.id)) ? mutedMap.get(r.id)!.mutedUntil?.toISOString() ?? null : null, id: r.id, kind: r.kind, otherTeamId, unread, last: lastW, name: r.name, imageUrl: r.imageUrl, bg: r.bg, font: r.font, createdById: r.createdById, members: r.members.map((m) => m.teamId) };
+    const mentioned = (await prisma.imMessage.count({ where: { roomId: r.id, id: { gt: Math.max(readMap.get(r.id) ?? 0, cleared) }, fromTeamId: { not: me }, deletedAt: null, OR: [{ mentionAll: true }, { mentions: { has: me } }] } })) > 0;
+    return { mentioned, lastReadId: readMap.get(r.id) ?? 0, muted: muteActive(mutedMap.get(r.id)), mutedUntil: muteActive(mutedMap.get(r.id)) ? mutedMap.get(r.id)!.mutedUntil?.toISOString() ?? null : null, id: r.id, kind: r.kind, otherTeamId, unread, last: lastW, name: r.name, imageUrl: r.imageUrl, bg: r.bg, font: r.font, createdById: r.createdById, members: r.members.map((m) => m.teamId) };
   }));
   return NextResponse.json({
     tradeRoomId: admin ? (await prisma.imSettings.findUnique({ where: { id: 1 }, select: { tradeRoomId: true } }))?.tradeRoomId ?? null : null,

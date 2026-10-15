@@ -5,6 +5,7 @@ export type PostInput = {
   roomId?: number; toTeamId?: number; body?: string; replyToId?: number; imageUrl?: string | null;
   file?: { url: string; name: string; size: number } | null;
   voice?: { url: string; secs: number } | null;
+  mentions?: number[]; mentionAll?: boolean;
   poll?: { question: string; options: string[]; multi: boolean } | null;
 };
 export type PostResult = { ok: true; roomId: number; message: WireMessage } | { ok: false; status: number; error: string };
@@ -37,9 +38,16 @@ export async function postMessage(me: number, b: PostInput): Promise<PostResult>
     const r = await prisma.imMessage.findUnique({ where: { id: b.replyToId }, select: { roomId: true } });
     if (r?.roomId === roomId) replyToId = b.replyToId;
   }
+  // @mentions: only people who are actually in this chat can be tagged
+  let members: number[] = [];
+  if (room?.kind === "group") members = (await prisma.imMember.findMany({ where: { roomId }, select: { teamId: true } })).map((m) => m.teamId);
+  else if (room?.kind === "dm" && room.dmKey) members = room.dmKey.split("-").map(Number);
+  else members = (await prisma.team.findMany({ where: { league: "NHL", passwordHash: { not: null } }, select: { id: true } })).map((t) => t.id);
+  const mentions = [...new Set((b.mentions ?? []).map(Number))].filter((id) => id !== me && members.includes(id)).slice(0, 40);
+  const mentionAll = !!b.mentionAll && room?.kind !== "dm";
   const msg = await prisma.imMessage.create({
     data: {
-      roomId, fromTeamId: me, body, replyToId, imageUrl, kind: poll ? "poll" : "user",
+      roomId, fromTeamId: me, body, replyToId, imageUrl, kind: poll ? "poll" : "user", mentions, mentionAll,
       ...(voice ? { voiceUrl: voice.url, voiceSecs: voice.secs } : {}),
       ...(file ? { fileUrl: file.url, fileName: file.name, fileSize: file.size } : {}),
       ...(poll ? { poll: { create: { question: poll.question, multi: poll.multi, options: { create: poll.options.map((text, order) => ({ text, order })) } } } } : {}),
@@ -61,10 +69,13 @@ export async function postMessage(me: number, b: PostInput): Promise<PostResult>
     title = `# ${room?.name || "League"} · ${who}`;
     targets = (await prisma.imPushSub.findMany({ where: { teamId: { not: me } }, select: { teamId: true }, distinct: ["teamId"] })).map((s) => s.teamId);
   }
+  // someone tagged by name gets the push even if the chat is muted (never for @all)
+  const tagged = mentions.filter((id) => id !== me);
   const mutedSet = new Set((await prisma.imRead.findMany({ where: { roomId, muted: true, teamId: { in: targets } }, select: { teamId: true, muted: true, mutedUntil: true } })).filter(muteActive).map((r) => r.teamId));
-  targets = targets.filter((t) => !mutedSet.has(t));
+  targets = targets.filter((t) => !mutedSet.has(t) && !tagged.includes(t));
   const preview = voice ? "🎤 Hlasová správa" : poll ? `📊 ${poll.question}` : file && !body ? `📎 ${file.name}` : body ? body.slice(0, 140) : /\.gif|giphy/i.test(imageUrl ?? "") ? "GIF" : "📷 Fotka";
   void pushToTeams(targets, { title, body: preview, url: "/chat", tag: `room-${roomId}` }).catch(() => {});
+  if (tagged.length) void pushToTeams(tagged, { title: `🔔 ${who} ťa označil`, body: preview, url: "/chat", tag: `room-${roomId}` }).catch(() => {});
   return { ok: true, roomId, message: (await wire([msg]))[0] };
 }
 

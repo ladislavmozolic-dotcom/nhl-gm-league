@@ -5,7 +5,7 @@ import { BACKGROUNDS, FONTS } from "./looks";
 import { PushBanner, usePush, type PushApi } from "./push";
 import { DEFAULT_PREFS, SOUNDS, loadPrefs, playSound, savePrefs, unlockAudio, type Prefs, type SoundId, type Theme } from "./sound";
 import { EmojiPicker, GifPicker, Lightbox, VOICE_MAX_SECS, emoticonize, linkify, VoicePlayer, fileIcon, fmtSecs, fmtSize, isBigEmoji, prepareImage, startRecording, uploadFile, uploadImage, uploadVoice, type Recorder } from "./media";
-import { useLayoutEffect, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TeamLite = { id: number; code: string | null; name: string; logoUrl: string | null; gmNickname: string | null; avatarUrl: string | null };
 type Poll = { id: number; question: string; multi: boolean; closed: boolean; options: { id: number; text: string; voters: number[] }[] };
@@ -13,9 +13,11 @@ type FileAtt = { url: string; name: string; size: number };
 type Reaction = { emoji: string; teams: number[] };
 const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
 const MORE_REACTIONS = ["🔥", "🏒", "🥅", "🎉", "👏", "🍆", "👎", "🙏"];
-type Msg = { reactions: Reaction[]; kind: string; voice: { url: string; secs: number } | null; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
-type Room = { id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; mutedUntil: string | null; bg: string | null; font: string | null; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
+type Msg = { mentions: number[]; mentionAll: boolean; reactions: Reaction[]; kind: string; voice: { url: string; secs: number } | null; file: FileAtt | null; pinned: boolean; poll: Poll | null; imageUrl: string | null; edited: boolean; id: number; roomId: number; fromTeamId: number; body: string; at: string; deleted: boolean; replyTo: { id: number; fromTeamId: number; body: string } | null };
+type Room = { mentioned: boolean; id: number; kind: string; otherTeamId: number | null; unread: number; last: Msg | null; lastReadId: number; muted: boolean; mutedUntil: string | null; bg: string | null; font: string | null; name: string | null; imageUrl: string | null; createdById: number | null; members: number[] };
 const attending = () => typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
+const handleOf = (t?: { gmNickname: string | null; code: string | null } | null) => ((t?.gmNickname || t?.code) ?? "").replace(/\s+/g, "");
+const ALL_TAGS = ["všetci", "vsetci", "all", "everyone"];
 const roomMuted = (r?: { muted: boolean; mutedUntil: string | null } | null) => !!r?.muted && (!r.mutedUntil || new Date(r.mutedUntil) > new Date());
 const muteLabel = (until: string | null) => (!until ? "Navždy" : `do ${new Date(until).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`);
 const MUTE_OPTIONS: { label: string; hours: number | null }[] = [{ label: "1 hodinu", hours: 1 }, { label: "8 hodín", hours: 8 }, { label: "1 deň", hours: 24 }, { label: "1 týždeň", hours: 168 }, { label: "Navždy", hours: null }];
@@ -133,7 +135,7 @@ export default function ChatApp() {
     const last = list[list.length - 1]?.id;
     if (!last) return;
     void fetch("/api/im/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomId, lastReadId: last }) });
-    setBoot((b) => b && { ...b, rooms: b.rooms.map((x) => (x.id === roomId ? { ...x, unread: 0 } : x)) });
+    setBoot((b) => b && { ...b, rooms: b.rooms.map((x) => (x.id === roomId ? { ...x, unread: 0, mentioned: false } : x)) });
   }, []);
 
   useEffect(() => {
@@ -158,7 +160,7 @@ export default function ChatApp() {
         // live alert for messages from others: sound + in-app banner (not for muted chats / own / system lines)
         const b0 = bootRef.current;
         if (b0 && document.visibilityState === "visible") {
-          const incoming = list.filter((m) => m.kind !== "system" && m.fromTeamId !== b0.me.id && !roomMuted(b0.rooms.find((r) => r.id === m.roomId)));
+          const incoming = list.filter((m) => m.kind !== "system" && m.fromTeamId !== b0.me.id && (!roomMuted(b0.rooms.find((r) => r.id === m.roomId)) || m.mentions.includes(b0.me.id)));
           const m = incoming[incoming.length - 1];
           if (m) {
             const pr = prefsRef.current;
@@ -192,7 +194,7 @@ export default function ChatApp() {
             const ex = rooms.find((r) => r.id === m.roomId);
             if (!ex) { unknownRoom = true; continue; }
             const mineMsg = m.fromTeamId === b.me.id || m.kind === "system";
-            rooms = rooms.map((r) => r.id === m.roomId ? { ...r, last: m, unread: mineMsg || (activeRef.current === m.roomId && attending()) ? r.unread : r.unread + 1 } : r);
+            rooms = rooms.map((r) => r.id === m.roomId ? { ...r, mentioned: r.mentioned || (!mineMsg && !(activeRef.current === m.roomId && attending()) && (m.mentionAll || m.mentions.includes(b.me.id))), last: m, unread: mineMsg || (activeRef.current === m.roomId && attending()) ? r.unread : r.unread + 1 } : r);
           }
           return { ...b, rooms };
         });
@@ -342,6 +344,7 @@ export default function ChatApp() {
                       {r.last ? (r.last.deleted ? "🚫 Správa bola odstránená" : r.last.voice ? `${lastMine ? "Ty: " : ""}🎤 Hlasová správa` : r.last.poll ? `${lastMine ? "Ty: " : ""}📊 ${r.last.poll.question}` : !r.last.body && r.last.file ? `${lastMine ? "Ty: " : ""}📎 ${r.last.file.name}` : !r.last.body && r.last.imageUrl ? `${lastMine ? "Ty: " : ""}${/\.gif|giphy/i.test(r.last.imageUrl) ? "GIF" : "📷 Fotka"}` : `${lastMine ? "Ty: " : r.kind !== "dm" && r.last.kind !== "system" && r.last.kind !== "trade" ? `${teamMap.get(r.last.fromTeamId)?.code ?? ""}: ` : ""}${r.last.body}`) : "Ešte tu nikto nenapísal"}
                     </span>
                     {roomMuted(r) && <span className="text-xs text-slate-500" title="Stlmené">🔕</span>}
+                    {r.mentioned && r.unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-black text-[11px] font-bold flex items-center justify-center" title="Označili ťa">@</span>}
                     {r.unread > 0 && <span className={`min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${roomMuted(r) ? "bg-slate-600" : "bg-blue-600"}`}>{r.unread}</span>}
                   </div>
                 </div>
@@ -454,6 +457,9 @@ function Thread(props: {
   const fileRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
   const look = room ? { bg: BACKGROUNDS[room.bg ?? "none"] ?? BACKGROUNDS.none, font: FONTS[room.font ?? "default"] ?? FONTS.default } : null;
+  const [mq, setMq] = useState<{ start: number; query: string } | null>(null);
+  const [mentionIds, setMentionIds] = useState<number[]>([]);
+  const [mentionAll, setMentionAll] = useState(false);
   const [attach, setAttach] = useState(false);
   const [pending, setPending] = useState<File | null>(null);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -554,12 +560,12 @@ function Thread(props: {
     }
     const r = await fetch("/api/im/send", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...(room ? { roomId: room.id } : { toTeamId: dmTeamId }), body, imageUrl, file, voice, replyToId: reply?.id }),
+      body: JSON.stringify({ ...(room ? { roomId: room.id } : { toTeamId: dmTeamId }), body, imageUrl, file, voice, replyToId: reply?.id, mentions: mentionIds.filter((id) => body.toLowerCase().includes(`@${handleOf(teamMap.get(id)).toLowerCase()}`)), mentionAll: mentionAll && /@(všetci|vsetci|all|everyone)\b/i.test(body) }),
     });
     setSending(false);
     if (!r.ok) { setError(r.status === 403 ? "Nemáš oprávnenie písať." : "Nepodarilo sa odoslať."); return; }
     const j = await r.json();
-    if (!imageUrl && !file && !voice) setText("");
+    if (!imageUrl && !file && !voice) { setText(""); setMentionIds([]); setMentionAll(false); setMq(null); }
     setReply(null); setTray(null);
     onSent(j.roomId, j.message);
   }
@@ -583,6 +589,31 @@ function Thread(props: {
     const r = await fetch("/api/im/poll", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(room ? { roomId: room.id } : { toTeamId: dmTeamId }), question, options, multi }) });
     if (!r.ok) return false;
     const j = await r.json(); onSent(j.roomId, j.message); return true;
+  }
+  const renderBody = (m: Msg): React.ReactNode =>
+    emoticonize(m.body).split(/(@[\p{L}\p{N}_.\-]+)/gu).map((part, i) => {
+      if (!part.startsWith("@")) return <Fragment key={i}>{linkify(part)}</Fragment>;
+      const tag = part.slice(1).toLowerCase();
+      const hit = (ALL_TAGS.includes(tag) && m.mentionAll) || m.mentions.some((id) => { const t = teamMap.get(id); return handleOf(t).toLowerCase() === tag || t?.code?.toLowerCase() === tag; });
+      return hit ? <span key={i} className="font-semibold rounded px-1 bg-amber-400/25 text-amber-200">{part}</span> : <Fragment key={i}>{part}</Fragment>;
+    });
+  const mentionsMe = (m: Msg) => m.fromTeamId !== boot.me.id && (m.mentionAll || m.mentions.includes(boot.me.id));
+  // @mentions — people who can be tagged in this chat (+ @všetci in group / league)
+  const taggable: TeamLite[] = (isLeague ? boot.teams : isGroup ? room!.members.map((id) => teamMap.get(id)).filter((t): t is TeamLite => !!t) : other ? [other] : []).filter((t) => t.id !== boot.me.id);
+  const mqList = mq ? taggable.filter((t) => { const q = mq.query.toLowerCase(); return !q || [t.gmNickname, t.name, t.code].some((x) => x?.toLowerCase().includes(q)); }).slice(0, 6) : [];
+  const showAllOpt = !!mq && multi && (!mq.query || "všetci".startsWith(mq.query.toLowerCase()) || "all".startsWith(mq.query.toLowerCase()));
+  function detectMention(value: string, caret: number) {
+    const m = /(^|\s)@([^\s@]*)$/.exec(value.slice(0, caret));
+    setMq(m ? { start: caret - m[2].length - 1, query: m[2] } : null);
+  }
+  function pickMention(t: TeamLite | "all") {
+    if (!mq) return;
+    const ta = taRef.current, caret = ta?.selectionStart ?? text.length;
+    const tag = t === "all" ? "@všetci " : `@${handleOf(t)} `;
+    setText(text.slice(0, mq.start) + tag + text.slice(caret));
+    if (t === "all") setMentionAll(true); else setMentionIds((ids) => (ids.includes(t.id) ? ids : [...ids, t.id]));
+    setMq(null);
+    requestAnimationFrame(() => { ta?.focus(); const pos = mq.start + tag.length; ta?.setSelectionRange(pos, pos); });
   }
   function startEdit(m: Msg) { setMenu(null); setReply(null); setEditing(m); setText(m.body); setTray(null); requestAnimationFrame(() => taRef.current?.focus()); }
   function cancelEdit() { setEditing(null); setText(""); }
@@ -686,7 +717,7 @@ function Thread(props: {
                   onDoubleClick={() => { if (m.deleted) return; window.getSelection()?.removeAllRanges(); setMenu(m); }}
                   onContextMenu={(e) => { if (m.deleted) return; e.preventDefault(); setMenu(m); }}
                   onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget && !m.deleted) setMenu(m); }}
-                  className={`max-w-[80%] text-left select-text cursor-pointer rounded-2xl px-3 py-2 ${mine ? "bg-blue-600 text-white rounded-br-md" : "bg-slate-800 rounded-bl-md"} ${m.deleted ? "opacity-60 italic" : ""}`}>
+                  className={`max-w-[80%] text-left select-text cursor-pointer rounded-2xl px-3 py-2 ${mine ? "bg-blue-600 text-white rounded-br-md" : "bg-slate-800 rounded-bl-md"} ${mentionsMe(m) ? "ring-2 ring-amber-400/70" : ""} ${m.deleted ? "opacity-60 italic" : ""}`}>
                   {showName && <div className="text-[11px] font-semibold text-blue-300 mb-0.5">{t?.gmNickname ?? t?.code ?? "GM"} · {t?.code}</div>}
                   {m.replyTo && !m.deleted && (
                     <div onClick={(e) => { e.stopPropagation(); jumpTo(m.replyTo!.id); }} className="border-l-2 border-white/40 pl-2 mb-1 text-xs opacity-80 cursor-pointer">
@@ -707,7 +738,7 @@ function Thread(props: {
                     </a>
                   )}
                   {m.poll && !m.deleted && <PollCard m={m} me={boot.me.id} teamMap={teamMap} onVote={(oid) => void vote(m, oid)} onClose={() => void closePoll(m)} />}
-                  {(m.deleted || (m.body && !m.poll)) && <div className={`whitespace-pre-wrap break-words ${!m.deleted && isBigEmoji(emoticonize(m.body)) ? "text-5xl leading-tight" : "text-[15px]"}`}>{m.deleted ? "🚫 Správa bola odstránená" : linkify(emoticonize(m.body))}</div>}
+                  {(m.deleted || (m.body && !m.poll)) && <div className={`whitespace-pre-wrap break-words ${!m.deleted && isBigEmoji(emoticonize(m.body)) ? "text-5xl leading-tight" : "text-[15px]"}`}>{m.deleted ? "🚫 Správa bola odstránená" : renderBody(m)}</div>}
                   {m.reactions.length > 0 && !m.deleted && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {m.reactions.map((rc) => {
@@ -750,6 +781,16 @@ function Thread(props: {
       )}
       {canWrite ? (
         <div className="border-t border-slate-800 bg-slate-900">
+          {mq && (mqList.length > 0 || showAllOpt) && (
+            <div className="mx-3 mt-2 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
+              {showAllOpt && <button onMouseDown={(e) => e.preventDefault()} onClick={() => pickMention("all")} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-800 text-left"><span className="w-8 h-8 rounded-full bg-amber-500 text-black flex items-center justify-center font-bold">@</span><span className="text-sm">@všetci <span className="text-slate-500">· označiť všetkých</span></span></button>}
+              {mqList.map((t) => (
+                <button key={t.id} onMouseDown={(e) => e.preventDefault()} onClick={() => pickMention(t)} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-800 text-left">
+                  <Logo t={t} size={32} /><span className="flex-1 min-w-0 text-sm truncate">{t.gmNickname ?? t.code} <span className="text-slate-500">· {t.name}</span></span>
+                </button>
+              ))}
+            </div>
+          )}
           {uploading && <div className="px-4 pt-2 text-xs text-slate-400">Nahrávam obrázok…</div>}
           {rec ? (
             <div className="flex items-center gap-3 p-3">
@@ -771,9 +812,9 @@ function Thread(props: {
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void sendDoc(f); }} />
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; e.target.accept = "image/png,image/jpeg,image/webp,image/gif"; if (f) void sendFile(f); }} />
-            <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} placeholder="Správa" onFocus={() => setTray(null)}
+            <textarea ref={taRef} value={text} onChange={(e) => { setText(e.target.value); detectMention(e.target.value, e.target.selectionStart); }} rows={1} maxLength={2000} placeholder="Správa" onFocus={() => setTray(null)}
               onPaste={(e) => { const f = [...e.clipboardData.files][0]; if (f) { e.preventDefault(); takeFile(f); } }}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(pointer:fine)").matches) { e.preventDefault(); void send(); } }}
+              onKeyDown={(e) => { if (mq && (e.key === "Enter" || e.key === "Tab") && (mqList[0] || showAllOpt)) { e.preventDefault(); pickMention(mqList[0] ?? "all"); return; } if (e.key === "Escape" && mq) { setMq(null); return; } if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(pointer:fine)").matches) { e.preventDefault(); void send(); } }}
               className="flex-1 min-w-0 resize-none max-h-32 rounded-2xl bg-slate-800 px-4 py-2.5 text-base outline-none" />
             {text.trim() || editing
               ? <button onClick={() => send()} disabled={!text.trim() || sending} className="w-11 h-11 rounded-full bg-blue-600 disabled:opacity-40 text-lg" aria-label="Odoslať">➤</button>
