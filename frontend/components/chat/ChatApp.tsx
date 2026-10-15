@@ -153,7 +153,7 @@ export default function ChatApp() {
   const lastSeen = useRef(0);
   useEffect(() => {
     if (!boot) return;
-    let es: EventSource | null = null, dead = false, lastBeat = Date.now();
+    let es: EventSource | null = null, dead = false, lastBeat = Date.now(), lastReload = 0;
     if (lastSeen.current === 0) lastSeen.current = boot.cursor;
     const handleMessages = (list: Msg[]) => {
         lastSeen.current = Math.max(lastSeen.current, ...list.map((m) => m.id));
@@ -212,6 +212,7 @@ export default function ChatApp() {
       es = new EventSource(`/api/im/stream${lastSeen.current ? `?after=${lastSeen.current}` : ""}`);
       es.addEventListener("messages", (e) => { lastBeat = Date.now(); handleMessages(JSON.parse((e as MessageEvent).data) as Msg[]); });
       es.addEventListener("hello", () => { lastBeat = Date.now(); });
+      es.addEventListener("myread", () => { lastBeat = Date.now(); if (Date.now() - lastReload > 1500) { lastReload = Date.now(); void load(); } }); // read on another device → refresh unread counts + app badge
       es.addEventListener("hb", () => { lastBeat = Date.now(); });
       es.addEventListener("deleted", (e) => {
         const dl = JSON.parse((e as MessageEvent).data) as { id: number; roomId: number }[];

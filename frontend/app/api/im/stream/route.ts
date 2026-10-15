@@ -20,6 +20,7 @@ export async function GET(req: Request) {
   let pollCursor = new Date();
   let pinCursor = new Date();
   let reactCursor = new Date();
+  let mySeen: Map<number, number> | null = null; // my own read pointers (roomId -> lastReadId) — baseline taken on the first tick
   const peerSeen = new Map<string, number>(); // "roomId:teamId" -> that member's lastReadId, last value sent
 
   const stream = new ReadableStream({
@@ -46,6 +47,14 @@ export async function GET(req: Request) {
             editCursor = new Date(Math.max(...eds.map((d) => d.editedAt!.getTime())));
             send(`event: edited\ndata: ${JSON.stringify(await wire(eds))}\n\n`);
           }
+          // my read pointer moved (I read the chat on ANOTHER device) → tell this device so its unread badges clear
+          const mine = await prisma.imRead.findMany({ where: { teamId: me, roomId: { in: rooms } }, select: { roomId: true, lastReadId: true, clearedId: true } });
+          const cur = new Map(mine.map((r) => [r.roomId, Math.max(r.lastReadId, r.clearedId)]));
+          if (mySeen) {
+            const moved = [...cur.entries()].filter(([rid, v]) => v > (mySeen!.get(rid) ?? 0)).map(([rid]) => rid);
+            if (moved.length) send(`event: myread\ndata: ${JSON.stringify(moved)}\n\n`);
+          }
+          mySeen = cur;
           const pls = await prisma.imPoll.findMany({ where: { updatedAt: { gt: pollCursor }, message: { roomId: { in: rooms }, deletedAt: null } }, include: { ...pollInclude, message: { select: { roomId: true } } } });
           if (pls.length) {
             pollCursor = new Date(Math.max(...pls.map((p) => p.updatedAt.getTime())));
