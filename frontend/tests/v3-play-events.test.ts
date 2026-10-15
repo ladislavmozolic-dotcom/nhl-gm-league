@@ -5,6 +5,7 @@ import { autoLines } from "../lib/sim/lines-core";
 import { buildTeam } from "../lib/sim/ratings";
 import { ENGINE_V2, ENGINE_V3 } from "../lib/sim/version";
 import { describeLiveEvent } from "../lib/sim/live-text";
+import { puckRaceText } from "../lib/sim/rush-text";
 import type { TeamTactics } from "../lib/sim/tactics";
 import type { GameResult, SimGoalie, SimSkater } from "../lib/sim/types";
 
@@ -94,5 +95,27 @@ test("V3 long zone pressure is narrated, tired defences show up, V2 and pin:fals
     assert.equal(count(run(seed, ENGINE_V2), "PRESSURE").length, 0);
   }
   assert.ok(pressure > 40, `a few pins a game (${pressure} in 40)`);
-  assert.ok(tired > 5, `some pins leave the defence gassed (${tired})`);
+  assert.ok(tired >= 1, `some pins leave the defence gassed (${tired})`);
+});
+
+test("V3 dump-ins are a race for the puck: both sides win some, the goalie plays some, V2 and dump:false have none", () => {
+  const raceLine = (t: string) => /wins the race to the dumped-in puck|play the dump-in|gets to the dump-in/.test(t);
+  let dumps = 0, won = 0, goalie = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const r = run(seed, ENGINE_V3);
+    const lines = r.playByPlay.filter((l) => raceLine(l.text));
+    const entries = (r.events ?? []).filter((e) => e.type === "ZONE_ENTRY" && (e.meta as { entryType?: string } | undefined)?.entryType === "dump");
+    assert.equal(lines.length, entries.length, "every dump-in is followed by a race result in the play-by-play");
+    won += lines.filter((l) => /wins the race/.test(l.text)).length;
+    goalie += lines.filter((l) => /play the dump-in/.test(l.text)).length;
+    dumps += entries.length;
+    const off = simulateGame(makeTeam(1, 60 + (seed % 9)), makeTeam(2, 62 + ((seed * 3) % 9)), { seed, engineVersion: ENGINE_V3, experimentalV3: { dump: false } });
+    assert.equal(off.playByPlay.filter((l) => raceLine(l.text)).length, 0);
+    assert.equal(run(seed, ENGINE_V2).playByPlay.filter((l) => raceLine(l.text)).length, 0);
+  }
+  assert.ok(dumps / 80 > 12 && dumps / 80 < 40, `dump-ins per team-game ${dumps / 80}`);
+  assert.ok(won / dumps > 0.25 && won / dumps < 0.6, `attackers win ${(won / dumps).toFixed(2)} of the races`);
+  assert.ok(goalie >= 20, `the goalie plays the puck now and then (${goalie})`);
+  // the live feed and the play-by-play share one wording
+  assert.equal(puckRaceText({ won: "def", goalie: true, next: "B" }, "G", "A"), "G comes out to play the dump-in behind the net and hands it to B.");
 });

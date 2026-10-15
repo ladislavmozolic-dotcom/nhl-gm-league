@@ -173,6 +173,7 @@ type SimState = {
   v3ShooterForm: boolean;            // V3 diagnostic feature flag
   v3LateTieCaution: boolean;         // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
+  v3Dump: boolean;                   // V3: a failed carry-in becomes a dump-in — a race for the puck, the goalie may play it
   v3Pin: boolean;                    // V3: a team pinned in its own end can't change, tires, and gets scored on more
   v3Pace: boolean;                   // V3: the puck needs real time to cross a zone — no 2-second counter-attacks, no 'takeaway' right after a shot
   v3FightStory: boolean;             // V3: a fight is an event with a winner, a description and who got hurt
@@ -2408,6 +2409,22 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           }
           zone = zone === "DEF" ? "NEU" : "OFF"; setup = "carry";
         }
+        else if (st.v3Dump && zone === "NEU" && rng.chance(DUMP_TUNING.share)) {
+          // dump and chase: the puck goes in deep and it's a race — the attackers' forecheck against the defenders' retrieval, with the goalie sometimes playing it behind the net
+          const dumper = carrier;
+          st.sink.emit({ period, seconds: tick, type: "ZONE_ENTRY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: dumper.id, playerName: dumper.name, zone: "OFF", importance: "NOTABLE", meta: { entryType: "dump" } });
+          const chase = onIceF(carrierTeam);
+          const runner = pickByAttr(rng, chase.length ? chase : [carrier], (s) => (s.attrs.sk ?? 50) + (s.attrs.ck ?? 50)) ?? carrier;
+          const pWin = Math.max(0.15, Math.min(0.7, DUMP_TUNING.race * ratio(atkSkill(runner.attrs.sk ?? 50), defSkill(dman.attrs.sk ?? 50))));
+          if (rng.chance(pWin)) {
+            carrier = runner; zone = "OFF"; setup = "carry"; press = 0;
+            st.sink.emit({ period, seconds: tick, type: "PUCK_RACE", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: runner.id, playerName: runner.name, targetId: dumper.id, targetName: dumper.name, importance: "MINOR", meta: { won: "att" } });
+          } else {
+            const g = liveGoalie(st, def), goalieGets = !st.emptyNet[def.id] && rng.chance(DUMP_TUNING.goalie);
+            carrierTeam = def; carrier = pickByAttr(rng, onIceD(def).concat(onIceF(def)), (s) => (s.attrs.pa ?? 50) + (s.attrs.df ?? 50)) ?? dman; zone = "DEF"; setup = "carry"; press = 0;
+            st.sink.emit({ period, seconds: tick, type: "PUCK_RACE", teamId: def.id, teamCode: def.code ?? undefined, playerId: goalieGets ? g.id : carrier.id, playerName: goalieGets ? g.name : carrier.name, targetId: dumper.id, targetName: dumper.name, importance: "MINOR", meta: { won: "def", goalie: goalieGets, next: carrier.name } });
+          }
+        }
         else if (rng.chance(0.4)) { if (tryRush(carrierTeam, zone, "entry", carrier)) continue; carrierTeam = def; carrier = pickByAttr(rng, onIceF(def), (s) => s.attrs.pa ?? 50) ?? dman; zone = "DEF"; setup = "carry"; press = 0; } // stuffed at the blue line → turnover (V3: the classic counter-rush)
       }
       continue;
@@ -2429,7 +2446,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     const crowd = carrierTeam === home ? st.crowdMult : 1;
     if (st.v3Pace && !rushCtx && setup !== "rebound" && tick - lastShotTick < PACE_TUNING.shotGap) continue; // a blocked / missed shot is not re-shot a second later
     if (st.v3Pace && !rushCtx && tick - zoneSince < PACE_TUNING.shotDwell) continue; // just arrived in the zone — nobody shoots in the first two seconds
-    if (!rushCtx && !rng.chance(0.29 * (st.v3Pace ? PACE_TUNING.shotBoost : 1) * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * (st.v3Pin ? PIN_TUNING.base * (1 + PIN_TUNING.shots * Math.min(1, (tick - zoneSince) / 40)) : 1) * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd * (st.v3Rush ? RUSH_TUNING.gate : 1))) continue;
+    if (!rushCtx && !rng.chance(0.29 * (st.v3Pace ? PACE_TUNING.shotBoost : 1) * (st.v3Dump ? DUMP_TUNING.boost : 1) * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * (st.v3Pin ? PIN_TUNING.base * (1 + PIN_TUNING.shots * Math.min(1, (tick - zoneSince) / 40)) : 1) * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd * (st.v3Rush ? RUSH_TUNING.gate : 1))) continue;
     lastShotTick = tick;
     const R = rushCtx; rushCtx = null; // V3: a rush shot is taken now, whatever the ordinary shot dice say
     // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
@@ -3119,6 +3136,8 @@ const HIT_DEF_TICKS = 1790;
 const TAKEAWAY_SHARE = 0.17;
 /** V3 pace: the earliest a puck may leave a zone / get a first shot after arriving, with the chances raised so the AVERAGE time stays what it was (the old geometric dice let a puck cross two zones in 2 s). */
 /** V3 pin: after `hold` s of the puck in their zone a team can't change (until `maxShift` s); a gassed defence concedes (`conv`); long possessions shoot more (`shots`); `base` keeps league shots where they were. */
+/** V3 dump-in: share of failed carry-ins that are dumped in instead, how often the attackers win the race, how often the goalie gets there first. */
+export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 export const PIN_TUNING = { hold: 6, maxShift: 100, conv: 0.35, shots: 0.25, base: 0.80, keep: 0.25, tire: 0.8, dur: 0.6 };
 export const PACE_TUNING = { dwell: 2, advance: 0.6, shotDwell: 2, shotGap: 3, shotBoost: 1.78 };
 
@@ -3216,7 +3235,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
+  experimentalV3?: { dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3292,6 +3311,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3ShooterForm: isV3 && (opts.experimentalV3?.shooterForm ?? true),
     v3LateTieCaution: isV3 && (opts.experimentalV3?.lateTieCaution ?? true),
     v3Stoppages: isV3 && (opts.experimentalV3?.stoppageRealism ?? CFG.v3StoppageRealism ?? false),
+    v3Dump: isV3 && (opts.experimentalV3?.dump ?? true),
     v3Pin: isV3 && (opts.experimentalV3?.pin ?? true),
     v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),
     v3FightStory: isV3 && (opts.experimentalV3?.fightStory ?? true),

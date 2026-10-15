@@ -65,3 +65,10 @@ export function pressureText(m: { seconds?: number; against?: string; tired?: bo
   const d = m.against ?? "the defenders";
   return `${atk ?? "The attackers"} ${atk ? "has" : "have"} ${d} pinned in ${m.against ? "its" : "their"} own end for ${m.seconds ?? 20} seconds${m.tired ? ` — the ${d} defenders are gassed and can't change.` : "."}`;
 }
+
+/** The race for a dumped-in puck. `name` is whoever got there (a skater, or the goalie when `goalie`). */
+export function puckRaceText(m: { won?: "att" | "def"; goalie?: boolean; next?: string }, name: string, dumper?: string): string {
+  if (m.won === "att") return `${name} wins the race to the dumped-in puck and keeps the forecheck alive.`;
+  if (m.goalie) return `${name} comes out to play the dump-in behind the net and ${m.next ? `hands it to ${m.next}` : "starts the breakout"}.`;
+  return `${name} gets to the dump-in${dumper ? ` from ${dumper}` : ""} first and the breakout starts.`;
+}
