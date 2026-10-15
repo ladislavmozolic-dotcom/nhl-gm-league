@@ -829,7 +829,10 @@ export async function runLiveCalculatorRecompute(): Promise<{
     }
 
     // Prospects / rookies without established ratings: use realistic Player Calculator logic
-    if (p.rosterType === "PROSPECT") {
+    // An established veteran parked in the reserve pool / LTIR (Kulikov, Barkov) keeps the normal NHL-rule projection;
+    // the rookie formula (OV 46-56 scale) would crush a real rating. Only prospects without an established rating use it.
+    const establishedVeteran = actual.ck != null && (p.age ?? 0) > 25;
+    if (p.rosterType === "PROSPECT" && !establishedVeteran) {
       const rookieRes = calculateRookieRatings(p as any, config.weights);
       for (const [param, val] of Object.entries(rookieRes.ratings)) {
         if (param === "OV") continue;

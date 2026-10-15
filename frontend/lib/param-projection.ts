@@ -179,7 +179,15 @@ type Row = {
 /** Project every skater from real form using the calculator's exact tables or live calculator ratings. */
 export async function projectAllSkaters(): Promise<{ rows: ProjSkater[]; active: boolean }> {
   const players = await prisma.player.findMany({
-    where: { isGoalie: false, rosterType: { in: ["NHL", "AHL"] } },
+    where: {
+      isGoalie: false,
+      OR: [
+        { rosterType: { in: ["NHL", "AHL"] } },
+        // Veterans sitting in the reserve pool / on LTIR who still play real games (e.g. a 35-year-old with 19 GP last
+        // year): they keep an established rating and must be tracked too. Young prospects stay in the Rookie Calculator.
+        { rosterType: "PROSPECT", OR: [{ ltir: true }, { age: { gt: 25 } }], AND: [{ OR: [{ curSeasonGP: { gt: 0 } }, { lastSeasonGP: { gt: 0 } }] }] },
+      ],
+    },
     select: {
       id: true, slug: true, name: true, position: true, teamId: true, rosterType: true,
       age: true, overall: true, number: true, photoUrl: true,
