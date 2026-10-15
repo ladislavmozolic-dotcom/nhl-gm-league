@@ -188,3 +188,23 @@ test("V3 an injury or knock from a hit comes with a real hit on him in the same 
   }
   assert.ok(hitInj >= 10, `enough hit injuries to say something (${hitInj})`);
 });
+
+test("V3 fouls are called ON an opposing player, in the play-by-play and the live feed; V2 keeps its plain line", () => {
+  const FOUL = ["Tripping", "Hooking", "Slashing", "Holding", "Interference", "Cross-checking", "Roughing", "High-sticking", "Boarding", "Elbowing"];
+  let named = 0, fouls = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const r = run(seed, ENGINE_V3);
+    for (const e of (r.events ?? []).filter((x) => x.type === "PENALTY" && FOUL.includes((x.meta as { penalty?: string } | undefined)?.penalty ?? "") && !(x.meta as { washedOut?: boolean } | undefined)?.washedOut)) {
+      fouls++;
+      const on = (e.meta as { on?: string }).on;
+      if (!on) continue;
+      named++;
+      assert.notEqual(on.split(" ")[0], e.playerName!.split(" ")[0], `${e.playerName} fouled ${on} — must be the other team`);
+      const t = describeLiveEvent(e)!.text;
+      assert.ok(t.includes(` on ${on} (`), t);
+      assert.ok(r.playByPlay.some((l) => l.kind === "penalty" && l.text.includes(` on ${on} (`)), "same victim in the play-by-play");
+    }
+    for (const l of run(seed, ENGINE_V2).playByPlay.filter((x) => x.kind === "penalty")) assert.ok(!/ penalty for \w[\w-]* on /.test(l.text), l.text);
+  }
+  assert.ok(fouls > 40 && named / fouls > 0.9, `almost every foul names its victim (${named}/${fouls})`);
+});

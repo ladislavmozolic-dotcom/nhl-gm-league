@@ -46,12 +46,12 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
       return { ...base, kind: "save", major: !!sm?.rush, text: `Shot by ${e.targetName ?? "?"}${how ? ` (${how})` : ""} — saved by ${e.playerName ?? "the goalie"} ${saveWhere(sm?.danger, e.seconds * 7 + (e.targetId ?? 0))}${sm?.rush ? ` on the ${RUSH_LABEL[sm.rush] ?? "rush"}` : ""}.` };
     }
     case "PENALTY": {
-      const mm = m<{ penalty?: string; minutes?: number; severity?: string; washedOut?: boolean; overGlass?: boolean }>(e);
+      const mm = m<{ penalty?: string; minutes?: number; severity?: string; washedOut?: boolean; overGlass?: boolean; on?: string }>(e);
       if (mm?.penalty === "Fighting") return null; // narrated as a fight
       if (mm?.severity === "Game Misconduct") return null; // folded into its major
       if (mm?.washedOut) return { ...base, kind: "penalty", major: false, text: `The delayed penalty on ${e.playerName} (${mm.penalty ?? "infraction"}) is washed out by the goal.` };
       if (mm?.overGlass) return { ...base, kind: "penalty", major: true, text: overGlassText(e.playerName ?? "?", mm.minutes ?? 2, mm.severity ?? "Minor") };
-      return { ...base, kind: "penalty", major: true, text: `${e.playerName} — ${mm?.penalty ?? "infraction"} (${mm?.minutes ?? 2} min, ${mm?.severity ?? "Minor"}).` };
+      return { ...base, kind: "penalty", major: true, text: `${e.playerName} — ${mm?.penalty ?? "infraction"}${mm?.on ? ` on ${mm.on}` : ""} (${mm?.minutes ?? 2} min, ${mm?.severity ?? "Minor"}).` };
     }
     case "EJECTION": return { ...base, outPlayerId: e.playerId, kind: "penalty", major: true, text: `${e.playerName ?? "?"} is ejected from the game.` };
     case "PUCK_RACE": return { ...base, kind: "note", major: false, text: puckRaceText(m<{ won?: "att" | "def"; goalie?: boolean; next?: string }>(e) ?? {}, e.playerName ?? "?", e.targetName) };

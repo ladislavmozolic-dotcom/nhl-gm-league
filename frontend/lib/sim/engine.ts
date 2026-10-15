@@ -1866,6 +1866,10 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
   let foZone: number | null = null;            // team whose DEFENSIVE zone hosts the next draw (null = centre ice)
   const noChange: Record<number, boolean> = {}; // iced the puck → that unit stays out for the draw
   const delayedSeen = new Set<Penalty>();
+  // V3: a foul is called ON somebody — when a pre-rolled penalty starts, name the opposing player it was committed against
+  const lastCarrierOf: Record<number, SimSkater> = {};
+  const victimNamed = new Set<Penalty>();
+  const FOUL_ON = new Set(["Tripping", "Hooking", "Slashing", "Holding", "Interference", "Cross-checking", "Roughing", "High-sticking", "Boarding", "Elbowing"]);
   const regulation = period <= 3;
   const shortenFor = (team: SimTeam, tick: number): 0 | 1 | 2 => {
     if (!CFG.benchShortenEnabled || !coach[team.id].benchShorten) return 0;
@@ -2064,6 +2068,17 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
             st.sink.emit({ period, seconds: tick, type: "DELAYED_PENALTY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, importance: "NOTABLE" });
           }
         }
+      }
+    }
+    if (st.v3PlayEvents && state === "PLAY") {
+      for (const pn of active) {
+        if (pn.expired || pn.offsetting || pn.playerId == null || victimNamed.has(pn) || pn.start > tick) continue;
+        victimNamed.add(pn);
+        const ev = st.sink.all().find((x) => x.type === "PENALTY" && x.period === period && x.seconds === pn.start && x.playerId === pn.playerId);
+        if (!ev || !FOUL_ON.has((ev.meta as { penalty?: string } | undefined)?.penalty ?? "")) continue;
+        const oppT = pn.team === home.id ? away : home;
+        const victim = carrierTeam === oppT ? carrier : lastCarrierOf[oppT.id] ?? onIceF(oppT)[0];
+        if (victim) ev.meta = { ...(ev.meta ?? {}), on: victim.name };
       }
     }
     // resolve the man-advantage FIRST so the on-ice snapshot uses PP/PK units
@@ -2306,6 +2321,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       else { st.box[carrierTeam.id].nzTime++; st.box[opp.id].nzTime++; }
     }
     const def = other(carrierTeam);
+    lastCarrierOf[carrierTeam.id] = carrier;
     if (st.v3Pace || st.v3Pin) {
       if (carrierTeam !== lastCT) { possSince = tick; zoneSince = tick; lastCT = carrierTeam; lastZone = zone; }
       else if (zone !== lastZone) { zoneSince = tick; lastZone = zone; }

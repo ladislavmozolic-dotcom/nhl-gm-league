@@ -276,7 +276,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
           else add(p, e.seconds + 1, null, "faceoff", `${center(home, p, e.seconds).name} wins face-off versus ${center(away, p, e.seconds).name} in neutral zone.`);
         }
       } else if (e.type === "PENALTY") {
-        const m = e.meta as { penalty?: string; minutes?: number; severity?: string; washedOut?: boolean; overGlass?: boolean } | undefined;
+        const m = e.meta as { penalty?: string; minutes?: number; severity?: string; washedOut?: boolean; overGlass?: boolean; on?: string } | undefined;
         if (m?.penalty === "Fighting") continue; // paired into a fight line below
         if (m?.washedOut) { add(p, e.seconds, tId, "penalty", `The delayed penalty on ${e.playerName} (${m?.penalty ?? "infraction"}) is washed out by the goal.`); continue; }
         // a major + game misconduct on the same player in the same second reads as ONE call
@@ -285,7 +285,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const isGmOfMajor = m?.severity === "Game Misconduct" && periodEvents.some((x) => sameCall(x) && (x.meta as { severity?: string } | undefined)?.severity === "Major");
         if (isGmOfMajor) continue; // folded into the major's line
         if (m?.overGlass) add(p, e.seconds, tId, "penalty", overGlassText(e.playerName ?? "?", m?.minutes ?? 2, m?.severity ?? "Minor"), true);
-        else add(p, e.seconds, tId, "penalty", `${e.playerName} penalty for ${m?.penalty ?? "infraction"} (${m?.minutes ?? 2} min, ${gmTwin ? "Major / Game Misconduct" : (m?.severity ?? "Minor")}).`, true);
+        else add(p, e.seconds, tId, "penalty", `${e.playerName} penalty for ${m?.penalty ?? "infraction"}${m?.on ? ` on ${m.on}` : ""} (${m?.minutes ?? 2} min, ${gmTwin ? "Major / Game Misconduct" : (m?.severity ?? "Minor")}).`, true);
       } else if (e.type === "RUSH") {
         // V3 transition rush: the turnover and who is going the other way, then (if it ends without a shot) how it died
         const rm = (e.meta ?? {}) as RushMeta;
