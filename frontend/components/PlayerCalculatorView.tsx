@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PlayerAvatar from "@/components/playerAvatar";
 import PlayerLink from "@/components/PlayerLink";
+import VeteranActivateButton from "@/components/VeteranActivateButton";
 import { cleanName } from "@/lib/playerName";
 import {
   ALL_SKATER_PARAMS,
@@ -898,6 +899,7 @@ export default function PlayerCalculatorView({
             onRowMouseLeave={handlePlayerMouseLeave}
             showTeamBadge={isAll}
             teamMap={teamMap}
+            isAdmin={isAdmin}
             emptyMessage={
               search || posFilter !== "ALL" || onlyChanges
                 ? "No NHL players match the filters."
@@ -931,6 +933,7 @@ export default function PlayerCalculatorView({
             onRowMouseLeave={handlePlayerMouseLeave}
             showTeamBadge={isAll}
             teamMap={teamMap}
+            isAdmin={isAdmin}
             emptyMessage={
               search || posFilter !== "ALL" || onlyChanges
                 ? "No AHL players match the filters."
@@ -1051,6 +1054,7 @@ function RosterSection({
   emptyMessage,
   showTeamBadge,
   teamMap,
+  isAdmin = false,
 }: {
   title: string;
   badgeText: string;
@@ -1069,6 +1073,7 @@ function RosterSection({
   emptyMessage: string;
   showTeamBadge?: boolean;
   teamMap?: Map<number, { id: number; slug: string; code: string; name: string; logoUrl: string | null }>;
+  isAdmin?: boolean;
 }) {
   const arrow = (k: SortConfig["key"]) =>
     sort.key === k ? (sort.dir === "asc" ? " ▲" : " ▾") : "";
@@ -1229,6 +1234,12 @@ function RosterSection({
                               >
                                 {teamMap.get(p.teamId)?.code ?? "—"}
                               </Link>
+                            )}
+                            {isAdmin && p.rosterType === "PROSPECT" && (
+                              <>
+                                <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30" title="Reserve pool / LTIR — playing again">RES</span>
+                                <VeteranActivateButton playerId={p.id} />
+                              </>
                             )}
                           </div>
                         </div>

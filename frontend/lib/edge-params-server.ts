@@ -772,6 +772,30 @@ export async function activateRookieLiveRating(playerId: number): Promise<{ ok: 
   return { ok: true, applied: ratings };
 }
 
+/** Apply an established veteran's recalculated Live rating (reserve pool / LTIR player who has started playing
+ *  again) to his live ck/sc/pa/... fields. Uses the projection the Live Calculator stored on the player; his roster
+ *  status (reserve, LTIR) is a separate roster move and is not touched here. */
+export async function activateVeteranLiveRating(playerId: number): Promise<{ ok: boolean; applied?: Record<string, number>; error?: string }> {
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { id: true, isGoalie: true, rosterType: true, liveCalculatorRatings: true } });
+  if (!player) return { ok: false, error: "Player not found." };
+  if (player.isGoalie) return { ok: false, error: "Goalies aren't supported here." };
+  const live = player.liveCalculatorRatings as { projected?: Record<string, number | null>; overallProjected?: number | null } | null;
+  if (!live?.projected) return { ok: false, error: "No recalculated rating yet — run the recalculation first." };
+
+  const data: Record<string, number> = {};
+  const applied: Record<string, number> = {};
+  for (const [param, field] of Object.entries(ROOKIE_PARAM_FIELD)) {
+    const v = live.projected[field];
+    if (v != null && Number.isFinite(v)) { data[field] = Math.round(Math.max(1, Math.min(99, v))); applied[param] = data[field]; }
+  }
+  if (live.overallProjected != null && Number.isFinite(live.overallProjected)) { data.overall = Math.round(live.overallProjected); applied.OV = data.overall; }
+  if (!Object.keys(data).length) return { ok: false, error: "No computed rating available." };
+
+  await backupLiveIfNeeded();
+  await prisma.player.update({ where: { id: playerId }, data });
+  return { ok: true, applied };
+}
+
 /** Write a GM-adjusted rating for one Rookie Calculator player directly onto his
  *  live ck/sc/pa/... fields, bypassing edgeRatings() entirely. The Rookie
  *  Calculator's engine is a model, not an oracle — a real GM's own read on a

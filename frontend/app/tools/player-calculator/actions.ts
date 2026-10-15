@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isAdmin } from "@/lib/auth";
-import { activateRookieLiveRating, applyRookieRatingsOverride } from "@/lib/edge-params-server";
+import { activateRookieLiveRating, activateVeteranLiveRating, applyRookieRatingsOverride } from "@/lib/edge-params-server";
 import { scanAndSyncDebutants } from "@/lib/rookie-debutants";
 
 export async function promoteRookieAction(playerId: number) {
@@ -31,6 +31,14 @@ export async function promoteRookieWithOverridesAction(playerId: number, ratings
 export async function scanAndSyncDebutantsAction() {
   if (!(await isAdmin())) return { ok: false as const, created: [], statsRefreshed: 0, ratingsRecomputed: 0, error: "Admin only." };
   const result = await scanAndSyncDebutants();
+  if (result.ok) revalidatePath("/tools/player-calculator");
+  return result;
+}
+
+/** Activate the recalculated rating of a reserve/LTIR veteran who is playing again (Live Calculator row button). */
+export async function promoteVeteranAction(playerId: number) {
+  if (!(await isAdmin())) return { ok: false as const, error: "Admin only." };
+  const result = await activateVeteranLiveRating(playerId);
   if (result.ok) revalidatePath("/tools/player-calculator");
   return result;
 }
