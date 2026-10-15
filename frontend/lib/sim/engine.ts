@@ -2425,8 +2425,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           // dump and chase: the puck goes in deep and it's a race — the attackers' forecheck against the defenders' retrieval, with the goalie sometimes playing it behind the net
           const dumper = carrier;
           st.sink.emit({ period, seconds: tick, type: "ZONE_ENTRY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: dumper.id, playerName: dumper.name, zone: "OFF", importance: "NOTABLE", meta: { entryType: "dump" } });
-          const chase = onIceF(carrierTeam);
-          const runner = pickByAttr(rng, chase.length ? chase : [carrier], (s) => (s.attrs.sk ?? 50) + (s.attrs.ck ?? 50)) ?? carrier;
+          const chase = onIceF(carrierTeam).filter((x) => x !== dumper); // somebody else chases the puck he put in
+          const runner = pickByAttr(rng, chase.length ? chase : onIceD(carrierTeam).filter((x) => x !== dumper).concat(carrier), (s) => (s.attrs.sk ?? 50) + (s.attrs.ck ?? 50)) ?? carrier;
           const pWin = Math.max(0.15, Math.min(0.7, DUMP_TUNING.race * ratio(atkSkill(runner.attrs.sk ?? 50), defSkill(dman.attrs.sk ?? 50))));
           if (rng.chance(pWin)) {
             carrier = runner; zone = "OFF"; setup = "carry"; press = 0;

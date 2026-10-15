@@ -106,6 +106,7 @@ test("V3 dump-ins are a race for the puck: both sides win some, the goalie plays
     const lines = r.playByPlay.filter((l) => raceLine(l.text));
     const entries = (r.events ?? []).filter((e) => e.type === "ZONE_ENTRY" && (e.meta as { entryType?: string } | undefined)?.entryType === "dump");
     assert.equal(lines.length, entries.length, "every dump-in is followed by a race result in the play-by-play");
+    for (const l of lines.filter((x) => /wins the race/.test(x.text))) { const m = l.text.match(/^(.+) wins the race/); assert.ok(!r.playByPlay.some((x) => x.time === l.time && x.text.startsWith(`${m![1]} dumps the puck`)), "the chaser is not the dumper: " + l.text); }
     won += lines.filter((l) => /wins the race/.test(l.text)).length;
     goalie += lines.filter((l) => /play the dump-in/.test(l.text)).length;
     dumps += entries.length;
