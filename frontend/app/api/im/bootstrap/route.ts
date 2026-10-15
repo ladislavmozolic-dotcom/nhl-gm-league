@@ -39,6 +39,7 @@ export async function GET() {
     return { lastReadId: readMap.get(r.id) ?? 0, muted: muteActive(mutedMap.get(r.id)), mutedUntil: muteActive(mutedMap.get(r.id)) ? mutedMap.get(r.id)!.mutedUntil?.toISOString() ?? null : null, id: r.id, kind: r.kind, otherTeamId, unread, last: lastW, name: r.name, imageUrl: r.imageUrl, createdById: r.createdById, members: r.members.map((m) => m.teamId) };
   }));
   return NextResponse.json({
+    tradeRoomId: admin ? (await prisma.imSettings.findUnique({ where: { id: 1 }, select: { tradeRoomId: true } }))?.tradeRoomId ?? null : null,
     cursor, me: meTeam ? withAv(meTeam) : meTeam, admin, enabled, muted: await isMuted(me), leagueRoomId: league, teams: teams.map(withAv), rooms: out,
     vapid: process.env.VAPID_PUBLIC_KEY ?? null, gif: !!process.env.GIPHY_API_KEY,
   });

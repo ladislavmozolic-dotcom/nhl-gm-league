@@ -18,7 +18,7 @@ const attending = () => typeof document !== "undefined" && document.visibilitySt
 const roomMuted = (r?: { muted: boolean; mutedUntil: string | null } | null) => !!r?.muted && (!r.mutedUntil || new Date(r.mutedUntil) > new Date());
 const muteLabel = (until: string | null) => (!until ? "Navždy" : `do ${new Date(until).toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`);
 const MUTE_OPTIONS: { label: string; hours: number | null }[] = [{ label: "1 hodinu", hours: 1 }, { label: "8 hodín", hours: 8 }, { label: "1 deň", hours: 24 }, { label: "1 týždeň", hours: 168 }, { label: "Navždy", hours: null }];
-type Boot = { cursor: number; me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null; gif: boolean };
+type Boot = { tradeRoomId: number | null; cursor: number; me: TeamLite; admin: boolean; enabled: boolean; muted: boolean; leagueRoomId: number; teams: TeamLite[]; rooms: Room[]; vapid: string | null; gif: boolean };
 
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("sk-SK", { hour: "2-digit", minute: "2-digit" });
 function dayLabel(iso: string) {
@@ -1097,6 +1097,12 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
     setBusy(false);
   }
   const [muteSheet, setMuteSheet] = useState(false);
+  const [tradeOn, setTradeOn] = useState(boot.tradeRoomId === room.id);
+  async function toggleTrade(v: boolean) {
+    setTradeOn(v);
+    await fetch("/api/im/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "tradeRoom", roomId: v ? room.id : null }) });
+    await onChanged(false);
+  }
   async function mute(v: boolean, hours: number | null = null) {
     setMuteSheet(false);
     const until = v && hours ? new Date(Date.now() + hours * 3600_000).toISOString() : null;
@@ -1213,6 +1219,12 @@ function InfoPanel({ boot, teamMap, room, title, onClose, onChanged, onCleared }
               <div className="flex-1"><div className="text-slate-200">{info?.muted ? "🔕 Stlmené" : "Stlmiť chat"}</div><div className="text-xs text-slate-500">{info?.muted ? `Notifikácie vypnuté ${muteLabel(info.mutedUntil)}. Ťukni pre zmenu.` : "Vypni notifikácie z tohto chatu na hodinu, deň alebo navždy"}</div></div>
               <span className="text-slate-500">›</span>
             </button>
+            {boot.admin && room.kind !== "dm" && (
+              <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-3">
+                <div className="flex-1"><div className="text-slate-200">🔄 Posielať sem schválené obchody</div><div className="text-xs text-slate-500">Keď sa obchod vykoná (oba tímy súhlasili, pri nováčikoch aj komisia), príde sem jedna karta: kto za koho.{boot.tradeRoomId != null && !tradeOn ? " Zapnutím sa presunie z iného chatu." : ""}</div></div>
+                <button onClick={() => void toggleTrade(!tradeOn)} aria-pressed={tradeOn} className={`w-12 h-7 rounded-full p-0.5 transition-colors ${tradeOn ? "bg-amber-500" : "bg-slate-700"}`}><span className={`block w-6 h-6 rounded-full bg-white transition-transform ${tradeOn ? "translate-x-5" : ""}`} /></button>
+              </div>
+            )}
             {muteSheet && (
               <Sheet title="Stlmiť chat" onClose={() => setMuteSheet(false)}>
                 <p className="px-5 pt-1 pb-2 text-xs text-slate-500">Správy sa ďalej ukladajú a počítajú, ale bez zvuku, bannera a push notifikácie.</p>
