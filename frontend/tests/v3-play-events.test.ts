@@ -242,3 +242,21 @@ test("V3 a player doesn't throw two in-play hits within a few seconds", () => {
   }
   assert.ok(hits > 500, `plenty of hits checked (${hits})`);
 });
+
+test("V3 overtime has more attempts and every one starts with the puck coming into the zone; V2 / otPace:false keep the sparse model", () => {
+  let otGames = 0, shots = 0;
+  for (let seed = 1; seed <= 300 && otGames < 25; seed++) {
+    const r = run(seed, ENGINE_V3);
+    if (r.endedIn === "REG") continue;
+    otGames++;
+    const t = (l: { time: string }) => { const [m, s] = l.time.split(":").map(Number); return m * 60 + s; };
+    const ot = r.playByPlay.filter((l) => l.period === 4);
+    for (const sh of ot.filter((l) => l.kind === "shot")) {
+      shots++;
+      assert.ok(ot.some((l) => l.kind === "entry" && t(l) <= t(sh) && t(sh) - t(l) <= 7), `no entry before the OT shot at ${sh.time}`);
+    }
+    const off = simulateGame(makeTeam(1, 60 + (seed % 9)), makeTeam(2, 62 + ((seed * 3) % 9)), { seed, engineVersion: ENGINE_V3, experimentalV3: { otPace: false } });
+    if (off.endedIn !== "REG") assert.ok(off.playByPlay.filter((l) => l.period === 4 && l.kind === "entry").length === 0, "the sparse OT model adds no entries");
+  }
+  assert.ok(otGames >= 15 && shots / otGames > 2.5, `OT games ${otGames}, shots per OT game ${(shots / Math.max(1, otGames)).toFixed(1)}`);
+});

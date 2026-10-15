@@ -174,6 +174,7 @@ type SimState = {
   v3ShooterForm: boolean;            // V3 diagnostic feature flag
   v3LateTieCaution: boolean;         // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
+  v3OtPace: boolean;                 // V3: 3-on-3 overtime has ~2x the attempts (each a real entry + shot) at a proportionally lower conversion — same scoring, a livelier feed
   v3Dump: boolean;                   // V3: a failed carry-in becomes a dump-in — a race for the puck, the goalie may play it
   v3Pin: boolean;                    // V3: a team pinned in its own end can't change, tires, and gets scored on more
   v3Pace: boolean;                   // V3: the puck needs real time to cross a zone — no 2-second counter-attacks, no 'takeaway' right after a shot
@@ -3088,7 +3089,7 @@ function simulateOvertime(st: SimState, cfg: { period?: number; seconds?: number
     }
     for (const [att, def, isHome] of [[home, away, true], [away, home, false]] as const) {
       // 3-on-3 is wide open: elevated chance rate scaled by offense
-      const rate = 0.07 * (att.offenseRating / LEAGUE.avgOffense) * (cfg.chanceMult ?? 1);
+      const rate = (st.v3OtPace ? OT_TUNING.rate : 0.07) * (att.offenseRating / LEAGUE.avgOffense) * (cfg.chanceMult ?? 1);
       const fallbackAttempt = !hasOtShot && t === periodLen - step && att.id === fallbackShooterId;
       if (!fallbackAttempt && !rng.chance(rate)) continue;
       // the injury roll just above can hurt someone from this very on-ice set,
@@ -3098,11 +3099,13 @@ function simulateOvertime(st: SimState, cfg: { period?: number; seconds?: number
       const shooter = pickShooterFromPool(rng, attOnIce);
       const { sector, shotType } = shotProfile(rng, { isDefense: shooter.isDefense, setup: "carry", danger: 1.25 });
       const xg = expectedGoal(rng, sector, shotType, "EV");
+      // V3: a chance in 3-on-3 starts with the puck coming into the zone a few seconds earlier
+      if (st.v3OtPace) st.sink.emit({ period: per, seconds: Math.max(0, t - 2 - rng.int(4)), type: "ZONE_ENTRY", teamId: att.id, teamCode: att.code ?? undefined, playerId: shooter.id, playerName: shooter.name, zone: "OFF", importance: "NOTABLE", meta: { entryType: "carry" } });
       const tracked = trackSpecialShot(st, att, def, shooter, per, t, sector, shotType, xg, true, "3V3");
       hasOtShot = true;
       const finishExponent = (st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7)
         + (st.v3OvertimeStars ? V3_OT_STAR_EXPONENT : 0); // the separate 3-on-3 OT model (the possession loop never plays OT)
-      const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV", finishExponent) * 2.2 * (cfg.finishMult ?? 1);
+      const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV", finishExponent) * 2.2 * (cfg.finishMult ?? 1) * (st.v3OtPace ? 0.07 / OT_TUNING.rate : 1);
       if (rng.chance(p)) {
         tracked.goalie!.goalsAgainst++;
         // st.currentOnIce already holds the real deployed trio for both teams
@@ -3188,6 +3191,8 @@ const TAKEAWAY_SHARE = 0.17;
 export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
+/** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
+export const OT_TUNING = { rate: 0.15 };
 export const PIN_TUNING = { hold: 6, maxShift: 100, conv: 0.35, shots: 0.25, base: 0.80, keep: 0.25, tire: 0.8, dur: 0.6 };
 export const PACE_TUNING = { dwell: 2, advance: 0.6, shotDwell: 2, shotGap: 3, shotBoost: 1.78 };
 
@@ -3285,7 +3290,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
+  experimentalV3?: { otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3361,6 +3366,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3ShooterForm: isV3 && (opts.experimentalV3?.shooterForm ?? true),
     v3LateTieCaution: isV3 && (opts.experimentalV3?.lateTieCaution ?? true),
     v3Stoppages: isV3 && (opts.experimentalV3?.stoppageRealism ?? CFG.v3StoppageRealism ?? false),
+    v3OtPace: isV3 && (opts.experimentalV3?.otPace ?? true),
     v3Dump: isV3 && (opts.experimentalV3?.dump ?? true),
     v3Pin: isV3 && (opts.experimentalV3?.pin ?? true),
     v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),
