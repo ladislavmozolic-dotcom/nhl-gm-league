@@ -2895,6 +2895,16 @@ function addInjury(st: SimState, team: SimTeam, victim: SimSkater, mech: InjuryM
 function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimSkater[], period: number, tick: number, intervalSec = 1): SimSkater[] {
   const hurt: SimSkater[] = [];
   if (!CFG.injuriesEnabled || !onIce.length) return hurt;
+  // V3: a hit that hurts somebody is a real hit — thrown on him in this very second, counted, and in the feed just before the injury
+  const hitOn = (victim: SimSkater): SimSkater => {
+    const by = pickHitter(st, opp);
+    if (st.v3PlayEvents) {
+      st.lines[opp.id][by.id].hits++; st.box[opp.id].hits++;
+      st.lastHit = { hitterId: by.id, hitterTeamId: opp.id, targetId: victim.id, targetName: victim.name, absT: (period - 1) * PERIOD_SECONDS + tick };
+      st.sink.emit({ period, seconds: tick, type: "HIT", teamId: opp.id, teamCode: opp.code ?? undefined, playerId: by.id, playerName: by.name, targetId: victim.id, targetName: victim.name, zone: "OFF", sector: pickZone(st.rng, HIT_ZONES), importance: "NOTABLE" });
+    }
+    return by;
+  };
   // Same calibration anchor the old per-game model used: the three shares below
   // (contact 0.26, blocked-shot 0.09, wear 0.20) sum to ~0.55/team/game at a
   // neutral matchup — rescaled to INJURY_BASE so 100% injuryChancePct still means
@@ -2921,6 +2931,7 @@ function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimS
       if (CFG.knocksEnabled && st.rng.chance(hazard * KNOCK_RATIO)) {
         const r = st.rng.next() * (contactShare + blockShare + wearShare);
         const mech: InjuryMechanism = r < contactShare ? "Hit" : r < contactShare + blockShare ? "Blocked shot" : "Non-contact";
+        if (mech === "Hit" && st.v3PlayEvents) hitOn(s); // (V2: no extra draw — its random stream stays as it was)
         const part = mech === "Hit" ? (st.rng.chance(0.5) ? "Upper Body" : "Shoulder") : mech === "Blocked shot" ? (st.rng.chance(0.5) ? "Hand" : "Foot") : "Lower Body";
         const away = 90 + st.rng.int(600); // 1:30 – 11:30 of game time
         st.injured.add(s.id);
@@ -2934,7 +2945,7 @@ function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimS
     const r = st.rng.next() * total;
     let mech: InjuryMechanism;
     let by: SimSkater | undefined;
-    if (r < contactShare) { mech = st.rng.chance(0.15) ? "Collision" : "Hit"; by = pickHitter(st, opp); }
+    if (r < contactShare) { mech = st.rng.chance(0.15) ? "Collision" : "Hit"; by = hitOn(s); }
     else if (r < contactShare + blockShare) { mech = "Blocked shot"; }
     else {
       const toi = st.lines[team.id][s.id]?.toi ?? 0;

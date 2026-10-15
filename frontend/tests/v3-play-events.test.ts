@@ -173,3 +173,18 @@ test("V3 period ends carry a recap (score, shots this period, hits) in the play-
     for (const l of run(seed, ENGINE_V2).playByPlay.filter((x) => x.kind === "period" && /^End of the/.test(x.text))) assert.ok(!l.text.includes(" — "), l.text);
   }
 });
+
+test("V3 an injury or knock from a hit comes with a real hit on him in the same second", () => {
+  let hitInj = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const r = run(seed, ENGINE_V3);
+    for (const e of (r.events ?? []).filter((x) => (x.type === "INJURY" || x.type === "KNOCK") && ["Hit", "Collision"].includes((x.meta as { mechanism?: string } | undefined)?.mechanism ?? ""))) {
+      if ((e.meta as { mechanism?: string }).mechanism !== "Hit") continue;
+      hitInj++;
+      const hit = (r.events ?? []).find((h) => h.type === "HIT" && h.period === e.period && h.seconds === e.seconds && h.targetId === e.playerId);
+      assert.ok(hit, `no hit on ${e.playerName} at ${e.period}:${e.seconds}`);
+      if (e.type === "INJURY") assert.equal(e.targetId, hit!.playerId, "the injury names the player who hit him");
+    }
+  }
+  assert.ok(hitInj >= 10, `enough hit injuries to say something (${hitInj})`);
+});
