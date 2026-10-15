@@ -2920,7 +2920,9 @@ function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimS
   if (!CFG.injuriesEnabled || !onIce.length) return hurt;
   // V3: a hit that hurts somebody is a real hit — thrown on him in this very second, counted, and in the feed just before the injury
   const hitOn = (victim: SimSkater): SimSkater => {
-    const by = pickHitter(st, opp);
+    // V3: the hitter is somebody actually on the ice for the other side right now (not a player in the box or on the bench)
+    const oi = st.currentOnIce[opp.id], pool = st.v3PlayEvents && oi ? [...oi.f, ...oi.d].filter((x) => !st.injured.has(x.id)) : [];
+    const by = pool.length ? pool[st.rng.weighted(pool.map((s) => s.hitting * s.iceTime * physFactor(s.weight)))] : pickHitter(st, opp);
     if (st.v3PlayEvents) {
       st.lines[opp.id][by.id].hits++; st.box[opp.id].hits++;
       st.lastHit = { hitterId: by.id, hitterTeamId: opp.id, targetId: victim.id, targetName: victim.name, absT: (period - 1) * PERIOD_SECONDS + tick };

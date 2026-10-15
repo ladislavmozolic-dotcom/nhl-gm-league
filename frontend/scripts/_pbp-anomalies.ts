@@ -29,6 +29,20 @@ import { prisma } from "../lib/prisma";
     for (const gl of goals) if (ev.some((e) => ["ZONE_ENTRY", "SHOT", "HIT", "BLOCK", "TAKEAWAY"].includes(e.type) && abs(e) === abs(gl) && e.seq > gl.seq)) hit("play event in the same second AFTER a goal", `${g}: goal@${abs(gl)}`);
     const hitsSame = ev.filter((e) => e.type === "HIT");
     for (let k = 1; k < hitsSame.length; k++) if (hitsSame[k].playerId === hitsSame[k - 1].playerId && abs(hitsSame[k]) - abs(hitsSame[k - 1]) <= 1) hit("same player two hits ≤1s", `${g}: ${hitsSame[k].playerName}@${abs(hitsSame[k])}`);
+    // somebody sitting in the box (first 100 s of his minor, well inside the 2:00 and before any PP goal could end it) doing things on the ice
+    const goalsAll = ev.filter((e) => e.type === "GOAL" && !e.meta?.so);
+    const box = ev.filter((e) => e.type === "PENALTY" && e.playerId != null && !e.meta?.washedOut && (e.meta?.minutes ?? 2) >= 2 && !["Fighting"].includes(e.meta?.penalty)).map((e) => {
+      const from = abs(e), mins = e.meta?.minutes ?? 2;
+      let to = from + mins * 60;
+      // a plain minor ends at the first goal against the penalized team
+      if (mins === 2) { const gl = goalsAll.find((x) => x.teamId !== e.teamId && abs(x) > from && abs(x) < to); if (gl) to = abs(gl); }
+      return { id: e.playerId, from, to: Math.min(to, from + 100) };
+    });
+    for (const e of ev) if (["HIT", "BLOCK", "TAKEAWAY", "SHOT", "MISS", "ZONE_ENTRY"].includes(e.type) && e.playerId != null) {
+      const t = abs(e); const w = box.find((b) => b.id === e.playerId && t > b.from + 1 && t < b.to);
+      if (w) hit(`${e.type} by a player in the penalty box`, `${g}: ${e.playerName}@${t} (box ${w.from}-${w.to})`);
+    }
+    for (const e of ev) if (e.type === "HIT" && e.targetId != null) { const t = abs(e); const w = box.find((b) => b.id === e.targetId && t > b.from + 1 && t < b.to); if (w) hit("HIT on a player in the penalty box", `${g}: ${e.targetName}@${t}`); }
     if (ev.filter((e) => e.type === "PRESSURE").length > 9) hit("more than 9 pressure lines", `${g}`);
     if (r.endedIn === "REG" && Math.abs(r.home.goals - r.away.goals) === 0) hit("tied after regulation but REG", `${g}`);
   }
