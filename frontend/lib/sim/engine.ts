@@ -953,8 +953,10 @@ function generatePenalties(st: SimState, team: SimTeam, period: number, active: 
       if (ds.length) offender = ds[st.rng.weighted(ds.map((s) => (105 - s.discipline) * (0.5 + s.iceTime)))];
     }
     const roll = st.rng.next();
-    const minutes = type === "Slashing" && roll < 0.05 ? 4 : roll < 0.02 ? 5 : 2;
-    const severity = minutes === 4 ? "Double Minor" : minutes === 5 ? "Major" : "Minor";
+    // Ordinary infractions are minors; slashing can be a double minor. A major
+    // must only originate in the dedicated severe-infraction or fighting paths.
+    const minutes = type === "Slashing" && roll < 0.05 ? 4 : 2;
+    const severity = minutes === 4 ? "Double Minor" : "Minor";
     addPenalty(st, team, offender, period, at, type, minutes, severity, true);
     if (st.v3Stoppages && type === "Delay of game") { // mark it so the play-by-play / live feed can say "over the glass"
       const evs = st.sink.all(), last = evs[evs.length - 1];

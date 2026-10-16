@@ -5,6 +5,7 @@ import { autoLines } from "../lib/sim/lines-core";
 import { buildTeam } from "../lib/sim/ratings";
 import { DEFAULT_SETTINGS } from "../lib/sim/settings";
 import { ENGINE_V2 } from "../lib/sim/version";
+import { SEVERE_INFRACTIONS } from "../lib/sim/infractions";
 import type { SimGoalie, SimSkater } from "../lib/sim/types";
 
 const attrs = {
@@ -67,4 +68,21 @@ test("a player serving a penalty is never called for another one while in the bo
     }
   }
   assert.ok(checked > 0, "expected some players to take multiple penalties in a period");
+});
+
+test("ordinary infractions never become five-minute majors", () => {
+  const majorTypes = new Set(["Fighting", ...SEVERE_INFRACTIONS.map((infraction) => infraction.type)]);
+  let penalties = 0;
+  for (let seed = 1; seed <= 100; seed++) {
+    const result = simulateGame(makeTeam(1, "HOM"), makeTeam(2, "AWY"), {
+      seed,
+      engineVersion: ENGINE_V2,
+      settings: { ...DEFAULT_SETTINGS, penaltiesPct: 300, fightsEnabled: false, injuriesEnabled: false },
+    });
+    for (const penalty of result.penalties.filter((p) => p.minutes === 5)) {
+      penalties++;
+      assert.ok(majorTypes.has(penalty.type), `unexpected five-minute ${penalty.type} major (seed ${seed})`);
+    }
+  }
+  assert.ok(penalties > 0, "expected severe majors in the high-penalty sample");
 });
