@@ -5,6 +5,7 @@ import { PageHeader, BackPill } from "@/components/ui";
 import LiveGame from "@/components/live/LiveGame";
 import { canManageTeam } from "@/lib/auth";
 import { roundName } from "@/lib/sim/playoffs";
+import { DEFAULT_ARENA_CAPACITY } from "@/lib/season-tickets";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export default async function LiveGamePage({ params }: { params: Promise<{ gameI
   const id = Number(gameId);
   if (!Number.isInteger(id)) notFound();
   const [game, teams] = await Promise.all([
-    prisma.game.findUnique({ where: { id }, select: { id: true, seriesId: true, gameNum: true, round: true, league: true, homeTeam: { select: { id: true, name: true, code: true } }, awayTeam: { select: { id: true, name: true, code: true } } } }),
+    prisma.game.findUnique({ where: { id }, select: { id: true, seriesId: true, gameNum: true, round: true, league: true, attendance: true, eventCapacity: true, homeTeam: { select: { id: true, name: true, code: true, capacity: true } }, awayTeam: { select: { id: true, name: true, code: true } } } }),
     prisma.team.findMany({ select: { id: true, logoUrl: true } }),
   ]);
   if (!game) notFound();
@@ -28,6 +29,14 @@ export default async function LiveGamePage({ params }: { params: Promise<{ gameI
       context = `${roundName(ser.round, ser.conference)} · Game ${game.gameNum ?? "?"} · ${lead}`;
     }
   }
+  // how full the building is for the 3D rink: tonight's gate if known, else the last ten home crowds
+  const capacity = game.eventCapacity ?? game.homeTeam.capacity ?? DEFAULT_ARENA_CAPACITY;
+  let occupancy: number | null = game.attendance != null ? game.attendance / capacity : null;
+  if (occupancy == null) {
+    const recent = await prisma.game.findMany({ where: { homeTeamId: game.homeTeam.id, status: "FINAL", attendance: { not: null } }, orderBy: { id: "desc" }, take: 10, select: { attendance: true } });
+    if (recent.length) occupancy = recent.reduce((t, g) => t + (g.attendance ?? 0), 0) / recent.length / capacity;
+  }
+  if (occupancy != null) occupancy = Math.max(0, Math.min(1, occupancy));
   const logos: Record<number, string> = {};
   for (const t of teams) if (t.logoUrl) logos[t.id] = t.logoUrl;
   // clubs this visitor may coach tonight (their own; an admin gets both)
@@ -38,7 +47,7 @@ export default async function LiveGamePage({ params }: { params: Promise<{ gameI
       <div className="flex items-center gap-3"><BackPill href="/live">Live scoreboard</BackPill></div>
       <PageHeader title={`${game.awayTeam.name} @ ${game.homeTeam.name}`} subtitle={context ?? undefined}
         right={<Link href={`/games/${game.id}`} className="text-sm text-slate-400 hover:text-blue-400">Game report →</Link>} />
-      <LiveGame gameId={game.id} logos={logos} home={game.homeTeam} away={game.awayTeam} coachTeams={coachTeams} finalHref={`/games/${game.id}`} />
+      <LiveGame gameId={game.id} logos={logos} home={game.homeTeam} away={game.awayTeam} coachTeams={coachTeams} finalHref={`/games/${game.id}`} occupancy={occupancy} />
     </div>
   );
 }

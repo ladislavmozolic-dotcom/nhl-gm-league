@@ -6,52 +6,14 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { Arena, roundedRect, glowTexture } from "./arena";
+import { makeRig, disposeRig, type Rig } from "./players";
 import { RINK, POSE, type Actor, type ClipFrame } from "@/lib/replay3d/reconstruct";
 import type { Kit } from "@/lib/replay3d/team-colors";
 
 export type CameraMode = "broadcast" | "end" | "goalcam" | "follow" | "top" | "free";
 
 const PX = 10.24; // ice texture pixels per foot
-
-function roundedRect(path: THREE.Shape | THREE.Path, hx: number, hz: number, r: number) {
-  path.moveTo(-hx + r, -hz);
-  path.lineTo(hx - r, -hz); path.absarc(hx - r, -hz + r, r, -Math.PI / 2, 0, false);
-  path.lineTo(hx, hz - r); path.absarc(hx - r, hz - r, r, 0, Math.PI / 2, false);
-  path.lineTo(-hx + r, hz); path.absarc(-hx + r, hz - r, r, Math.PI / 2, Math.PI, false);
-  path.lineTo(-hx, -hz + r); path.absarc(-hx + r, -hz + r, r, Math.PI, 1.5 * Math.PI, false);
-}
-
-/** A flat ring between two rounded rectangles, extruded upward (boards, glass, stands). */
-function ringGeometry(inner: number, outer: number, height: number): THREE.BufferGeometry {
-  const s = new THREE.Shape();
-  roundedRect(s, RINK.halfLength + outer, RINK.halfWidth + outer, RINK.cornerR + outer);
-  const hole = new THREE.Path();
-  roundedRect(hole, RINK.halfLength + inner, RINK.halfWidth + inner, Math.max(1, RINK.cornerR + inner));
-  s.holes.push(hole);
-  const g = new THREE.ExtrudeGeometry(s, { depth: height, bevelEnabled: false, curveSegments: 20 });
-  g.rotateX(-Math.PI / 2); // shape y → −z, extrusion → +y
-  return g;
-}
-
-/** Point on the rounded rink outline `offset` ft outside the boards, u ∈ [0,1). */
-function outlinePoint(offset: number, u: number): { x: number; z: number; nx: number; nz: number } {
-  const hx = RINK.halfLength + offset, hz = RINK.halfWidth + offset, r = RINK.cornerR + offset;
-  const sx = 2 * (hx - r), sz = 2 * (hz - r), arc = (Math.PI / 2) * r;
-  const L = 2 * sx + 2 * sz + 4 * arc;
-  let d = (((u % 1) + 1) % 1) * L;
-  const segs: Array<[number, (k: number) => { x: number; z: number; nx: number; nz: number }]> = [
-    [sx, (k) => ({ x: -hx + r + k * sx, z: -hz, nx: 0, nz: -1 })],
-    [arc, (k) => { const a = -Math.PI / 2 + k * Math.PI / 2; return { x: hx - r + Math.cos(a) * r, z: -hz + r + Math.sin(a) * r, nx: Math.cos(a), nz: Math.sin(a) }; }],
-    [sz, (k) => ({ x: hx, z: -hz + r + k * sz, nx: 1, nz: 0 })],
-    [arc, (k) => { const a = k * Math.PI / 2; return { x: hx - r + Math.cos(a) * r, z: hz - r + Math.sin(a) * r, nx: Math.cos(a), nz: Math.sin(a) }; }],
-    [sx, (k) => ({ x: hx - r - k * sx, z: hz, nx: 0, nz: 1 })],
-    [arc, (k) => { const a = Math.PI / 2 + k * Math.PI / 2; return { x: -hx + r + Math.cos(a) * r, z: hz - r + Math.sin(a) * r, nx: Math.cos(a), nz: Math.sin(a) }; }],
-    [sz, (k) => ({ x: -hx, z: hz - r - k * sz, nx: -1, nz: 0 })],
-    [arc, (k) => { const a = Math.PI + k * Math.PI / 2; return { x: -hx + r + Math.cos(a) * r, z: -hz + r + Math.sin(a) * r, nx: Math.cos(a), nz: Math.sin(a) }; }],
-  ];
-  for (const [len, f] of segs) { if (d <= len) return f(len ? d / len : 0); d -= len; }
-  return segs[0][1](0);
-}
 
 function iceTexture(logo: HTMLImageElement | null): THREE.CanvasTexture {
   const W = Math.round(200 * PX), H = Math.round(85 * PX);
@@ -134,11 +96,6 @@ function netTexture(): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
 
-type Rig = {
-  root: THREE.Group; upper: THREE.Group; legL: THREE.Group; legR: THREE.Group; armL: THREE.Group; armR: THREE.Group;
-  stick: THREE.Group; label: THREE.Sprite; labelKey: string; phase: number; goalie: boolean; side: "home" | "away";
-};
-
 export class RinkScene {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
@@ -162,11 +119,12 @@ export class RinkScene {
   private ice: THREE.Mesh;
   private jumbo: THREE.Group;
   private jumboScreen: THREE.MeshBasicMaterial;
-  private crowd: THREE.InstancedMesh | null = null;
+  private arena: Arena;
+  private goalGlow: Record<string, THREE.Sprite> = {};
   private disposables: Array<{ dispose(): void }> = [];
   private small = false;
 
-  constructor(canvas: HTMLCanvasElement, opts: { homeKit: Kit; awayKit: Kit; homeLogoUrl?: string | null }) {
+  constructor(canvas: HTMLCanvasElement, opts: { homeKit: Kit; awayKit: Kit; homeLogoUrl?: string | null; occupancy?: number | null; homeCode?: string | null; awayCode?: string | null; homeName?: string | null }) {
     this.kits = { home: opts.homeKit, away: opts.awayKit };
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     // phones / small screens: fewer pixels, a smaller shadow map and a thinner crowd keep it smooth
@@ -193,8 +151,9 @@ export class RinkScene {
     this.disposables.push(env, pmrem);
 
     // lights: arena whites from above, one shadow caster
-    this.scene.add(new THREE.HemisphereLight("#e8f0ff", "#1a2233", 1.1));
-    const sun = new THREE.DirectionalLight("#ffffff", 2.2);
+    // the ice is lit hard from the rigs; the bowl sits darker so the play pops
+    this.scene.add(new THREE.HemisphereLight("#e8f0ff", "#141a26", 0.8));
+    const sun = new THREE.DirectionalLight("#ffffff", 2.5);
     sun.position.set(-30, 140, 40); sun.castShadow = true;
     sun.shadow.mapSize.set(this.small ? 1024 : 2048, this.small ? 1024 : 2048);
     Object.assign(sun.shadow.camera, { left: -115, right: 115, top: 60, bottom: -60, near: 10, far: 320 });
@@ -215,20 +174,12 @@ export class RinkScene {
       img.src = opts.homeLogoUrl;
     }
 
-    // boards (kick plate, white boards, cap), glass
-    const add = (g: THREE.BufferGeometry, m: THREE.Material, y = 0, shadow = true) => { const me = new THREE.Mesh(g, m); me.position.y = y; me.receiveShadow = shadow; me.castShadow = shadow; this.scene.add(me); return me; };
-    add(ringGeometry(-0.06, 0.4, 0.8), new THREE.MeshStandardMaterial({ color: "#f2c230", roughness: 0.6 }));
-    add(ringGeometry(0, 0.7, 3.4), new THREE.MeshStandardMaterial({ color: "#f5f7fa", roughness: 0.55 }));
-    add(ringGeometry(-0.15, 1.1, 0.3), new THREE.MeshStandardMaterial({ color: "#122445", roughness: 0.5 }), 3.4);
-    const glass = new THREE.MeshPhysicalMaterial({ color: "#d6ecff", roughness: 0.05, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
-    add(ringGeometry(0.25, 0.4, 6.5), glass, 3.7, false);
-
-    // stands + crowd
-    const standMat = new THREE.MeshStandardMaterial({ color: "#151b26", roughness: 0.9 });
-    const tiers = 7;
-    for (let k = 0; k < tiers; k++) add(ringGeometry(4 + k * 4.2, 4 + (k + 1) * 4.2, 1), standMat, 1.5 + k * 3.2, false);
-    add(ringGeometry(1.1, 4, 0.6), new THREE.MeshStandardMaterial({ color: "#0d1320" }), 0, false);
-    this.buildCrowd(tiers);
+    // the building: boards + ads, glass, benches, the two-tier bowl, the crowd, the roof
+    this.arena = new Arena({
+      homeKit: opts.homeKit, awayKit: opts.awayKit, small: this.small,
+      occupancy: opts.occupancy ?? 0.92, homeCode: opts.homeCode ?? "HOME", awayCode: opts.awayCode ?? "AWAY", homeName: opts.homeName ?? "UNHL",
+    });
+    this.scene.add(this.arena.group);
 
     // nets + goal lights
     for (const d of [-1, 1] as const) this.scene.add(this.buildNet(d));
@@ -241,6 +192,10 @@ export class RinkScene {
     for (const [x, z, ry, w] of [[0, 9.05, 0, 24], [0, -9.05, Math.PI, 24], [13.05, 0, Math.PI / 2, 16], [-13.05, 0, -Math.PI / 2, 16]] as const) {
       const scr = new THREE.Mesh(new THREE.PlaneGeometry(w, 10), this.jumboScreen); scr.position.set(x, 0, z); scr.rotation.y = ry; this.jumbo.add(scr);
     }
+    for (const y of [-6.4, 6.4]) {
+      const ring = new THREE.Mesh(new THREE.BoxGeometry(26.4, 0.8, 18.4), new THREE.MeshStandardMaterial({ color: "#000", emissive: opts.homeKit.jersey === "#f4f4f4" ? "#3b82f6" : opts.homeKit.jersey, emissiveIntensity: 2.2 }));
+      ring.position.y = y; this.jumbo.add(ring);
+    }
     this.scene.add(this.jumbo);
 
     // puck + its streak
@@ -249,38 +204,6 @@ export class RinkScene {
     this.trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: "#ffe28a", transparent: true, opacity: 0.85 }));
     this.trail.frustumCulled = false;
     this.scene.add(this.trail);
-  }
-
-  private buildCrowd(tiers: number) {
-    const per: Array<{ x: number; y: number; z: number; nx: number; nz: number }> = [];
-    for (let k = 0; k < tiers; k++) {
-      const off = 4 + k * 4.2 + 2.1, y = 2.5 + k * 3.2 + 1;
-      const n = Math.floor((2 * (200 + 85) + 2 * Math.PI * (RINK.cornerR + off) - 8 * (RINK.cornerR + off)) / 2.3);
-      for (let i = 0; i < n; i++) {
-        if (Math.random() < (this.small ? 0.5 : 0.12)) continue; // empty seats (and a sparser crowd on phones)
-        const p = outlinePoint(off, i / n + Math.random() * 0.002);
-        if (Math.abs(p.x) < 30 && p.nz > 0.9 && k < 2) continue; // benches side gap
-        per.push({ x: p.x, y, z: p.z, nx: p.nx, nz: p.nz });
-      }
-    }
-    const geo = new THREE.BoxGeometry(1.25, 2.3, 1.1); geo.translate(0, 1.15, 0);
-    const mat = new THREE.MeshStandardMaterial({ roughness: 0.9 });
-    const im = new THREE.InstancedMesh(geo, mat, per.length);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), col = new THREE.Color();
-    const home = new THREE.Color(this.kits.home.jersey);
-    per.forEach((p, i) => {
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(p.nx, p.nz));
-      sc.set(1, 0.85 + Math.random() * 0.3, 1);
-      m.compose(new THREE.Vector3(p.x, p.y, p.z), q, sc);
-      im.setMatrixAt(i, m);
-      const r = Math.random();
-      if (r < 0.42) col.copy(home).offsetHSL(0, 0, (Math.random() - 0.5) * 0.15);
-      else if (r < 0.55) col.set("#e9e9e9");
-      else col.setHSL(Math.random(), 0.25 + Math.random() * 0.3, 0.15 + Math.random() * 0.3);
-      im.setColorAt(i, col);
-    });
-    this.crowd = im;
-    this.scene.add(im);
   }
 
   private buildNet(d: 1 | -1): THREE.Group {
@@ -321,70 +244,14 @@ export class RinkScene {
     }
     // goal light above the glass behind the net
     // kept just under the top of the glass so it never sits in front of the end camera
-    const light = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), new THREE.MeshStandardMaterial({ color: "#5a0d0d", emissive: "#ff1a1a", emissiveIntensity: 0 }));
-    light.position.set(RINK.halfLength - RINK.goalLine + 1.0, 9.2, 0); g.add(light);
+    const light = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: "#5a0d0d", emissive: "#ff1a1a", emissiveIntensity: 0 }));
+    light.position.set(RINK.halfLength - RINK.goalLine + 0.6, 10.25, 0); g.add(light); // a small dome on top of the glass
     this.goalLights[String(d)] = light;
+    // the red halo that blooms around it when it goes on
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: "#ff2a2a", blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+    halo.scale.set(7, 7, 1); halo.position.copy(light.position); halo.visible = false; g.add(halo);
+    this.goalGlow[String(d)] = halo;
     return g;
-  }
-
-  private makeRig(a: Actor): Rig {
-    const kit = this.kits[a.side];
-    const goalie = a.role === "G";
-    const jersey = new THREE.MeshStandardMaterial({ color: kit.jersey, roughness: 0.7 });
-    const trim = new THREE.MeshStandardMaterial({ color: kit.trim, roughness: 0.6 });
-    const pants = new THREE.MeshStandardMaterial({ color: kit.pants, roughness: 0.8 });
-    const dark = new THREE.MeshStandardMaterial({ color: "#111111", roughness: 0.4 });
-    const helmet = new THREE.MeshStandardMaterial({ color: kit.helmet, roughness: 0.3, metalness: 0.1 });
-    const padMat = new THREE.MeshStandardMaterial({ color: "#f2f2f2", roughness: 0.6 });
-    const root = new THREE.Group();
-    const cast = (m: THREE.Mesh) => { m.castShadow = true; return m; };
-    const mkLeg = (z: number) => {
-      const leg = new THREE.Group(); leg.position.set(0, 3.0, z);
-      const thigh = cast(new THREE.Mesh(new THREE.CapsuleGeometry(goalie ? 0.42 : 0.36, 0.7, 4, 10), pants)); thigh.position.y = -0.55; leg.add(thigh);
-      const shin = cast(new THREE.Mesh(new THREE.CapsuleGeometry(goalie ? 0.5 : 0.25, 1.25, 4, 10), goalie ? padMat : jersey)); shin.position.y = -1.85; if (goalie) shin.position.x = 0.15; leg.add(shin);
-      const skate = cast(new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.3, 0.32), dark)); skate.position.set(0.15, -2.82, 0); leg.add(skate);
-      return leg;
-    };
-    const legL = mkLeg(-0.42), legR = mkLeg(0.42);
-    root.add(legL, legR);
-    const upper = new THREE.Group(); upper.position.y = 3.0; root.add(upper);
-    const torso = cast(new THREE.Mesh(new THREE.CapsuleGeometry(goalie ? 0.95 : 0.78, 1.15, 6, 14), jersey)); torso.position.y = 1.0; torso.scale.set(0.72, 1, 1); upper.add(torso);
-    const hem = cast(new THREE.Mesh(new THREE.CylinderGeometry(goalie ? 0.96 : 0.8, goalie ? 0.96 : 0.8, 0.28, 18, 1, true), trim)); hem.position.y = 0.3; hem.scale.set(0.73, 1, 1); upper.add(hem);
-    const head = cast(new THREE.Mesh(new THREE.SphereGeometry(0.46, 16, 12), helmet)); head.position.y = 2.45; upper.add(head);
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.28, 0.62), goalie ? new THREE.MeshStandardMaterial({ color: "#d9d9d9", wireframe: true }) : dark); visor.position.set(0.38, 2.38, 0); upper.add(visor);
-    // numbers front + back
-    const num = a.number != null ? String(a.number) : "";
-    if (num) {
-      const tex = textTexture([{ text: num, font: "bold 150px Arial Black, Arial, sans-serif", color: kit.number, y: 100 }], 256, 200);
-      const nm = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.9), nm); back.position.set(-0.58, 1.15, 0); back.rotation.y = -Math.PI / 2; upper.add(back);
-      const front = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.47), nm); front.position.set(0.58, 1.35, 0.25); front.rotation.y = Math.PI / 2; upper.add(front);
-    }
-    const mkArm = (z: number) => {
-      const arm = new THREE.Group(); arm.position.set(0, 1.75, z);
-      const sleeve = cast(new THREE.Mesh(new THREE.CapsuleGeometry(goalie ? 0.3 : 0.24, 1.0, 4, 10), jersey)); sleeve.position.y = -0.62; arm.add(sleeve);
-      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.255, 0.255, 0.18, 12, 1, true), trim); band.position.y = -0.85; arm.add(band);
-      const glove = cast(new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.4, 0.4), goalie ? padMat : trim)); glove.position.y = -1.3; arm.add(glove);
-      return arm;
-    };
-    const armL = mkArm(-0.92), armR = mkArm(0.92);
-    armL.rotation.z = 0.7; armR.rotation.z = 0.9; // reaching forward to the stick
-    upper.add(armL, armR);
-    if (goalie) {
-      const blocker = cast(new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.0, 0.75), padMat)); blocker.position.set(0.1, -1.35, 0.25); armR.add(blocker);
-      const glove = cast(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.25, 16), trim)); glove.rotation.z = Math.PI / 2; glove.position.set(0.15, -1.35, -0.2); armL.add(glove);
-    }
-    // stick: pivot at the hands, blade near the ice ahead and to the right
-    const stick = new THREE.Group(); stick.position.set(0.95, 0.65, 0.5);
-    const shaft = cast(new THREE.Mesh(new THREE.BoxGeometry(0.09, goalie ? 3.6 : 4.6, 0.12), new THREE.MeshStandardMaterial({ color: "#1d1d1d", roughness: 0.5 })));
-    shaft.position.y = goalie ? -1.4 : -1.9; shaft.rotation.z = goalie ? 0.35 : 0.55; stick.add(shaft);
-    const bl = cast(new THREE.Mesh(new THREE.BoxGeometry(goalie ? 1.4 : 1.15, goalie ? 0.35 : 0.28, 0.08), new THREE.MeshStandardMaterial({ color: "#262626" })));
-    bl.position.set(goalie ? 0.9 : 1.6, goalie ? -3.05 : -3.55, 0); stick.add(bl);
-    upper.add(stick);
-    const label = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false }));
-    label.position.y = 7.6; label.renderOrder = 10; root.add(label);
-    this.scene.add(root);
-    return { root, upper, legL, legR, armL, armR, stick, label, labelKey: "", phase: Math.random() * 6, goalie, side: a.side };
   }
 
   private setLabel(r: Rig, a: Actor, focus: boolean) {
@@ -404,13 +271,13 @@ export class RinkScene {
   /** Define who's on the ice (re-uses meshes for ids it already has). */
   setActors(actors: Actor[]) {
     const keep = new Set(actors.map((a) => a.id));
-    for (const [id, r] of this.rigs) if (!keep.has(id)) { this.scene.remove(r.root); this.rigs.delete(id); }
+    for (const [id, r] of this.rigs) if (!keep.has(id)) { this.scene.remove(r.root); disposeRig(r); this.rigs.delete(id); }
     for (const a of actors) {
       const r = this.rigs.get(a.id);
       const sig = `${a.side}|${a.role}|${a.number}`;
       if (r && r.root.userData.sig === sig) continue;
-      if (r) this.scene.remove(r.root);
-      const nr = this.makeRig(a); nr.root.userData.sig = sig; this.rigs.set(a.id, nr);
+      if (r) { this.scene.remove(r.root); disposeRig(r); }
+      const nr = makeRig(this.scene, a, this.kits[a.side]); nr.root.userData.sig = sig; this.rigs.set(a.id, nr);
     }
     this.order = actors.map((a) => a.id);
     this.actorsById = new Map(actors.map((a) => [a.id, a]));
@@ -433,6 +300,7 @@ export class RinkScene {
     this.controls.enabled = mode === "free";
     if (mode === "free") { this.controls.target.copy(this.camLook); this.controls.update(); }
     this.jumbo.visible = mode !== "top";
+    this.arena.setTopView(mode === "top");
   }
 
   resize(w: number, h: number) {
@@ -497,12 +365,17 @@ export class RinkScene {
     this.trail.geometry = new THREE.BufferGeometry().setFromPoints(this.trailPts.length > 1 ? this.trailPts : []);
   }
 
+  /** The crowd of `side` reacts (goal: 1, big chance ~0.3). */
+  cheer(side: "home" | "away", level = 1, seconds = 6) { this.arena.cheer(side, level, seconds); }
+
   render(dt: number) {
     this.clock += dt;
+    this.arena.update(dt);
     // goal light pulse
     for (const [k, m] of Object.entries(this.goalLights)) {
       const on = this.clock < this.goalLightUntil && k === String(this.goalLightDir);
       (m.material as THREE.MeshStandardMaterial).emissiveIntensity = on ? 2.5 + Math.sin(this.clock * 14) * 1.5 : 0;
+      const halo = this.goalGlow[k]; halo.visible = on; if (on) { const s = 6 + Math.sin(this.clock * 14) * 1.5; halo.scale.set(s, s, 1); }
     }
     this.updateCamera(dt, false);
     this.renderer.render(this.scene, this.camera);

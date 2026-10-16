@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_ARENA_CAPACITY } from "@/lib/season-tickets";
 import { kindOf } from "@/lib/special-games-shared";
 import { officialsOf } from "@/lib/officials-server";
 import { notFound } from "next/navigation";
@@ -878,6 +879,8 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
       shooterSlug: slugById.get(a.shooterId) ?? null,
     })),
     attendance: game.attendance,
+    // share of the building that was full — the 3D replay seats that many fans
+    occupancy: game.attendance != null ? Math.min(1, game.attendance / (game.eventCapacity ?? game.homeTeam.capacity ?? DEFAULT_ARENA_CAPACITY)) : null,
     officials: (await officialsOf(game.officialIds ?? [])).map((o) => ({ name: o.name, number: o.number, role: o.role })),
     arena: game.eventVenue ?? game.homeTeam.arena,
     event: game.eventKind ? { kind: game.eventKind, title: game.eventTitle ?? kindOf(game.eventKind)?.label ?? "Special event", venue: game.eventVenue } : null,

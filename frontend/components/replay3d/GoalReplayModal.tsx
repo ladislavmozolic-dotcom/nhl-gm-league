@@ -11,8 +11,8 @@ import { teamKit } from "@/lib/replay3d/team-colors";
 type Team = { teamId: number; name: string; code?: string | null; logoUrl: string | null };
 export type ReplayGoal = { data: GoalReplayData; homeScoreAfter: number; awayScoreAfter: number; scorerName: string; assistNames: string[]; label: string };
 
-export default function GoalReplayModal({ gameId, home, away, goals, start, onClose }: {
-  gameId: number; home: Team; away: Team; goals: ReplayGoal[]; start: number; onClose: () => void;
+export default function GoalReplayModal({ gameId, home, away, goals, start, onClose, occupancy }: {
+  gameId: number; home: Team; away: Team; goals: ReplayGoal[]; start: number; onClose: () => void; occupancy?: number | null;
 }) {
   const [i, setI] = useState(start);
   const g = goals[i];
@@ -54,7 +54,7 @@ export default function GoalReplayModal({ gameId, home, away, goals, start, onCl
             <button onClick={onClose} className="ml-1 px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold hover:bg-red-600 hover:border-red-500" aria-label="Zavrieť">✕</button>
           </div>
         </div>
-        <Replay3DPlayer clip={clip} homeKit={homeKit} awayKit={awayKit} homeLogoUrl={home.logoUrl} focusId={`${side}-${g.data.scorerId}`} hud={hud} />
+        <Replay3DPlayer clip={clip} homeKit={homeKit} awayKit={awayKit} homeLogoUrl={home.logoUrl} focusId={`${side}-${g.data.scorerId}`} hud={hud} occupancy={occupancy} homeName={home.name} />
         <p className="mt-2 text-[10px] text-slate-500 leading-snug">
           Rekonštrukcia z údajov simulácie (sektor a typ strely, dorážka/zakladačka/tečovanie, brejk, asistencie a hráči na ľade). Pohyb hráčov je dopočítaný, výsledok zápasu neovplyvňuje.
         </p>

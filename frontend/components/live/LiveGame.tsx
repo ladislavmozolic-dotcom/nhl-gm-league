@@ -35,6 +35,7 @@ type Props = {
   home: Side; away: Side;
   coachTeams: Array<{ id: number; name: string }>;
   finalHref: string;
+  occupancy?: number | null; // share of seats filled — the 3D rink's crowd
 };
 
 function TeamBlock({ logos, t, score, align }: { logos: Record<number, string>; t: Side; score: number | string; align: "left" | "right" }) {
@@ -49,7 +50,7 @@ function TeamBlock({ logos, t, score, align }: { logos: Record<number, string>; 
   );
 }
 
-export default function LiveGame({ gameId, logos, home, away, coachTeams, finalHref }: Props) {
+export default function LiveGame({ gameId, logos, home, away, coachTeams, finalHref, occupancy }: Props) {
   const [since, setSince] = useState(-1);
   const [lines, setLines] = useState<LiveLine[]>([]);
   const [eventsList, setEventsList] = useState<SimEvent[]>([]);
@@ -333,6 +334,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
             periodText={view ? periodLabel(view.period) : ""}
             clockText={view ? (view.status === "final" ? "0:00" : view.shootout ? "SO" : fmtRemainingClock(view.clock, view.period)) : "20:00"}
             status={view?.status ?? null}
+            occupancy={occupancy}
           />
         </div>
       )}

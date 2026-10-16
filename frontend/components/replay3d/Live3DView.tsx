@@ -36,8 +36,8 @@ function readPref(key: string, fallback: string): string {
   try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
 }
 
-export default function Live3DView({ gameId, home, away, homeLogoUrl, events, score, shots, periodText, clockText, status }: {
-  gameId: number; home: Side; away: Side; homeLogoUrl?: string | null;
+export default function Live3DView({ gameId, home, away, homeLogoUrl, events, score, shots, periodText, clockText, status, occupancy }: {
+  gameId: number; home: Side; away: Side; homeLogoUrl?: string | null; occupancy?: number | null;
   events: SimEvent[]; score: { home: number; away: number }; shots: { home: number; away: number };
   periodText: string; clockText: string; status: "pending" | "live" | "final" | null;
 }) {
@@ -91,7 +91,7 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
     const canvas = canvasRef.current, box = boxRef.current;
     if (!canvas || !box || !ready) return;
     let scene: RinkScene;
-    try { scene = new RinkScene(canvas, { homeKit, awayKit, homeLogoUrl }); } catch { return; }
+    try { scene = new RinkScene(canvas, { homeKit, awayKit, homeLogoUrl, occupancy, homeCode: home.code, awayCode: away.code, homeName: home.name }); } catch { return; }
     sceneRef.current = scene;
     scene.setLabels(labels);
     const ro = new ResizeObserver(() => scene.resize(box.clientWidth, box.clientHeight));
@@ -148,7 +148,8 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
         else if (c.kind === "whistle") playSfx("whistle");
         else if (c.kind === "hit") playSfx("hit");
       }
-      if (it.clip.goalT != null && prevT < it.clip.goalT && t >= it.clip.goalT && it.kind !== "replay") scene.flashGoalLight(it.clip.attackDir);
+      if (it.clip.goalT != null && prevT < it.clip.goalT && t >= it.clip.goalT && it.kind !== "replay") { scene.flashGoalLight(it.clip.attackDir); scene.cheer(it.clip.attackSide, 1, 8); }
+      else if (it.clip.shotT != null && prevT < it.clip.shotT && t >= it.clip.shotT && it.kind !== "replay") scene.cheer(it.clip.attackSide, 0.3, 1.4);
       // glide out of the previous clip
       let fr = clipAt(it.clip, t);
       const k = Math.min(1, (t - (it.startAt ?? 0)) / BLEND);
@@ -168,7 +169,7 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); scene.dispose(); sceneRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, homeKit, awayKit, homeLogoUrl]);
+  }, [ready, homeKit, awayKit, homeLogoUrl, occupancy]);
 
   // the centre-hung board mirrors the real score
   useEffect(() => {

@@ -23,8 +23,9 @@ function readPref<T extends string>(key: string, fallback: T): T {
   try { return (localStorage.getItem(key) as T) ?? fallback; } catch { return fallback; }
 }
 
-export default function Replay3DPlayer({ clip, homeKit, awayKit, homeLogoUrl, focusId, hud, onEnded }: {
+export default function Replay3DPlayer({ clip, homeKit, awayKit, homeLogoUrl, focusId, hud, onEnded, occupancy, homeName }: {
   clip: Clip; homeKit: Kit; awayKit: Kit; homeLogoUrl?: string | null; focusId?: string | null; hud: ReplayHud; onEnded?: () => void;
+  occupancy?: number | null; homeName?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -56,12 +57,13 @@ export default function Replay3DPlayer({ clip, homeKit, awayKit, homeLogoUrl, fo
     const canvas = canvasRef.current, box = boxRef.current;
     if (!canvas || !box) return;
     let scene: RinkScene;
-    try { scene = new RinkScene(canvas, { homeKit, awayKit, homeLogoUrl }); } catch { return; }
+    try { scene = new RinkScene(canvas, { homeKit, awayKit, homeLogoUrl, occupancy, homeCode: hud.home.code, awayCode: hud.away.code, homeName }); } catch { return; }
     sceneRef.current = scene;
     const ro = new ResizeObserver(() => scene.resize(box.clientWidth, box.clientHeight));
     ro.observe(box); scene.resize(box.clientWidth, box.clientHeight);
     return () => { ro.disconnect(); scene.dispose(); sceneRef.current = null; };
-  }, [homeKit, awayKit, homeLogoUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [homeKit, awayKit, homeLogoUrl, occupancy]);
 
   // a new clip: cast, labels, start from the top
   useEffect(() => {
@@ -109,7 +111,8 @@ export default function Replay3DPlayer({ clip, homeKit, awayKit, homeLogoUrl, fo
           else if (c.kind === "save") playSfx("save");
           else if (c.kind === "whistle") playSfx("whistle");
         }
-        if (clip.goalT != null && prev < clip.goalT && tRef.current >= clip.goalT) scene.flashGoalLight(clip.attackDir);
+        if (clip.goalT != null && prev < clip.goalT && tRef.current >= clip.goalT) { scene.flashGoalLight(clip.attackDir); scene.cheer(clip.attackSide, 1, 7); }
+        else if (clip.shotT != null && prev < clip.shotT && tRef.current >= clip.shotT) scene.cheer(clip.attackSide, 0.3, 1.4);
         if (tRef.current >= clip.duration && !endedRef.current) { endedRef.current = true; playingRef.current = false; setPlaying(false); setEnded(true); onEnded?.(); }
       }
       if (camRef.current === "auto") scene.setCamera(directed(tRef.current), clip.attackDir);

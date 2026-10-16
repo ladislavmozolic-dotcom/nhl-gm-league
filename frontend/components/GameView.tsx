@@ -61,7 +61,7 @@ type Data = {
   goals: GoalE[]; penalties: PenE[]; playByPlay: PbpE[]; shootout?: ShootoutE[];
   injuries?: InjuryRow[]; homeSystem?: SystemDials; awaySystem?: SystemDials;
   story?: { report: GameReport; flow: GameFlow } | null;
-  attendance?: number | null; arena?: string | null; event?: { kind: string; title: string; venue: string | null } | null; officials?: { name: string; number: number | null; role: string }[]; gameDate?: string | Date | null;
+  attendance?: number | null; occupancy?: number | null; arena?: string | null; event?: { kind: string; title: string; venue: string | null } | null; officials?: { name: string; number: number | null; role: string }[]; gameDate?: string | Date | null;
   seriesId?: number | null; gameNum?: number | null; round?: number | null;
 };
 
@@ -721,7 +721,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
   return (
     <div className="max-w-[1360px] mx-auto px-2 sm:px-4 space-y-6 pb-16">
       {replayAt != null && replayGoals.length > 0 && (
-        <GoalReplayModal gameId={data.id} home={data.home} away={data.away} goals={replayGoals} start={Math.min(replayAt, replayGoals.length - 1)} onClose={() => setReplayAt(null)} />
+        <GoalReplayModal gameId={data.id} home={data.home} away={data.away} goals={replayGoals} start={Math.min(replayAt, replayGoals.length - 1)} onClose={() => setReplayAt(null)} occupancy={data.occupancy} />
       )}
       <div className="flex items-center justify-between text-xs text-slate-400">
         <button
