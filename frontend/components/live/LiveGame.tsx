@@ -138,6 +138,18 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       });
   }, [eventsList]);
 
+  // three stars from the goals/assists of the finished game (skaters only — saves aren't in the live feed)
+  const stars = useMemo(() => {
+    if (view?.status !== "final") return [];
+    const t = new Map<string, { name: string; team: string; g: number; a: number }>();
+    const row = (name: string, team: string) => { const k = `${team}|${name}`; if (!t.has(k)) t.set(k, { name, team, g: 0, a: 0 }); return t.get(k)!; };
+    for (const g of liveGoals) {
+      row(g.scorerName, g.teamCode ?? "").g++;
+      for (const a of g.assists) row(a, g.teamCode ?? "").a++;
+    }
+    return [...t.values()].sort((x, y) => (y.g + y.a) - (x.g + x.a) || y.g - x.g).slice(0, 3);
+  }, [view?.status, liveGoals]);
+
   const livePeriods = useMemo(() => {
     const pSet = new Set<number>([1]);
     if (view && view.period > 1) {
@@ -263,6 +275,17 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
           away={away}
           logos={logos}
         />
+      )}
+
+      {stars.length > 0 && (
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 mb-4">
+          <h3 className="text-sm font-semibold text-slate-200 mb-2">⭐ Three stars</h3>
+          <ol className="space-y-1 text-sm text-slate-300">
+            {stars.map((s, i) => (
+              <li key={`${s.team}-${s.name}`}>{"⭐".repeat(3 - i)} <span className="font-medium text-slate-100">{s.name}</span> <span className="text-slate-500">{s.team}</span> — {s.g}G {s.a}A</li>
+            ))}
+          </ol>
+        </div>
       )}
 
       {/* 5. COACH PANEL */}
