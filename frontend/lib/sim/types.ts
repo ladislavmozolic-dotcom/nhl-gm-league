@@ -95,6 +95,7 @@ export type SimTeam = {
   forwards: SimSkater[];
   defense: SimSkater[];
   goalie: SimGoalie;        // active starter for this game
+  backToBack?: boolean;     // the club also played yesterday (second night of a back-to-back) — V3 tires its skaters
   backup: SimGoalie | null; // dressed but (usually) not playing
   goalies: SimGoalie[];     // all available goalies, best first
   strategy: GameStrategy | null; // manager tactics (null = auto)

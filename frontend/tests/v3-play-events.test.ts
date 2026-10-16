@@ -329,3 +329,11 @@ test("live line stats: every 5-on-5 shot lands on exactly one line per side; TOI
   const toi = st[1].reduce((n, x) => n + x.toi, 0);
   assert.ok(toi > 1800 && toi <= 3900, `toi ${toi}`);
 });
+
+test("V3 back-to-back: the tired club gets a feed note at puck drop; flag off / V2 have none", () => {
+  const b2b = () => { const t = makeTeam(1, 64); t.backToBack = true; return t; };
+  const r = simulateGame(b2b(), makeTeam(2, 64), { seed: 3, engineVersion: ENGINE_V3 });
+  assert.ok(r.playByPlay.some((l) => l.period === 1 && /second night of a back-to-back/.test(l.text)));
+  assert.ok(!simulateGame(b2b(), makeTeam(2, 64), { seed: 3, engineVersion: ENGINE_V3, experimentalV3: { backToBack: false } }).playByPlay.some((l) => /back-to-back/.test(l.text)));
+  assert.ok(!simulateGame(b2b(), makeTeam(2, 64), { seed: 3, engineVersion: ENGINE_V2 }).playByPlay.some((l) => /back-to-back/.test(l.text)));
+});

@@ -175,6 +175,7 @@ type SimState = {
   v3LateTieCaution: boolean;         // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
   v3OtPace: boolean;                 // V3: 3-on-3 overtime has ~2x the attempts (each a real entry + shot); OT_TUNING.conv → ~2/3 of OT games end before the shootout (NHL-like)
+  v3BackToBack: boolean;             // V3: a club on the 2nd night of a back-to-back tires faster and fades late (B2B_TUNING)
   v3Roles: boolean;                  // V3: shooters shoot, playmakers pass (steeper SC-vs-PA shoot/pass choice) and a pass always goes to somebody else
   v3CoachNotes: boolean;             // V3: the feed says when a bench wins its matchup (last change) or sends a chosen line for a zone draw (no RNG)
   v3SixOnFive: boolean;              // V3: a pulled goalie is a real 6-on-5 push (more and better looks), the leader mostly clears instead of shooting at the empty net; the default 90 s pull reads as 2:30
@@ -1810,8 +1811,9 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
   };
   // team-system tactics multiply into the fatigue drain (fast tempo / aggressive
   // forecheck tire a team faster).
-  const fat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].fElapsed * team.tactics.fatigue, s.attrs.en ?? 50);
-  const dfat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].dElapsed * team.tactics.fatigue, s.attrs.en ?? 50);
+  const b2bDrain = (team: SimTeam) => (st.v3BackToBack && team.backToBack ? B2B_TUNING.drain : 1);
+  const fat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].fElapsed * team.tactics.fatigue * b2bDrain(team), s.attrs.en ?? 50);
+  const dfat = (team: SimTeam, s: SimSkater) => fatigueMult(shifts[team.id].dElapsed * team.tactics.fatigue * b2bDrain(team), s.attrs.en ?? 50);
 
   const killedPens = new Set<Penalty>(); // penalties that expired without a PP goal → PK momentum
 
@@ -2417,7 +2419,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // compare) and amplifies the (narrow) OV gap; scaled by possessionSkillPct —
     // turn it down for more upsets, up for chalk.
     const ovGap = carrierTeam.avgOV - def.avgOV;
-    const teamMult = Math.max(0.68, Math.min(1.32, 1 + ovGap * 0.035 * CFG.possessionSkillPct * (st.v3Pace && st.v3Dump ? TEAM_EDGE_TUNING.edge : 1)));
+    const b2bEdge = (t: SimTeam) => (st.v3BackToBack && t.backToBack ? (period >= 3 ? B2B_TUNING.late : B2B_TUNING.early) : 1); // heavy legs, worst late
+    const teamMult = Math.max(0.68, Math.min(1.32, 1 + ovGap * 0.035 * CFG.possessionSkillPct * (st.v3Pace && st.v3Dump ? TEAM_EDGE_TUNING.edge : 1))) * b2bEdge(carrierTeam) / b2bEdge(def);
 
     // final-skill helper: base × tactics × chemistry × morale × fatigue × score-effect × team edge
     // depth parity: a top-liner's edge (and a depth player's deficit) in the puck battles
@@ -3243,6 +3246,7 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
+export const B2B_TUNING = { drain: 1.3, early: 0.92, late: 0.87 }; // V3 back-to-back: shift-fatigue speed, team edge in periods 1-2 / 3+
 export const ROLE_TUNING = { exp: 1.6, creator: 75 }; // V3 roles: SC-vs-PA exponent of the shoot-or-pass choice (V2: 0.7); % of goals whose primary assist is the real passer
 export const SIX_TUNING = { rate: 2.3, conv: 1.8, enShots: 0.3, pullSec: 150 }; // V3 6-on-5: attack shot rate / finishing (×, replaces 1.22), the leader's shot rate at the empty net, default pull window
 export const SCORE_TUNING = { push: 0.15, sit: 0.10 }; // V3 3rd-period score effects on the shot rate (down 1-2: ×(1+push), up 1-2: ×(1−sit))
@@ -3345,7 +3349,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
+  experimentalV3?: { backToBack?: boolean; roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3427,6 +3431,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3SixOnFive: isV3 && (opts.experimentalV3?.sixOnFive ?? true),
     v3CoachNotes: isV3 && (opts.experimentalV3?.coachNotes ?? true),
     v3Roles: isV3 && (opts.experimentalV3?.roles ?? true),
+    v3BackToBack: isV3 && (opts.experimentalV3?.backToBack ?? true),
     v3Dump: isV3 && (opts.experimentalV3?.dump ?? true),
     v3Pin: isV3 && (opts.experimentalV3?.pin ?? true),
     v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),
@@ -3487,6 +3492,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     // penalty, so they sit in the feed at their real time (a live viewer sees them when the clock
     // gets there) and the players are really in the box. V2 keeps the old after-the-period roll.
     if (st.v3Stoppages) generateHeatEvents(st, period);
+    if (period === 1 && st.v3BackToBack && st.v3CoachNotes) for (const t of [st.home, st.away]) if (t.backToBack) st.sink.emit({ period: 1, seconds: 0, type: "MATCHUP", teamId: t.id, teamCode: t.code ?? undefined, importance: "MINOR", meta: { kind: "b2b" } });
     yield* periodGen(st, period);
     // scrums/donnybrooks/abuse-of-official stay a per-period post-hoc roll (rare
     // enough that the same-period residual this leaves is a non-issue); donnybrook

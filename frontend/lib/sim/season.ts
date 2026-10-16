@@ -424,6 +424,8 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     const [home, away] = await Promise.all([getTeam(gm.homeTeamId), getTeam(gm.awayTeamId)]);
     if (!home || !away) { skippedIds.push(gm.id); return null; } // roster won't load (e.g. farm w/o goalie) — mark no-contest below so it never blocks the day pointer
     for (const team of [home, away]) {
+      // second night of a back-to-back (the club played the previous game day) — V3 tires its skaters; V2 ignores it
+      team.backToBack = (await prisma.game.count({ where: { season, round: round - 1, status: "FINAL", seriesId: null, OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }] } })) > 0;
       const starter = chooseStarter(team, round - 1, gState);
       starter.fatigued = (gState.get(starter.id)?.lastStartRound ?? -99) === round - 1;
       team.goalie = starter;

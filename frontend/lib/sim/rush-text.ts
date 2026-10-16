@@ -97,6 +97,7 @@ export function longShiftText(m: { seconds?: number; unit?: string; names?: stri
 
 export function matchupText(m: { kind?: string; mine?: string; theirs?: string; opp?: string; late?: boolean }, team?: string | null): string {
   const t = team ?? "The bench";
+  if (m.kind === "b2b") return `${t} is on the second night of a back-to-back — watch the legs late in this one.`;
   if (m.kind === "check") return `${t} uses the last change: the ${m.mine} line goes out against the ${m.theirs} line.`;
   if (m.kind === "top") return `${t} gets its top line, the ${m.mine} line, out against ${m.opp ?? "their"}'s checkers (the ${m.theirs} line).`;
   if (m.kind === "ozone") return `Offensive-zone draw: ${t} sends out the ${m.mine} line.`;
