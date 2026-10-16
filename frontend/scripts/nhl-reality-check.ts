@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Read-only: the current V3 default against real-NHL reference values. Game-state numbers (goals, periods, margins,
 // OT/SO, leads after 2, comebacks, EN goals, home win) are MEASURED from all 2,624 regular-season games of 2023-24 +
-// 2024-25 (api-web.nhle.com/v1/score/<date>); shots / sv% / PP / pull timing are approximate league averages.
+// 2024-25 (api-web.nhle.com/v1/score/<date>), as are SOG, sv% and the PP/SH goal shares; PP chances and pull timing are approximate.
 // Every ordered pair of the 32 NHL clubs × bases. Run: npx tsx scripts/nhl-reality-check.ts [bases=2] [seedBase=91000000]
 import { simulateGame, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING, COMPRESS_TUNING } from "../lib/sim/engine";
 import { loadSettings } from "../lib/sim/settings";
@@ -18,7 +18,7 @@ if (process.argv[8]) Object.assign(COMPRESS_TUNING, JSON.parse(process.argv[8]))
 
 // ≈ NHL reference (rounded; per game = both teams)
 const NHL: Record<string, number> = {
-  goals: 6.09, shots: 29.5, svp: 90.2, ppOpp: 2.9, ppPct: 21, ot: 20.7, so: 6.1, home: 55.2,
+  goals: 6.09, shots: 29.28, svp: 90.22, ppOpp: 2.9, ppPct: 21, ot: 20.7, so: 6.1, home: 55.2,
   shutout: 0.11, eng: 0.37, p1: 28.9, p2: 33.6, p3: 35.1,
   m1: 38.2, m2: 21.0, m3: 23.9, m4: 16.9, lead2win: 84.7, trailShotShare: 53, pullSec: 165,
 };
@@ -44,6 +44,7 @@ const pulls: number[] = [];
     add("sv", r.home.shots + r.away.shots - goals.filter((g) => !g.meta?.emptyNet).length);
     add("sog", r.home.shots + r.away.shots);
     add("ppOpp", r.home.ppOpp + r.away.ppOpp); add("ppG", goals.filter((g) => g.strength === "PP").length);
+    add("shG", goals.filter((g) => g.strength === "SH").length); add("psG", goals.filter((g) => g.meta?.penaltyShot).length); add("allG", goals.length);
     add("ot", r.endedIn !== "REG" ? 1 : 0); add("so", r.endedIn === "SO" ? 1 : 0);
     add("home", r.winner === H ? 1 : 0);
     add("fav", r.winner === (teams[i].avgOV >= teams[j].avgOV ? teams[i].id : teams[j].id) ? 1 : 0);
@@ -90,6 +91,9 @@ const pulls: number[] = [];
     ["Save % (no EN)", pct("sv", a.sog), NHL.svp],
     ["Power plays / team", per("ppOpp") / 2, NHL.ppOpp],
     ["Power-play %", pct("ppG", a.ppOpp), NHL.ppPct],
+    ["PP goals, share of all goals %", pct("ppG", a.allG), 20.0],
+    ["SH goals, share of all goals %", pct("shG", a.allG), 2.8],
+    ["Penalty-shot goals / game", per("psG"), 0.009],
     ["Games past regulation %", pct("ot"), NHL.ot],
     ["Shootouts % of games", pct("so"), NHL.so],
     ["Home team wins %", pct("home"), NHL.home],
