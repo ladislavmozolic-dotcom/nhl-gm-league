@@ -195,6 +195,18 @@ export class RinkScene {
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.6;
     this.scene.add(sun);
 
+    // Rim lighting: opposite high-angle kicker for EA NHL / broadcast edge highlight on shoulders & helmets
+    const rimLight = new THREE.DirectionalLight("#cde0ff", 1.8);
+    rimLight.position.set(40, 110, -50);
+    this.scene.add(rimLight);
+
+    // Ice bounce fill: upward light reflecting from the bright ice sheet onto player undersides/visors
+    const iceFill = new THREE.DirectionalLight("#e8f2ff", 0.6);
+    iceFill.position.set(0, -10, 0);
+    iceFill.target.position.set(0, 10, 0);
+    this.scene.add(iceFill);
+    this.scene.add(iceFill.target);
+
     // ice
     const iceShape = new THREE.Shape(); roundedRect(iceShape, RINK.halfLength, RINK.halfWidth, RINK.cornerR);
     const iceGeo = new THREE.ShapeGeometry(iceShape, 32); iceGeo.rotateX(-Math.PI / 2);
