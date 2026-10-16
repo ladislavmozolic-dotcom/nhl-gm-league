@@ -308,50 +308,189 @@ export class RinkScene {
     this.camera.aspect = w / Math.max(1, h); this.camera.updateProjectionMatrix();
   }
 
-  /** Pose everyone from one interpolated frame. */
+  /** Pose everyone from one interpolated frame (EA NHL console style biomechanics). */
   setFrame(frame: ClipFrame, dt: number) {
     this.order.forEach((id, i) => {
-      const r = this.rigs.get(id), s = frame.a[i], a = this.actorsById.get(id);
+      const r = this.rigs.get(id),
+        s = frame.a[i],
+        a = this.actorsById.get(id);
       if (!r || !s || !a) return;
+
       r.root.position.set(s.x, 0, s.z);
       r.root.rotation.y = -s.h;
-      const v = Math.min(1, s.speed / 22);
-      r.phase += dt * (3 + s.speed * 0.32);
-      const stride = Math.sin(r.phase) * 0.55 * v;
-      r.legL.rotation.z = stride; r.legR.rotation.z = -stride;
-      r.legL.rotation.x = 0.12 + Math.max(0, stride) * 0.4; r.legR.rotation.x = -0.12 - Math.max(0, -stride) * 0.4;
-      r.legL.position.y = r.legR.position.y = 3.0;
-      r.upper.rotation.z = -0.18 - 0.28 * v; r.upper.position.y = 3.0 - 0.25 * v;
-      r.upper.rotation.x = Math.sin(r.phase) * 0.06 * v;
-      r.armL.rotation.set(0, 0, 0.7); r.armR.rotation.set(0, 0, 0.9); r.stick.rotation.set(0, 0, 0);
-      r.root.position.y = 0;
+
+      // Heading delta for dynamic turn banking (leaning into curves)
+      let dh = s.h - (r.prevHeading || s.h);
+      while (dh > Math.PI) dh -= 2 * Math.PI;
+      while (dh < -Math.PI) dh += 2 * Math.PI;
+      r.prevHeading = s.h;
+
+      const v = Math.min(1, s.speed / 20);
+      const turnRate = dt > 0.001 ? Math.max(-1, Math.min(1, (dh / dt) * 0.2)) : 0;
+      const targetBank = turnRate * v * 0.38;
+      r.bankAngle += (targetBank - r.bankAngle) * Math.min(1, dt * 9);
+
+      // Stride cycle frequency (faster strides when sprinting)
+      r.phase += dt * (3.0 + s.speed * 0.36);
+      const strideL = Math.sin(r.phase);
+      const strideR = -strideL;
+
+      // Check if skater is carrying the puck
+      const distToPuck = Math.hypot(s.x - frame.p.x, s.z - frame.p.z);
+      const hasPuck = distToPuck < 4.2;
+
+      // Athletic hockey crouch: center of gravity drops as speed increases
+      r.pelvis.position.y = -0.12 - 0.22 * v;
+      // Lateral weight shift over the gliding skate
+      r.pelvis.position.z = Math.sin(r.phase) * 0.16 * v;
+      // Banking into turn + subtle pelvic roll
+      r.pelvis.rotation.x = r.bankAngle + Math.sin(r.phase) * 0.05 * v;
+      r.pelvis.rotation.z = -0.05 * v;
+
+      // Athletic forward pitch of spine
+      r.upper.rotation.z = -0.22 - 0.28 * v;
+      r.upper.rotation.x = Math.sin(r.phase) * 0.05 * v;
+      r.upper.position.y = 3.05;
+
       if (r.goalie) {
-        r.upper.rotation.z = -0.35; r.upper.position.y = 2.6;
-        r.legL.rotation.x = 0.25; r.legR.rotation.x = -0.25; r.legL.rotation.z = r.legR.rotation.z = 0.35;
-        r.armL.rotation.set(0.5, 0, 0.5); r.armR.rotation.set(-0.3, 0, 0.6);
+        // --- GOALIE BIOMECHANICS ---
+        r.upper.rotation.z = -0.38;
+        r.upper.position.y = 2.65;
+        r.pelvis.position.y = -0.25;
+
+        // Wide active ready stance
+        r.thighL.rotation.set(-0.25, 0, 0.42);
+        r.thighR.rotation.set(0.25, 0, 0.42);
+        r.shinL.rotation.set(0, 0, -0.55);
+        r.shinR.rotation.set(0, 0, -0.55);
+        r.skateL.rotation.set(0, 0, 0.15);
+        r.skateR.rotation.set(0, 0, 0.15);
+
+        // Blocker and Catcher active in front of chest
+        r.armL.rotation.set(0.45, 0, 0.55);
+        r.armR.rotation.set(-0.35, 0, 0.65);
+        r.forearmL.rotation.set(0, 0, -0.5);
+        r.forearmR.rotation.set(0, 0, -0.45);
+
+        r.stick.position.set(0.85, 0.45, 0.3);
+        r.stick.rotation.set(0, 0, 0.15);
+
         if (s.pose === POSE.BUTTERFLY) {
-          // knees down, pads flared out to the posts
-          r.upper.position.y = 1.7; r.upper.rotation.z = -0.15;
-          r.legL.position.y = r.legR.position.y = 1.5;
-          r.legL.rotation.set(1.35, 0, 0.6); r.legR.rotation.set(-1.35, 0, 0.6);
-          r.armL.rotation.set(1.0, 0, 0.4);
+          // Modern Butterfly Slide: knees drop tight to seal the 5-hole,
+          // shins flare outward 85° to seal ice from post to post!
+          r.pelvis.position.y = -1.45;
+          r.upper.position.y = 2.05;
+          r.upper.rotation.z = -0.16;
+
+          // Thighs together, angled down
+          r.thighL.rotation.set(1.42, 0, 0.2);
+          r.thighR.rotation.set(-1.42, 0, 0.2);
+          // Shins flared wide across the ice
+          r.shinL.rotation.set(1.5, 0, 0.75);
+          r.shinR.rotation.set(-1.5, 0, 0.75);
+
+          // Catcher & Blocker tracking puck
+          r.armL.rotation.set(0.85, 0, 0.4);
+          r.armR.rotation.set(-0.3, 0, 0.55);
+          r.forearmL.rotation.set(0, 0, -0.3);
+          r.forearmR.rotation.set(0, 0, -0.3);
+
+          // Paddle seals 5-hole
+          r.stick.position.set(0.72, -0.15, 0.15);
+          r.stick.rotation.set(0.1, 0, 0.3);
         }
       } else if (s.pose === POSE.SHOOT) {
+        // --- EXPLOSIVE NHL SHOT BIOMECHANICS ---
         const k = s.poseT;
-        const wind = k < 0.55 ? k / 0.55 : 1 - (k - 0.55) / 0.15;
-        const follow = k > 0.55 ? Math.min(1, (k - 0.55) / 0.15) : 0;
-        // stick back on the wind-up, through the puck, up on the follow-through
-        r.stick.rotation.z = -1.5 * Math.max(0, wind) + 0.9 * follow;
-        r.upper.rotation.y = 0.5 * Math.max(0, wind) - 0.4 * follow;
-        r.armR.rotation.z = 0.9 - 1.2 * Math.max(0, wind) + 0.4 * follow;
+        const wind = k < 0.5 ? k / 0.5 : 1 - (k - 0.5) / 0.15;
+        const follow = k > 0.5 ? Math.min(1, (k - 0.5) / 0.35) : 0;
+
+        // Weight shifts to back leg during windup, drives forward on release
+        r.pelvis.position.y = -0.28 - 0.15 * Math.max(0, wind);
+        r.pelvis.position.x = 0.2 * follow - 0.15 * Math.max(0, wind);
+
+        // Torso coils on backswing, explosive uncoiling through release
+        r.upper.rotation.y = 0.65 * Math.max(0, wind) - 0.55 * follow;
+        r.upper.rotation.z = -0.28 - 0.25 * follow;
+
+        // Stick sweeps back, flexes into ice, and follows through towards goal
+        r.stick.rotation.z = -1.65 * Math.max(0, wind) + 1.1 * follow;
+        r.stick.rotation.y = 0.4 * Math.max(0, wind) - 0.3 * follow;
+
+        // Arms & shoulders flex through the shot
+        r.armR.rotation.z = 0.95 - 1.4 * Math.max(0, wind) + 0.65 * follow;
+        r.armL.rotation.z = 0.65 + 0.8 * Math.max(0, wind) - 0.45 * follow;
+        r.forearmR.rotation.z = -0.55 + 0.5 * follow;
+        r.forearmL.rotation.z = -0.45;
+
+        // Front leg plants firmly with knee bend, back leg kicks back for balance
+        r.thighL.rotation.set(-0.15, 0, 0.45 * follow - 0.3 * Math.max(0, wind));
+        r.shinL.rotation.set(0, 0, -0.6 * follow);
+        r.thighR.rotation.set(0.15, 0, -0.55 * follow + 0.25 * Math.max(0, wind));
+        r.shinR.rotation.set(0, 0, 0.4 * follow);
       } else if (s.pose === POSE.CELEBRATE) {
+        // --- GOAL CELEBRATION ---
         const k = s.poseT;
-        r.armL.rotation.set(2.5, 0, 0.2); r.armR.rotation.set(-2.5, 0, 0.2 + Math.sin(k * 10) * 0.3);
-        r.stick.rotation.z = 1.9;
-        r.upper.rotation.z = 0.1; r.upper.position.y = 3.0;
-        r.root.position.y = Math.max(0, Math.sin(k * 9)) * 0.35 * Math.max(0, 1 - k / 3);
+        // Arms high in the air in triumph!
+        r.armL.rotation.set(2.55, 0, 0.25);
+        r.armR.rotation.set(-2.55, 0, 0.25 + Math.sin(k * 10) * 0.35);
+        r.forearmL.rotation.set(0, 0, 0.2);
+        r.forearmR.rotation.set(0, 0, 0.2);
+        r.stick.rotation.set(0, 0, 1.85);
+
+        r.upper.rotation.set(0, 0, 0.1);
+        r.upper.position.y = 3.05;
+        // Hop & fist pump
+        r.pelvis.position.y = Math.max(0, Math.sin(k * 9)) * 0.42 * Math.max(0, 1 - k / 3);
+
+        r.thighL.rotation.set(-0.1, 0, 0.2);
+        r.thighR.rotation.set(0.1, 0, -0.3);
+        r.shinL.rotation.set(0, 0, -0.4);
+        r.shinR.rotation.set(0, 0, -0.5);
+      } else {
+        // --- NATURAL NHL SKATING STRIDE & STICKHANDLING ---
+        // Left Leg: 40-45° lateral push-off when extending, knee flex when recovering
+        const pushL = Math.max(0, -strideL);
+        const glideL = Math.max(0, strideL);
+        r.thighL.rotation.z = 0.35 * v - strideL * 0.58 * v; // Hip push backward
+        r.thighL.rotation.x = -0.1 - pushL * 0.42 * v; // 45° lateral push-off!
+        r.shinL.rotation.z = -0.42 - pushL * 0.35 * v + glideL * 0.45 * v; // Knee flexion/extension
+        r.skateL.rotation.z = -r.thighL.rotation.z - r.shinL.rotation.z; // Keeps blade aligned to ice
+
+        // Right Leg: in opposition
+        const pushR = Math.max(0, -strideR);
+        const glideR = Math.max(0, strideR);
+        r.thighR.rotation.z = 0.35 * v - strideR * 0.58 * v;
+        r.thighR.rotation.x = 0.1 + pushR * 0.42 * v;
+        r.shinR.rotation.z = -0.42 - pushR * 0.35 * v + glideR * 0.45 * v;
+        r.skateR.rotation.z = -r.thighR.rotation.z - r.shinR.rotation.z;
+
+        // Stickhandling & Arm Mechanics
+        if (hasPuck) {
+          // Puck carrier: hands and stick sweep smoothly side-to-side (dangling / stickhandling)
+          const stickWag = Math.sin(r.phase * 1.6) * 0.28;
+          r.upper.rotation.y = stickWag * 0.35;
+          r.stick.position.set(0.92, 0.65, 0.45 + stickWag * 0.35);
+          r.stick.rotation.set(0, stickWag * 0.4, 0);
+
+          r.armL.rotation.set(0.2, stickWag * 0.2, 0.68);
+          r.armR.rotation.set(-0.2, stickWag * 0.2, 0.88);
+          r.forearmL.rotation.set(0, 0, -0.52);
+          r.forearmR.rotation.set(0, 0, -0.68);
+        } else {
+          // Non-carrier: natural arm pump in counter-balance to strides
+          r.upper.rotation.y = 0;
+          r.stick.position.set(0.92, 0.65, 0.45);
+          r.stick.rotation.set(0, 0, 0);
+
+          r.armL.rotation.set(0, 0, 0.68 + strideR * 0.32 * v);
+          r.armR.rotation.set(0, 0, 0.88 + strideL * 0.32 * v);
+          r.forearmL.rotation.set(0, 0, -0.45);
+          r.forearmR.rotation.set(0, 0, -0.55);
+        }
       }
-      // names only around the puck (plus the player the clip is about), so a crowded slot stays readable
+
+      // Names only around the puck (plus the player the clip is about)
       const near = Math.hypot(s.x - frame.p.x, s.z - frame.p.z) < 26;
       r.label.visible = ((this.labels && near) || id === this.focusId) && !!a.name;
       if (r.label.visible) this.setLabel(r, a, id === this.focusId);
