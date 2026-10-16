@@ -211,6 +211,8 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
 
       <Card title="📺 Live Matches (V3)">
         <Toggle k="liveMatchesEnabled" label="Play rounds live — watch games unfold and let GMs coach at stoppages" />
+        <Toggle k="live2dEnabled" label="2D rink tracker on the live game page (each viewer can still hide it)" />
+        <Toggle k="live3dEnabled" label="3D rink on the live page and 3D goal replays on the game page" />
         <p className="text-xs text-slate-500 mb-2">Off: Simulate Day resolves every game instantly, exactly as before. Needs the V3 engine; ignored on any other engine.</p>
         <NumField k="livePeriodSec" label="Seconds to watch one period (60–600; 300 = 5 min, so a game ≈ 16 min with breaks)" step={30} />
         <NumField k="liveIntermissionSec" label="Intermission length (seconds)" step={5} />

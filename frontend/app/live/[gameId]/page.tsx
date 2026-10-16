@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, BackPill } from "@/components/ui";
 import LiveGame from "@/components/live/LiveGame";
+import { loadSettings } from "@/lib/sim/settings";
 import { canManageTeam } from "@/lib/auth";
 import { roundName } from "@/lib/sim/playoffs";
 import { DEFAULT_ARENA_CAPACITY } from "@/lib/season-tickets";
@@ -37,6 +38,7 @@ export default async function LiveGamePage({ params }: { params: Promise<{ gameI
     if (recent.length) occupancy = recent.reduce((t, g) => t + (g.attendance ?? 0), 0) / recent.length / capacity;
   }
   if (occupancy != null) occupancy = Math.max(0, Math.min(1, occupancy));
+  const liveCfg = await loadSettings();
   const logos: Record<number, string> = {};
   for (const t of teams) if (t.logoUrl) logos[t.id] = t.logoUrl;
   // clubs this visitor may coach tonight (their own; an admin gets both)
@@ -47,7 +49,7 @@ export default async function LiveGamePage({ params }: { params: Promise<{ gameI
       <div className="flex items-center gap-3"><BackPill href="/live">Live scoreboard</BackPill></div>
       <PageHeader title={`${game.awayTeam.name} @ ${game.homeTeam.name}`} subtitle={context ?? undefined}
         right={<Link href={`/games/${game.id}`} className="text-sm text-slate-400 hover:text-blue-400">Game report →</Link>} />
-      <LiveGame gameId={game.id} logos={logos} home={game.homeTeam} away={game.awayTeam} coachTeams={coachTeams} finalHref={`/games/${game.id}`} occupancy={occupancy} />
+      <LiveGame gameId={game.id} logos={logos} home={game.homeTeam} away={game.awayTeam} coachTeams={coachTeams} finalHref={`/games/${game.id}`} occupancy={occupancy} allow2d={liveCfg.live2dEnabled} allow3d={liveCfg.live3dEnabled} />
     </div>
   );
 }

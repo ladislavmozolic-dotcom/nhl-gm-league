@@ -127,6 +127,8 @@ export type EngineSettings = {
   financeMode: "base" | "detailed";  // base = ticket-revenue finance; detailed = richer model (pending)
   waiversEnabled: boolean;           // enforce the waiver wire (claims / re-entry) on demotions
   // Live matches (V3 only): a round is played out in real time with coaching windows at stoppages
+  live2dEnabled: boolean;           // the 2D rink tracker on the live game page (viewers can still switch it off for themselves)
+  live3dEnabled: boolean;           // the 3D rink on the live page + 3D goal replays on the game page
   liveMatchesEnabled: boolean;       // off = Simulate Day resolves games instantly, exactly as before
   livePeriodSec: number;             // wall-clock seconds one 20-minute period takes to watch (default 300 = 5 min)
   liveIntermissionSec: number;       // wall-clock seconds each intermission lasts (the guaranteed lines window)
@@ -288,7 +290,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   faWeightF: { sc: 0.42, pa: 0.38, df: 0.12, sk: 0.08 },
   faWeightD: { df: 0.40, pa: 0.30, sc: 0.20, sk: 0.10 },
   faWeightG: { ag: 0.34, sc: 0.30, rb: 0.26, hs: 0.10 },
-  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, liveMatchesEnabled: false, livePeriodSec: 300, liveIntermissionSec: 30, v3TransitionRush: true, v3StoppageRealism: true, intelligenceRollout: "full",
+  faMode: "full", faSignLock: true, financeMode: "base", waiversEnabled: true, liveMatchesEnabled: false, live2dEnabled: true, live3dEnabled: true, livePeriodSec: 300, liveIntermissionSec: 30, v3TransitionRush: true, v3StoppageRealism: true, intelligenceRollout: "full",
   faLowballMaxBumpPct: 25, iceUnhappyPct: 70, iceWarnDays: 5, iceRequestDays: 20, resignLockDays: 10,
   finJerseyNet: 120, finJerseyScale: 40000, finApparelBase: 3200000, finOtherBase: 1400000,
   finTradeBoostPct: 60, finTradeBoostHalfLife: 21,

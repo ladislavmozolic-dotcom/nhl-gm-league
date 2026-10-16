@@ -637,7 +637,7 @@ function EdgePanel({ data }: { data: Data }) {
 }
 
 // ---- main view --------------------------------------------------------------
-export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: React.ReactNode }) {
+export default function GameView({ data, intelSlot, allow3d = true }: { data: Data; intelSlot?: React.ReactNode; allow3d?: boolean }) {
   const [tab, setTab] = useState("summary");
   const [metric, setMetric] = useState<"shots" | "goals" | "pp" | "hits" | "fo" | "blocks" | "xg">("shots");
   const [replayAt, setReplayAt] = useState<number | null>(null);
@@ -878,7 +878,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
             <div className="grid grid-cols-2 bg-slate-900/95 text-xs font-black tracking-wider text-slate-300 border-b border-slate-800">
               <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between">
                 <span className="flex items-center gap-2"><span>🚨</span> GOALS</span>
-                {replayGoals.length > 0 ? (
+                {allow3d && replayGoals.length > 0 ? (
                   <button type="button" onClick={() => setReplayAt(0)} className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition" title="Všetky góly zápasu v 3D">🎬 3D zostrih</button>
                 ) : (
                   <span className="text-[11px] font-normal text-slate-500 font-mono hidden sm:inline">Running score & players on ice</span>
@@ -945,7 +945,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
                                     {g.scorerSeasonGoal != null && <span className="text-sm font-bold text-amber-400">({g.scorerSeasonGoal})</span>}
                                   </div>
                                   <span className="flex items-center gap-1.5 shrink-0">
-                                    {replayIndexOf(g) >= 0 && (
+                                    {allow3d && replayIndexOf(g) >= 0 && (
                                       <button type="button" onClick={() => setReplayAt(replayIndexOf(g))} className="text-[11px] font-black px-2 py-1 rounded bg-sky-600/90 hover:bg-sky-500 text-white transition" title="3D replay gólu">▶ 3D</button>
                                     )}
                                     <span className="text-xs font-mono font-extrabold px-2.5 py-1 rounded bg-slate-900 border border-slate-700/70 text-slate-200">

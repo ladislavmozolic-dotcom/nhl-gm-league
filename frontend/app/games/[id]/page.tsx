@@ -4,6 +4,7 @@ import { kindOf } from "@/lib/special-games-shared";
 import { officialsOf } from "@/lib/officials-server";
 import { notFound } from "next/navigation";
 import GameView from "@/components/GameView";
+import { loadSettings } from "@/lib/sim/settings";
 import type { PbpEvent, ShootoutAttempt } from "@/lib/sim/types";
 import type { TeamLinesData } from "@/lib/sim/lines";
 import { cleanName } from "@/lib/playerName";
@@ -908,6 +909,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
     <>
       <GameView
         data={data}
+        allow3d={(await loadSettings()).live3dEnabled}
         intelSlot={game.status === "FINAL" && (await getTeamSession()) != null ? <PostGameIntelCard gameId={game.id} /> : undefined}
       />
       {game.status === "FINAL" && <GameDiscipline items={discipline} reviewable={game.league !== "AHL" && !game.season.endsWith("-PRE")} />}

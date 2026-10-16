@@ -23,8 +23,8 @@ test("V3 is a next-gen workbench version, not a league-selectable engine", () =>
   assert.equal(engineVersionFor("nextgen"), ENGINE_V2);
 });
 
-test("V3 is reachable only on the sandbox instance — a stored v3 value never activates it on live", () => {
-  assert.equal(resolveSimEngine("v3", false), "nextgen");
+test("V3 runs only when the commissioner's stored switch says v3 (test or live); everything else is V2", () => {
+  assert.equal(resolveSimEngine("v3", false), "v3");
   assert.equal(resolveSimEngine("v3", true), "v3");
   assert.equal(resolveSimEngine("nextgen", true), "nextgen");
   assert.equal(resolveSimEngine("current", true), "nextgen");

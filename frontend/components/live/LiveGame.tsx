@@ -36,6 +36,8 @@ type Props = {
   coachTeams: Array<{ id: number; name: string }>;
   finalHref: string;
   occupancy?: number | null; // share of seats filled — the 3D rink's crowd
+  allow2d?: boolean;  // commissioner switch (Admin → Live Matches): false hides the 2D rink for everyone
+  allow3d?: boolean;  // …and the 3D rink
 };
 
 function TeamBlock({ logos, t, score, align }: { logos: Record<number, string>; t: Side; score: number | string; align: "left" | "right" }) {
@@ -50,7 +52,7 @@ function TeamBlock({ logos, t, score, align }: { logos: Record<number, string>; 
   );
 }
 
-export default function LiveGame({ gameId, logos, home, away, coachTeams, finalHref, occupancy }: Props) {
+export default function LiveGame({ gameId, logos, home, away, coachTeams, finalHref, occupancy, allow2d = true, allow3d = true }: Props) {
   const [since, setSince] = useState(-1);
   const [lines, setLines] = useState<LiveLine[]>([]);
   const [eventsList, setEventsList] = useState<SimEvent[]>([]);
@@ -77,6 +79,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
 
   const [showRink, setShowRink] = useState(false);
   const [show3d, setShow3d] = useState(false);
+  const rinkOn = allow2d && showRink, d3On = allow3d && show3d; // a viewer's choice, within what the league allows
   const [showBoxscore, setShowBoxscore] = useState(true);
   const [feedTab, setFeedTab] = useState<"pbp" | "boxscore">("pbp");
 
@@ -220,7 +223,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       </section>
 
       {/* 2. MAIN GAME HEADER / SCOREBOARD (Zobrazené keď je 2D klzisko vypnuté) */}
-      {!showRink && (
+      {!rinkOn && (
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 mb-3">
           <div className="flex items-center justify-between mb-4 text-xs uppercase tracking-wide">
             <span className={view?.status === "live" ? "text-red-400 font-bold" : "text-slate-500"}>{view?.status === "live" ? "● LIVE" : ""}</span>
@@ -242,6 +245,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
               </button>
 
               {/* 2D Rink toggle button */}
+              {allow2d && (<>
               <button
                 onClick={toggleRink}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
@@ -255,9 +259,10 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
                 <span className={`px-1.5 py-0.2 rounded text-[10px] ${showRink ? "bg-sky-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
                   {showRink ? "ZAP" : "VYP"}
                 </span>
-              </button>
+              </button></>)}
 
               {/* 3D Rink toggle button */}
+              {allow3d && (<>
               <button
                 onClick={toggle3d}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
@@ -271,7 +276,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
                 <span className={`px-1.5 py-0.2 rounded text-[10px] ${show3d ? "bg-violet-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
                   {show3d ? "ZAP" : "VYP"}
                 </span>
-              </button>
+              </button></>)}
               <span className="text-slate-300 font-semibold text-sm normal-case tracking-normal">{status}</span>
             </div>
           </div>
@@ -289,7 +294,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       )}
 
       {/* 3. 2D RINK TRACKER (Obsahuje unifikovaný scoreboard s ovládaním zvuku, rýchlosti a boxscore) */}
-      {showRink && (
+      {rinkOn && (
         <div className="mb-3">
           <LiveRinkTracker
             gameId={gameId}
@@ -313,7 +318,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
             liveLines={lines}
             showBoxscore={showBoxscore}
             onToggleBoxscore={toggleBoxscore}
-            showRink={showRink}
+            showRink={rinkOn}
             onToggleRink={toggleRink}
             statusText={status}
           />
@@ -321,7 +326,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       )}
 
       {/* 3b. 3D RINK — the same live events, staged in 3D */}
-      {show3d && (
+      {d3On && (
         <div className="mb-3">
           <Live3DView
             gameId={gameId}
