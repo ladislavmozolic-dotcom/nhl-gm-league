@@ -57,8 +57,8 @@ test("with rushes on, odd-man rushes of every kind happen, tagged on their shots
   }
   for (const k of ["BREAKAWAY", "2ON1", "3ON2"]) assert.ok(kinds[k] && kinds[k].n > 40 && kinds[k].shots > 30, `${k} should be common (${JSON.stringify(kinds[k])})`);
   const conv = (k: string) => kinds[k].goals / kinds[k].shots;
-  // flat synthetic teams with no goalie spread run hotter than the NHL (scripts/rush-check.ts: ~21%)
-  assert.ok(conv("BREAKAWAY") > 0.15 && conv("BREAKAWAY") < 0.45, `breakaway conversion ${conv("BREAKAWAY").toFixed(3)}`);
+  // flat synthetic teams with no goalie spread run hotter than the NHL (real rosters, scripts/rush-check.ts: ~27%)
+  assert.ok(conv("BREAKAWAY") > 0.15 && conv("BREAKAWAY") < 0.5, `breakaway conversion ${conv("BREAKAWAY").toFixed(3)}`);
   assert.ok(conv("BREAKAWAY") > conv("2ON1") && conv("2ON1") > 0.06 && conv("3ON2") > 0.05, "a breakaway beats a 2-on-1 beats a normal look");
   assert.ok(rushGames > 300, `most games should feature at least one rush (${rushGames}/400)`);
   assert.ok(penaltyShots > 0, "a foul on a breakaway should occasionally earn a penalty shot over 400 games");

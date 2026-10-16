@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { coreDumpShare, coreShootShare, type CoreEngineContext } from "../lib/sim/v3-core/engine-bridge";
+import { coreClearShare, coreDumpShare, coreShootShare, type CoreEngineContext } from "../lib/sim/v3-core/engine-bridge";
 
 const base = (over: Partial<CoreEngineContext> = {}, attrs: Record<string, number> = {}, type: string | null = null): CoreEngineContext => ({
   carrier: { id: 1, type, attrs: { sk: 70, ph: 70, pa: 70, sc: 70, df: 60, st: 60, ck: 60, ...attrs } as never },
@@ -27,4 +27,13 @@ test("Core bridge: a neutral-zone dump-in is likelier for a tired unit, under a 
   assert.ok(nz({ oppForecheck: 0.9 }) > nz({ oppForecheck: 0.2 }), "hard forecheck");
   assert.ok(nz({}, { puckStyle: "cycle" }) > nz({}, { puckStyle: "rush" }), "a cycle team dumps more than a rush team");
   assert.ok(nz({ scoreMargin: -1, secondsRemaining: 120 }) < avg, "down one late: carry it in");
+});
+
+test("Core bridge: in his own end a hemmed-in, tired unit or a team protecting a late lead just clears it", () => {
+  const dz = (over: Partial<CoreEngineContext> = {}) => coreClearShare(base({ zone: "DEF", ...over }));
+  const avg = dz();
+  assert.ok(avg > 0.15 && avg < 0.6, `average ${avg}`);
+  assert.ok(dz({ pressureSeconds: 35 }) > avg, "hemmed in");
+  assert.ok(dz({ shiftSeconds: 90 }) > avg, "tired");
+  assert.ok(dz({ scoreMargin: 1, secondsRemaining: 120 }) > avg, "protecting a late lead");
 });

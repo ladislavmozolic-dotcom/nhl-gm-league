@@ -46,6 +46,7 @@ const pulls: number[] = [];
     add("sv", r.home.shots + r.away.shots - goals.filter((g) => !g.meta?.emptyNet).length);
     add("sog", r.home.shots + r.away.shots);
     add("ppOpp", r.home.ppOpp + r.away.ppOpp); add("ppG", goals.filter((g) => g.strength === "PP").length);
+    add("icing", (r.home.icings ?? 0) + (r.away.icings ?? 0));
     add("shG", goals.filter((g) => g.strength === "SH").length); add("psG", goals.filter((g) => g.meta?.penaltyShot).length); add("allG", goals.length);
     add("ot", r.endedIn !== "REG" ? 1 : 0); add("so", r.endedIn === "SO" ? 1 : 0);
     add("home", r.winner === H ? 1 : 0);
@@ -93,6 +94,7 @@ const pulls: number[] = [];
     ["Save % (no EN)", pct("sv", a.sog), NHL.svp],
     ["Power plays / team", per("ppOpp") / 2, NHL.ppOpp],
     ["Power-play %", pct("ppG", a.ppOpp), NHL.ppPct],
+    ["Icings / game (keep level)", per("icing"), NaN],
     ["PP goals, share of all goals %", pct("ppG", a.allG), 20.0],
     ["SH goals, share of all goals %", pct("shG", a.allG), 2.8],
     ["Penalty-shot goals / game", per("psG"), 0.009],

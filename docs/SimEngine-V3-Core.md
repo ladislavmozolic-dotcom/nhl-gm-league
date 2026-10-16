@@ -138,7 +138,13 @@ carry attempt is stopped in the neutral zone, `CORE_TUNING.dump (1.3) × that sh
 `DUMP_TUNING.share` (0.35) as the chance it becomes a dump-in. Same RNG draws; dump-ins stay ≈25 per
 team-game; reality check unchanged within noise.
 
+### Step 12 — Defensive-zone clear intent
+
+`coreClearShare(ctx)` is Core's CLEAR share among CLEAR / PASS / CARRY in the carrier's own end (pressure =
+time hemmed in, fatigue, a late lead to protect, the carrier's passing/skating). `CORE_TUNING.clear (2.8) ×
+that share` replaces V3's flat tired ×1.7 as the icing multiplier — icings stay ≈7 per game, but now come
+from hemmed-in, tired units and teams sitting on a lead rather than from tiredness alone.
+
 ### Next hybrid steps
-2. Defensive zone: CLEAR vs breakout PASS / CARRY under pressure.
 3. Explain decisions in the live feed / coach panel with Core's `reason`.
 4. Only then consider Core's goalie contest against V3's shot model.

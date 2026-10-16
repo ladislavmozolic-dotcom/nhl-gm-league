@@ -49,3 +49,11 @@ export function coreDumpShare(ctx: CoreEngineContext): number {
   const total = c.reduce((n, x) => n + x.score, 0);
   return total > 0 ? (c.find((x) => x.action === "DUMP_IN")?.score ?? 0) / total : 0.2;
 }
+
+/** In the defensive zone: Core's share of CLEAR (just get it out) among clear / breakout pass / carry —
+ *  high under a long hem-in, with tired legs or protecting a late lead; a puck-moving D wants to make a play. */
+export function coreClearShare(ctx: CoreEngineContext): number {
+  const c = coreCandidates({ ...ctx, zone: "DEF", rebound: false });
+  const total = c.reduce((n, x) => n + x.score, 0);
+  return total > 0 ? (c.find((x) => x.action === "CLEAR")?.score ?? 0) / total : 0.33;
+}
