@@ -5,6 +5,7 @@ import { PageHeader, Card, BackPill } from "@/components/ui";
 import { disciplineList } from "@/lib/discipline-server";
 import { SuspensionItem } from "@/components/SuspensionList";
 import { IssueForm } from "@/components/PlayerSafety";
+import ReviewDayForm from "@/components/ReviewDayForm";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,10 @@ export default async function AdminDisciplinePage() {
         {pending.length ? <ul className="divide-y divide-slate-800/70">{pending.map((r) => <SuspensionItem key={r.id} now={now} r={r} myTeamId={null} admin />)}</ul> : <p className="text-sm text-slate-500">No appeals pending.</p>}
       </Card>
       <Card title="Issue a ruling" accent="text-red-400"><IssueForm /><p className="text-[11px] text-slate-500 mt-2">Automatic reviews run after every sim day (Admin ▸ Simulation settings ▸ Player Safety: on/off and frequency).</p></Card>
+      <Card title="Re-run the review for a day" accent="text-amber-400">
+        <ReviewDayForm defaultDate={new Date().toISOString().slice(0, 10)} />
+        <p className="text-[11px] text-slate-500 mt-2">For a day that was simulated by a path that skipped the Player Safety review. Repeat-safe: a player who already has a ruling for that game is skipped.</p>
+      </Card>
       <Card title={`🚫 Active suspensions (${active.length})`} accent="text-blue-400" right={<Link href="/league/player-safety" className="text-xs text-blue-400 hover:underline">Public page →</Link>}>
         {active.length ? <ul className="divide-y divide-slate-800/70">{active.map((r) => <SuspensionItem key={r.id} now={now} r={r} myTeamId={null} admin />)}</ul> : <p className="text-sm text-slate-500">None.</p>}
       </Card>
