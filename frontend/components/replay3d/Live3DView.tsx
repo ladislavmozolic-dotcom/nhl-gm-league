@@ -55,6 +55,7 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
   const [labels, setLabels] = useState(() => readPref("live3d_labels", "on") !== "off");
   const [banner, setBanner] = useState<Banner | null>(null);
   const [behind, setBehind] = useState(0);
+  const [replaying, setReplaying] = useState(false);
   const [webgl] = useState(() => { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; } });
   const homeKit = useMemo(() => teamKit(home.code, home.name, true), [home.code, home.name]);
   const awayKit = useMemo(() => teamKit(away.code, away.name, false), [away.code, away.name]);
@@ -107,11 +108,16 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
       }
       item = d.next();
       t = item.startAt ?? 0;
+      if (item.kind === "replay") prev = null; // a replay is a hard cut, like on TV
+      setReplaying(item.kind === "replay");
       scene.setActors(item.clip.actors);
       scene.setFocus(item.focusId ?? null);
       if (item.banner) { setBanner(item.banner); bannerUntil = performance.now() + (item.kind === "goal" ? 6000 : 3200); }
     };
     const camFor = (it: LiveItem, time: number): CameraMode => {
+      const shot0 = it.clip.shotT ?? 0, hit0 = it.clip.goalT ?? shot0 + 0.4;
+      if (it.kind === "replay") return time < hit0 + 0.9 ? "goalcam" : "end";
+      if (it.kind === "solo" || (it.kind === "goal" && it.clip.actors.filter((a) => a.role !== "G").length === 1)) return time < shot0 - 0.5 ? "follow" : time < hit0 + 1.2 ? "end" : "follow";
       if (it.kind === "goal" || it.kind === "shot") {
         const shot = it.clip.shotT ?? 0, hit = it.clip.goalT ?? shot + 0.4;
         if (time < shot - 0.8) return "broadcast";
@@ -129,11 +135,12 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
       if (!item || (t >= item.clip.duration && !over)) start();
       const it = item!;
       // keep up with the feed: up to 2.2× when several clips are waiting
-      const speed = statusRef.current === "pending" ? 0.6 : 1 + Math.min(1.2, d.pending * 0.3);
+      let speed = statusRef.current === "pending" ? 0.6 : 1 + Math.min(1.2, d.pending * 0.3);
+      if (it.kind === "replay") { const sh = it.clip.shotT ?? 0, g = it.clip.goalT ?? sh; speed = t > sh - 0.7 && t < g + 0.6 ? 0.4 : 1.2; }
       const prevT = t;
       if (!over) t = Math.min(it.clip.duration, t + dt * speed);
       if (soundRef.current) for (const c of it.clip.cues) if (c.t > prevT && c.t <= t) {
-        if (c.kind === "goal") { playSfx("horn"); playSfx("crowd"); }
+        if (c.kind === "goal") { if (it.kind !== "replay") { playSfx("horn"); playSfx("crowd"); } }
         else if (c.kind === "shot") playSfx("shot");
         else if (c.kind === "pass") playSfx("pass");
         else if (c.kind === "post") playSfx("post");
@@ -141,7 +148,7 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
         else if (c.kind === "whistle") playSfx("whistle");
         else if (c.kind === "hit") playSfx("hit");
       }
-      if (it.clip.goalT != null && prevT < it.clip.goalT && t >= it.clip.goalT) scene.flashGoalLight(it.clip.attackDir);
+      if (it.clip.goalT != null && prevT < it.clip.goalT && t >= it.clip.goalT && it.kind !== "replay") scene.flashGoalLight(it.clip.attackDir);
       // glide out of the previous clip
       let fr = clipAt(it.clip, t);
       const k = Math.min(1, (t - (it.startAt ?? 0)) / BLEND);
@@ -185,7 +192,9 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
         </div>
         <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex items-center gap-1.5 pointer-events-none">
           <span className="text-[10px] font-mono text-slate-300 bg-slate-950/70 px-1.5 py-0.5 rounded hidden sm:inline">SOG {shots.away}–{shots.home}</span>
-          <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black tracking-widest ${status === "live" ? "bg-red-600 text-white animate-pulse" : "bg-slate-700 text-slate-200"}`}>{status === "live" ? "● LIVE" : status === "final" ? "FINAL" : "PRED ZÁPASOM"}</span>
+          {replaying
+            ? <span className="px-2 py-0.5 rounded text-[10px] sm:text-xs font-black tracking-widest bg-amber-500 text-slate-950">🔁 REPLAY</span>
+            : <span className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-black tracking-widest ${status === "live" ? "bg-red-600 text-white animate-pulse" : "bg-slate-700 text-slate-200"}`}>{status === "live" ? "● LIVE" : status === "final" ? "FINAL" : "PRED ZÁPASOM"}</span>}
         </div>
         {banner && (
           <div className="absolute left-1/2 -translate-x-1/2 bottom-3 sm:bottom-5 max-w-[92%] pointer-events-none">

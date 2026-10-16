@@ -164,11 +164,14 @@ export class RinkScene {
   private jumboScreen: THREE.MeshBasicMaterial;
   private crowd: THREE.InstancedMesh | null = null;
   private disposables: Array<{ dispose(): void }> = [];
+  private small = false;
 
   constructor(canvas: HTMLCanvasElement, opts: { homeKit: Kit; awayKit: Kit; homeLogoUrl?: string | null }) {
     this.kits = { home: opts.homeKit, away: opts.awayKit };
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // phones / small screens: fewer pixels, a smaller shadow map and a thinner crowd keep it smooth
+    this.small = Math.min(window.innerWidth, window.innerHeight) < 600;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.small ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -193,7 +196,7 @@ export class RinkScene {
     this.scene.add(new THREE.HemisphereLight("#e8f0ff", "#1a2233", 1.1));
     const sun = new THREE.DirectionalLight("#ffffff", 2.2);
     sun.position.set(-30, 140, 40); sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(this.small ? 1024 : 2048, this.small ? 1024 : 2048);
     Object.assign(sun.shadow.camera, { left: -115, right: 115, top: 60, bottom: -60, near: 10, far: 320 });
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.6;
     this.scene.add(sun);
@@ -254,7 +257,7 @@ export class RinkScene {
       const off = 4 + k * 4.2 + 2.1, y = 2.5 + k * 3.2 + 1;
       const n = Math.floor((2 * (200 + 85) + 2 * Math.PI * (RINK.cornerR + off) - 8 * (RINK.cornerR + off)) / 2.3);
       for (let i = 0; i < n; i++) {
-        if (Math.random() < 0.12) continue; // empty seats
+        if (Math.random() < (this.small ? 0.5 : 0.12)) continue; // empty seats (and a sparser crowd on phones)
         const p = outlinePoint(off, i / n + Math.random() * 0.002);
         if (Math.abs(p.x) < 30 && p.nz > 0.9 && k < 2) continue; // benches side gap
         per.push({ x: p.x, y, z: p.z, nx: p.nx, nz: p.nz });

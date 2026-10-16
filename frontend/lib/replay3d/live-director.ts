@@ -9,6 +9,7 @@
 // events it plays possession filler so the ice never freezes.
 
 import type { SimEvent } from "@/lib/sim/events";
+import { cleanName } from "@/lib/playerName";
 import {
   attackDirFor, buildFaceoffClip, buildFlowClip, buildHitClip, buildShotClip, momentSeed,
   type Actor, type Clip, type Role, type Side,
@@ -17,7 +18,7 @@ import {
 export type LivePlayer = { name: string; number: number | null; role: Role };
 export type LiveTeam = { teamId: number; code: string; fLines: LivePlayer[][]; dPairs: LivePlayer[][]; goalie: LivePlayer | null };
 export type Banner = { text: string; tone: "goal" | "penalty" | "save" | "info" };
-export type LiveItem = { clip: Clip; banner?: Banner; focusId?: string | null; startAt?: number; kind: "shot" | "goal" | "hit" | "faceoff" | "flow" | "stoppage" };
+export type LiveItem = { clip: Clip; banner?: Banner; focusId?: string | null; startAt?: number; kind: "shot" | "goal" | "hit" | "faceoff" | "flow" | "stoppage" | "replay" | "solo" };
 
 /** "Jesper Bratt (R)" and "J. Bratt" both → "j. bratt". */
 export function nameKey(name: string): string {
@@ -149,7 +150,12 @@ export class LiveDirector {
 
   /** Feed new events (repeats are dropped by seq). */
   ingest(events: SimEvent[]) {
-    const incoming = events.filter((e) => !this.seen.has(e.seq));
+    // names as the site shows them (no ''C''/''A'' or clause markers in banners and labels)
+    const tidy = (n: string | undefined) => (n ? cleanName(n) : n);
+    const incoming = events.filter((e) => !this.seen.has(e.seq)).map((e) => {
+      const m = e.meta as { assistNames?: string[] } | undefined;
+      return { ...e, playerName: tidy(e.playerName), targetName: tidy(e.targetName), meta: m?.assistNames ? { ...e.meta, assistNames: m.assistNames.map(cleanName) } : e.meta };
+    });
     for (const e of incoming) this.seen.add(e.seq);
     const fresh = [...this.held, ...incoming].sort((a, b) => ABS(a) - ABS(b) || a.seq - b.seq);
     this.held = [];
@@ -210,6 +216,7 @@ export class LiveDirector {
           break;
         }
         case "GOALIE_PULL": if (side) this.pulled[side] = true; break;
+        case "SHOOTOUT": if (side) this.shootout(e, side, seed); break;
         case "PERIOD_START":
           this.pulled = { home: false, away: false };
           { const now = this.snap(); this.push("faceoff", () => this.faceoff("center", seed, now)); }
@@ -252,6 +259,9 @@ export class LiveDirector {
     const assists = (meta.assistNames ?? []).slice(0, 2);
     const outcome = goal ? "goal" : save ? "save" : block ? "block" : miss ? "miss" : "save";
     const src = goal ?? save ?? shot ?? miss ?? block!;
+    // a penalty shot: the shooter alone from centre ice against the goalie, nobody else in the play
+    const solo = group.some((x) => (x.meta as { penaltyShot?: boolean } | undefined)?.penaltyShot);
+    if (solo) { this.solo(att, shooterName, goal ? "goal" : "save", seed, at, `🎯 Trestné strieľanie – ${shooterName ?? ""}${goal ? " · GÓL!" : " · zákrok"}`); if (goal) { this.pulled = { home: false, away: false }; const after = this.snap(); this.push("faceoff", () => this.faceoff("center", seed + 7, after)); } return; }
     const emptyNet = !!(goal && meta.emptyNet);
     if (emptyNet) at.pulled[def] = true;
     const kind = goal ? "goal" : "shot";
@@ -280,12 +290,43 @@ export class LiveDirector {
       if (goal) banner = { text: `🚨 GÓL! ${goal.playerName ?? ""} (${code})${assists.length ? ` · ${assists.join(", ")}` : ""}`, tone: "goal" };
       else if (save) banner = { text: `🧤 Zákrok – ${save.playerName ?? ""}`, tone: "save" };
       else if (block) banner = { text: `🛡️ Blok – ${block.playerName ?? ""}`, tone: "info" };
-      if (goal) this.queue.unshift({ kind: "faceoff", make: () => this.faceoff("center", seed + 7, after) });
+      if (goal) {
+        // the TV way: an instant replay of the goal, then the draw at centre ice
+        this.queue.unshift({ kind: "faceoff", make: () => this.faceoff("center", seed + 7, after) });
+        this.queue.unshift({ kind: "replay", make: () => ({ kind: "replay", clip, focusId: shooter?.id ?? null, startAt: Math.max(0, (clip.shotT ?? 0) - 2.2), banner: { text: `🔁 Replay – ${goal.playerName ?? ""}`, tone: "info" } }) });
+      }
       else if (clip.cues.some((c) => c.kind === "whistle")) this.queue.unshift({ kind: "faceoff", make: () => this.faceoff(def, seed + 3, after) });
       this.poss = { side: outcome === "save" || outcome === "block" ? def : att, zone: outcome === "miss" ? "OFF" : "DEF" };
       if (this.poss.side === def) this.poss.zone = "DEF";
       return { kind, clip, banner, focusId: shooter?.id ?? null };
     });
+  }
+
+  /** One shooter vs the goalie from centre ice (penalty shot / shootout attempt). */
+  private solo(att: Side, shooterName: string | undefined, outcome: "goal" | "save" | "miss", seed: number, at: Snap, text: string, dir?: 1 | -1, goalieName?: string) {
+    const def = this.other(att);
+    this.push(outcome === "goal" ? "goal" : "solo", () => {
+      const shooter = this.ensure(att, shooterName) ?? { id: `${att}-solo`, side: att, role: "F" as const, name: shooterName ?? "", number: null };
+      let goalie = this.unit[def].g;
+      if (goalieName && goalie && nameKey(goalie.name) !== nameKey(goalieName)) {
+        const known = this.teams[def].goalie;
+        goalie = { id: `${def}-G-${nameKey(goalieName)}`, side: def, role: "G", name: goalieName, number: known && nameKey(known.name) === nameKey(goalieName) ? known.number : null };
+      }
+      const clip = buildShotClip({
+        outcome, attackSide: att, attackDir: dir ?? attackDirFor(att, Math.min(at.period, 4)),
+        attackers: [shooter], defenders: [], goalie, ownGoalie: null,
+        shooterId: shooter.id, rush: "BREAKAWAY", shotType: (seed % 3) === 0 ? "BACKHAND" : "WRIST", seed,
+      });
+      return { kind: outcome === "goal" ? "goal" : "solo", clip, focusId: shooter.id, banner: { text, tone: outcome === "goal" ? "goal" : "info" } };
+    });
+  }
+
+  private shootout(e: SimEvent, side: Side, seed: number) {
+    const m = (e.meta ?? {}) as { round?: number; result?: string; homeSo?: number; awaySo?: number };
+    const outcome = m.result === "goal" ? "goal" : m.result === "miss" ? "miss" : "save";
+    const word = outcome === "goal" ? "GÓL!" : outcome === "miss" ? "mimo" : "zákrok";
+    // both sides shoot at the same end in a shootout
+    this.solo(side, e.playerName, outcome, seed, this.snap(), `🥅 Nájazd ${m.round ?? ""}: ${e.playerName ?? ""} – ${word} · ${this.teams.away.code} ${m.awaySo ?? 0}–${m.homeSo ?? 0} ${this.teams.home.code}`, 1, e.targetName);
   }
 
   /** How many clips are waiting (the view speeds up when this grows). */

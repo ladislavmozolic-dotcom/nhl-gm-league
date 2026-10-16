@@ -71,7 +71,7 @@ test("a shot split from its goal across two polls becomes one goal clip", () => 
   d.ingest([ev({ type: "GOAL", teamId: 1, period: 2, seconds: 400, playerName: "H. F11", sector: "SLOT", importance: "HIGHLIGHT", meta: { assistNames: [] } })]);
   const second = []; while (d.pending) second.push(d.next().kind);
   assert.deepEqual(first, []); // joined mid-game (no opening draw) and the lone SHOT waits for its outcome
-  assert.deepEqual(second, ["goal", "faceoff"]);
+  assert.deepEqual(second, ["goal", "replay", "faceoff"]);
 });
 
 test("joining mid-game stages only the last moments, not the whole history", () => {
@@ -79,4 +79,47 @@ test("joining mid-game stages only the last moments, not the whole history", () 
   const history = Array.from({ length: 80 }, (_, i) => ev({ type: i % 2 ? "SAVE" : "SHOT", teamId: i % 2 ? 2 : 1, period: 1, seconds: 10 + Math.floor(i / 2) * 15, playerName: i % 2 ? "A. Goalie" : "H. F00", targetName: "H. F00", sector: "SLOT" }));
   d.ingest(history);
   assert.ok(d.pending > 0 && d.pending <= 3, `pending ${d.pending}`);
+});
+
+test("a goal is followed by an instant replay of the same clip, then a centre-ice draw", () => {
+  const d = new LiveDirector(team(1, "HOM", "H"), team(2, "AWY", "A"), 11);
+  d.ingest([ev({ type: "GOAL", teamId: 2, period: 1, seconds: 15, playerName: "A. F00", sector: "SLOT", importance: "HIGHLIGHT", meta: { assistNames: [] } })]);
+  const items = []; while (d.pending) items.push(d.next());
+  const kinds = items.map((i) => i.kind);
+  assert.deepEqual(kinds.slice(-3), ["goal", "replay", "faceoff"]);
+  const g = items[kinds.lastIndexOf("goal")], r = items[kinds.indexOf("replay")];
+  assert.equal(r.clip, g.clip);
+  assert.ok((r.startAt ?? -1) >= 0 && (r.startAt ?? 0) < (g.clip.shotT ?? 0)); // joins the build-up shortly before the shot
+});
+
+test("penalty shots and shootout attempts are one shooter against the goalie", () => {
+  const d = new LiveDirector(team(1, "HOM", "H"), team(2, "AWY", "A"), 12);
+  d.ingest([
+    ev({ type: "PENALTY_SHOT", teamId: 1, period: 2, seconds: 300, playerName: "H. F10", importance: "MAJOR" }),
+    ev({ type: "SHOT", teamId: 1, period: 2, seconds: 300, playerName: "H. F10", sector: "SLOT", meta: { penaltyShot: true } }),
+    ev({ type: "SAVE", teamId: 2, period: 2, seconds: 300, playerName: "A. Goalie", targetName: "H. F10", sector: "SLOT", meta: { penaltyShot: true } }),
+  ]);
+  const ps = []; while (d.pending) ps.push(d.next());
+  const solo = ps.find((i) => i.kind === "solo");
+  assert.ok(solo, "penalty shot clip");
+  assert.equal(solo!.clip.actors.filter((a) => a.role !== "G").length, 1);
+  assert.equal(solo!.clip.goalT, null);
+  d.ingest([
+    ev({ type: "SHOOTOUT", teamId: 2, period: 5, seconds: 10, playerName: "A. F01", targetName: "H. Goalie", meta: { so: true, round: 1, result: "goal", homeSo: 0, awaySo: 1 } }),
+    ev({ type: "SHOOTOUT", teamId: 1, period: 5, seconds: 20, playerName: "H. F02", targetName: "Backup Guy", meta: { so: true, round: 1, result: "miss", homeSo: 0, awaySo: 1 } }),
+  ]);
+  const so = []; while (d.pending) so.push(d.next());
+  const attempts = so.filter((i) => i.kind === "goal" || i.kind === "solo");
+  assert.equal(attempts.length, 2);
+  assert.ok(attempts[0].clip.goalT != null && attempts[0].clip.attackDir === 1 && attempts[1].clip.attackDir === 1);
+  assert.ok(attempts[1].clip.actors.some((a) => a.role === "G" && a.name === "Backup Guy"), "the goalie named on the attempt is in net");
+  assert.ok(attempts[0].banner?.text.includes("Nájazd 1"));
+});
+
+test("banners use clean display names", () => {
+  const d = new LiveDirector(team(1, "HOM", "H"), team(2, "AWY", "A"), 13);
+  d.ingest([ev({ type: "HIT", teamId: 1, seconds: 30, playerName: "Jacob Trouba ''A''", targetName: "A. F00" })]);
+  const items = []; while (d.pending) items.push(d.next());
+  const hit = items.find((i) => i.kind === "hit");
+  assert.equal(hit?.banner?.text, "💥 Hit – Jacob Trouba");
 });
