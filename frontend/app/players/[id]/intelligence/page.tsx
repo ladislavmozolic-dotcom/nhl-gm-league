@@ -6,6 +6,7 @@ import { PageHeader, BackPill } from "@/components/ui";
 import PlayerIntelligenceCard from "@/components/PlayerIntelligenceCard";
 import PlayerFitCard from "@/components/PlayerFitCard";
 import ContractIntelCard from "@/components/ContractIntelCard";
+import PlayerScoutCard from "@/components/ai/PlayerScoutCard";
 import { getLang } from "@/lib/lang-server";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,7 @@ export default async function PlayerIntelligencePage({ params }: { params: Promi
         subtitle={player.team ? player.team.name : "Free Agent"}
         right={<BackPill href={`/players/${player.id}`}>{cs ? "Späť na profil" : "Back to profile"}</BackPill>}
       />
+      <PlayerScoutCard playerId={player.id} playerName={cleanName(player.name)} />
       <PlayerIntelligenceCard playerId={player.id} />
       <PlayerFitCard playerId={player.id} playerTeamId={player.teamId ?? null} viewerTeamId={gmTeamId} />
       <ContractIntelCard playerId={player.id} />

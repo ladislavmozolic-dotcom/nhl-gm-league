@@ -1,20 +1,33 @@
 "use client";
 
 import React, { useState } from "react";
+import { useLang } from "@/components/LangProvider";
 
 interface GeminiAdvisorCardProps {
   teamId: number;
   teamName: string;
 }
 
-const PRESET_PROMPTS = [
-  { label: "🎯 Celkový audit kádra", question: "Urob celkový strategický audit kádra, pomenuj kľúčové diery a odporuč 3 konkrétne manažérske kroky.", focus: "general" },
-  { label: "🚨 Slabiny a ciele pred uzávierkou (Deadline)", question: "Zameraj sa detailne na naše slabiny a odporuč konkrétne pozície a profily hráčov, ktorých by sme mali získať výmenou.", focus: "deadline" },
-  { label: "💰 Platový strop a končiace zmluvy", question: "Analyzuj náš platový strop, končiace zmluvy (pending UFA/RFA) a odporuč, koho predĺžiť a koho nechať odísť.", focus: "cap" },
-  { label: "🏒 Taktické odporúčania pre trénera", question: "Aké taktické nastavenie a roly hráčov by najlepšie vyhovovali súčasnému zloženiu nášho mužstva?", focus: "tactics" },
-];
-
 export default function GeminiAdvisorCard({ teamId, teamName }: GeminiAdvisorCardProps) {
+  const lang = useLang();
+  const cs = lang === "cs";
+
+  const presetPrompts = cs
+    ? [
+        { label: "🎯 Celkový audit kádra", question: "Urob celkový strategický audit kádra, pomenuj kľúčové diery a odporuč 3 konkrétne manažérske kroky.", focus: "general" },
+        { label: "⚔️ Príprava na najbližšieho súpera", question: "Zameraj sa na náš najbližší zápas. Zanalyzuj silné a slabé stránky súpera a navrhni herný plán a zloženie formácií.", focus: "opponent" },
+        { label: "🚨 Slabiny a ciele pred uzávierkou (Deadline)", question: "Zameraj sa detailne na naše slabiny a odporuč konkrétne pozície a profily hráčov, ktorých by sme mali získať výmenou.", focus: "deadline" },
+        { label: "💰 Platový strop a končiace zmluvy", question: "Analyzuj náš platový strop, končiace zmluvy (pending UFA/RFA) a odporuč, koho predĺžiť a koho nechať odísť.", focus: "cap" },
+        { label: "🏒 Taktické odporúčania pre trénera", question: "Aké taktické nastavenie a roly hráčov by najlepšie vyhovovali súčasnému zloženiu nášho mužstva?", focus: "tactics" },
+      ]
+    : [
+        { label: "🎯 Full Roster Audit", question: "Perform a comprehensive roster audit, highlight key vulnerabilities, and recommend 3 immediate GM steps.", focus: "general" },
+        { label: "⚔️ Next Opponent Scouting", question: "Analyze our next scheduled opponent. Break down their strengths, weaknesses, and recommend an effective tactical game plan.", focus: "opponent" },
+        { label: "🚨 Trade Deadline Targets", question: "Focus on our role score deficiencies and recommend specific target archetypes to acquire before the deadline.", focus: "deadline" },
+        { label: "💰 Salary Cap & Expiring Deals", question: "Analyze our cap space, pending UFAs/RFAs, and advise on who to extend versus let walk into free agency.", focus: "cap" },
+        { label: "🏒 Tactical Coaching Plan", question: "What tactical system, dials, and forward line roles best suit our personnel?", focus: "tactics" },
+      ];
+
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
@@ -30,23 +43,23 @@ export default function GeminiAdvisorCard({ teamId, teamName }: GeminiAdvisorCar
       const res = await fetch("/api/ai/advisor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId, question: q, focus }),
+        body: JSON.stringify({ teamId, question: q, focus, lang }),
       });
 
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 503 && data.configured === false) {
           setNotConfigured(true);
-          setError("Pre aktiváciu je potrebné nastaviť GEMINI_API_KEY v .env na serveri.");
+          setError(cs ? "Pre aktiváciu je potrebné nastaviť GEMINI_API_KEY v .env na serveri." : "GEMINI_API_KEY is not configured.");
           return;
         }
-        throw new Error(data.error || "Chyba pri generovaní odpovede.");
+        throw new Error(data.error || (cs ? "Chyba pri generovaní odpovede." : "Failed to generate analysis."));
       }
 
       setAnalysis(data.analysis);
       setModelUsed(data.model);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nepodarilo sa spojiť s AI.");
+      setError(err instanceof Error ? err.message : (cs ? "Nepodarilo sa spojiť s AI." : "Could not reach AI advisor."));
     } finally {
       setLoading(false);
     }
@@ -70,113 +83,114 @@ export default function GeminiAdvisorCard({ teamId, teamName }: GeminiAdvisorCar
           <div className="flex items-center gap-2">
             <span className="text-xl">🤖</span>
             <h3 className="text-base font-black text-white uppercase tracking-wide">
-              Gemini 4 Argon AI Strategický Radca
+              {cs ? "Gemini 4 Argon AI Strategický Radca" : "Gemini 4 Argon AI Strategic Advisor"}
             </h3>
             <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-500 text-emerald-300 text-[10px] font-black uppercase tracking-wider animate-pulse">
-              Frontier Reasoning
+              LIVE
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Hĺbkový rozbor kádra tímu <strong className="text-slate-200">{teamName}</strong> s priamym vyhodnotením platového stropu, zmlúv a taktiky.
+            {cs
+              ? `Generatívna AI v reálnom čase analyzuje súpisku tímu ${teamName}, platový strop a herné ukazovatele.`
+              : `Generative AI actively evaluating ${teamName}'s roster, cap breakdown, and role-score indicators.`}
           </p>
         </div>
-
         {modelUsed && (
-          <div className="text-[11px] font-mono text-slate-400 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 shrink-0">
-            Model: <span className="text-emerald-400 font-bold">{modelUsed}</span>
+          <div className="text-right">
+            <span className="text-[11px] font-mono text-slate-400 block">{cs ? "Aktívny model:" : "Active Model:"}</span>
+            <span className="text-xs font-mono font-bold text-sky-400 bg-sky-950/60 border border-sky-800/40 px-2 py-0.5 rounded">
+              {modelUsed}
+            </span>
           </div>
         )}
       </div>
 
-      {/* Preset Action Chips */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Rýchle analýzy:</span>
-        {PRESET_PROMPTS.map((p, idx) => (
-          <button
-            key={idx}
-            onClick={() => {
-              setQuestion(p.question);
-              fetchAdvice(p.question, p.focus);
-            }}
-            disabled={loading}
-            className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-semibold text-slate-200 hover:text-white transition disabled:opacity-50 shadow-sm"
-          >
-            {p.label}
-          </button>
-        ))}
+      {/* Quick Prompts */}
+      <div className="mb-4">
+        <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+          {cs ? "⚡ Rýchle strategické analýzy:" : "⚡ Instant Strategic Briefings:"}
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {presetPrompts.map((p, idx) => (
+            <button
+              key={idx}
+              onClick={() => fetchAdvice(p.question, p.focus)}
+              disabled={loading}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/60 hover:border-slate-500 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Custom Question Form */}
-      <form onSubmit={handleCustomSubmit} className="flex items-center gap-2 mb-4">
+      {/* Custom question input */}
+      <form onSubmit={handleCustomSubmit} className="flex gap-2 mb-4">
         <input
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Opýtaj sa Gemini čokoľvek na mieru o svojom tíme..."
+          placeholder={
+            cs
+              ? "Opýtajte sa čokoľvek na zmluvu, hráča, formácie alebo plán prestavby..."
+              : "Ask anything about contracts, players, forward lines, or rebuild strategy..."
+          }
           disabled={loading}
-          className="flex-1 bg-slate-950/90 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-2 text-xs text-slate-100 placeholder-slate-500 outline-none transition shadow-inner"
+          className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition shadow-inner"
         />
         <button
           type="submit"
           disabled={loading || !question.trim()}
-          className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs transition disabled:opacity-50 flex items-center gap-1.5 shadow-lg shadow-emerald-950"
+          className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-bold uppercase tracking-wider transition shadow-lg shadow-sky-900/30 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
         >
-          {loading ? (
-            <>
-              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-              <span>Uvažujem...</span>
-            </>
-          ) : (
-            <>
-              <span>Analyzovať</span>
-              <span>➔</span>
-            </>
-          )}
+          {loading ? (cs ? "Analyzujem…" : "Analyzing…") : (cs ? "Odoslať" : "Submit")}
         </button>
       </form>
 
-      {/* Loading state message */}
-      {loading && (
-        <div className="p-6 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col items-center justify-center gap-3 text-center my-4">
-          <div className="w-10 h-10 rounded-full border-3 border-emerald-500/20 border-t-emerald-400 animate-spin"></div>
-          <div>
-            <div className="text-xs font-bold text-slate-200">Gemini 4 Argon analyzuje dáta klubu...</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Prebieha hĺbkový rozbor kádra, platového stropu a herných parametrov.</div>
-          </div>
-        </div>
-      )}
-
       {/* Error / Not configured notice */}
-      {error && !loading && (
-        <div className="p-4 rounded-xl bg-red-950/40 border border-red-800 text-xs text-red-300 mb-4">
-          <div className="font-bold flex items-center gap-1.5">
-            <span>⚠️</span>
-            <span>Upozornenie:</span>
-          </div>
-          <p className="mt-1">{error}</p>
-          {notConfigured && (
-            <p className="mt-2 text-[11px] text-slate-400 font-mono">
-              Do súboru <code>.env</code> stačí pridať: <code>GEMINI_API_KEY=vaš_klúč_z_google_ai_studio</code>
-            </p>
-          )}
+      {notConfigured && (
+        <div className="rounded-xl bg-amber-950/40 border border-amber-600/50 p-4 text-xs text-amber-200 mb-4">
+          <p className="font-bold mb-1">{cs ? "ℹ️ AI Radca zatiaľ nie je aktívny" : "ℹ️ AI Advisor not active yet"}</p>
+          <p>
+            {cs
+              ? "Pre odomknutie funkcie stačí do súboru .env na serveri doplniť platný GEMINI_API_KEY z Google AI Studio."
+              : "To enable, add GEMINI_API_KEY from Google AI Studio to .env on the server."}
+          </p>
         </div>
       )}
 
-      {/* Analysis Output Area */}
+      {error && !notConfigured && (
+        <div className="rounded-xl bg-rose-950/40 border border-rose-600/50 p-3 text-xs text-rose-200 mb-4">
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* Loading Skeleton */}
+      {loading && (
+        <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-6 flex flex-col items-center justify-center gap-3 animate-pulse">
+          <div className="w-8 h-8 rounded-full border-2 border-sky-400 border-t-transparent animate-spin"></div>
+          <p className="text-xs font-bold text-sky-400 uppercase tracking-wider">
+            {cs ? "Riaditeľ hokejových operácií prepočítava dáta kádra..." : "Director of Hockey Ops synthesizing roster data..."}
+          </p>
+        </div>
+      )}
+
+      {/* Result Display */}
       {analysis && !loading && (
-        <div className="mt-4 p-5 rounded-2xl bg-slate-950/90 border border-slate-800 text-xs text-slate-200 shadow-inner space-y-3 leading-relaxed">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-            <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">
-              Výsledok strategického rozboru
+        <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-5 shadow-inner">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-800/60 pb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <span>📋</span> {cs ? "Strategické zhodnotenie riaditeľa operácií" : "Director of Hockey Ops Briefing"}
             </span>
             <button
               onClick={() => navigator.clipboard.writeText(analysis)}
-              className="text-[10px] font-bold text-slate-400 hover:text-white transition bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
+              className="text-[11px] text-slate-400 hover:text-white transition"
+              title={cs ? "Kopírovať rozbor" : "Copy briefing"}
             >
-              📋 Kopírovať
+              {cs ? "Kopírovať text" : "Copy text"}
             </button>
           </div>
-          <div className="whitespace-pre-wrap font-sans text-slate-200 space-y-2">
+          <div className="prose prose-invert prose-sm max-w-none text-slate-200 leading-relaxed space-y-3 whitespace-pre-line text-xs sm:text-sm">
             {analysis}
           </div>
         </div>

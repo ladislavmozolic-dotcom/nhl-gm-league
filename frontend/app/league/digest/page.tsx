@@ -4,6 +4,7 @@ import { defaultStatsPhase } from "@/lib/calendar-server";
 import { REGULAR_SEASON, PRE_SEASON } from "@/lib/phase";
 import { getLang } from "@/lib/lang-server";
 import PlayerAvatar from "@/components/playerAvatar";
+import DigestAiStoryCard from "@/components/ai/DigestAiStoryCard";
 
 export const dynamic = "force-dynamic";
 
@@ -245,6 +246,9 @@ export default async function DigestPage({
         </div>
       ) : (
         <>
+          {/* AI Nightly Story Card */}
+          <DigestAiStoryCard season={season} target={target} hasGames={d.gameCount > 0} />
+
           {/* Top Featured 2-Column Grid */}
           <div className="grid gap-6 md:grid-cols-2">
             {/* 🌟 Game of the Night */}

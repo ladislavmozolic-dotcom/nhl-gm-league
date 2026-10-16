@@ -6,6 +6,8 @@ import { loadLeagueCap } from "@/lib/free-agency-server";
 import { liveCapHit } from "@/lib/finance";
 import { generateWithGemini, isGeminiConfigured } from "@/lib/ai/gemini";
 import { cleanName } from "@/lib/playerName";
+import { getLang } from "@/lib/lang-server";
+import type { Lang } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,9 @@ export async function POST(req: Request) {
     if (!Number.isInteger(targetTeamId) || targetTeamId <= 0) {
       return NextResponse.json({ error: "Invalid team ID" }, { status: 400 });
     }
+
+    const cookieLang = await getLang();
+    const lang: Lang = (body.lang as Lang) || cookieLang || "cs";
 
     if (!isGeminiConfigured()) {
       return NextResponse.json(
@@ -57,6 +62,35 @@ export async function POST(req: Request) {
       orderBy: { overall: "desc" },
     });
 
+    // Next scheduled opponent
+    const nextGame = await prisma.game.findFirst({
+      where: {
+        status: "SCHEDULED",
+        season: "2026-27",
+        league: "NHL",
+        OR: [{ homeTeamId: targetTeamId }, { awayTeamId: targetTeamId }],
+      },
+      orderBy: [{ round: "asc" }, { id: "asc" }],
+      include: {
+        homeTeam: { select: { id: true, name: true, code: true } },
+        awayTeam: { select: { id: true, name: true, code: true } },
+      },
+    });
+
+    let opponentBrief = "";
+    if (nextGame) {
+      const opp = nextGame.homeTeamId === targetTeamId ? nextGame.awayTeam : nextGame.homeTeam;
+      const isHome = nextGame.homeTeamId === targetTeamId;
+      const oppPlayers = await prisma.player.findMany({
+        where: { teamId: opp.id, rosterType: "NHL", scratched: false },
+        select: { name: true, position: true, overall: true, isGoalie: true },
+        orderBy: { overall: "desc" },
+        take: 5,
+      });
+      opponentBrief = `\nNAJBLIŽŠÍ ZÁPAS: Proti ${opp.name} (${opp.code || "OPP"}) [${isHome ? "DOMA" : "VONKU"}]
+Kľúčoví hráči súpera: ${oppPlayers.map((p) => `${cleanName(p.name)} (${p.position}, OV: ${p.overall})`).join(", ")}`;
+    }
+
     // Load Cap and Roster analysis
     const [capData, rosterAnalysis] = await Promise.all([
       loadLeagueCap().catch(() => null),
@@ -89,12 +123,16 @@ export async function POST(req: Request) {
     const userQuestion = body.question?.trim() || "";
     const focus = body.focus || "general";
 
-    const systemInstruction = `Si elitný strategický hokejový poradca a riaditeľ hokejových operácií pre tím ${team.name} v profesionálnej online NHL GM lige (UNHL).
+    let systemInstruction = "";
+    let prompt = "";
+
+    if (lang === "cs") {
+      systemInstruction = `Si elitný strategický hokejový poradca a riaditeľ hokejových operácií pre tím ${team.name} v profesionálnej online NHL GM lige (UNHL).
 Tvojou úlohou je poskytnúť generálnemu manažérovi (GM) hlboký, expertný, realistický a nekompromisne vecný rozbor v SLOVENSKOM JAZYKU.
 Píš štruktúrovane, profesionálne a pútavo v štýle špičkového NHL analytika (The Athletic / TSN Insider).
 Používaj odrážky, tučné písmo, jasné odporúčania a konkrétne kroky. Nepoužívaj zbytočnú vatu.`;
 
-    const prompt = `
+      prompt = `
 DÁTA KLUBU ${team.name} (${team.code || "NHL"}):
 - Celkový platový rozpočet (Cap Hit): $${(teamCapHit / 1_000_000).toFixed(2)}M / Strop: $${(capCeiling / 1_000_000).toFixed(2)}M
 - Voľný platový priestor (Cap Space): $${(capSpace / 1_000_000).toFixed(2)}M
@@ -106,6 +144,7 @@ ${topSkaters.map((s) => `  • ${s}`).join("\n")}
 ${goalies.map((g) => `  • ${g}`).join("\n")}
 - Hráči s končiacou zmluvou po tejto sezóne (pending FA):
 ${pendingFreeAgents.length ? pendingFreeAgents.map((f) => `  • ${f}`).join("\n") : "  • Žiadne urgentné končiace zmluvy"}
+${opponentBrief}
 
 OTÁZKA / POŽIADAVKA MANAŽÉRA:
 ${userQuestion ? `"${userQuestion}"` : "Urob celkový strategický audit kádra, pomenuj kľúčové diery a odporuč 3 konkrétne manažérske kroky pred ďalšou fázou sezóny."}
@@ -116,8 +155,39 @@ Priprav pre mňa detailný rozbor s týmito bodmi:
 1. 📊 Diagnóza a stav tímu (kde sa klub nachádza)
 2. 🚨 Kritické slabiny a kde nás tlačí topánka
 3. 💼 Odporúčané prestupové ťahy (Trade & Cap stratégia)
-4. 🏒 Taktické a personálne odporúčanie pre trénera
+4. 🏒 Taktické a personálne odporúčanie pre trénera (vrátane prípravy na najbližšieho súpera, ak je známy)
 `;
+    } else {
+      systemInstruction = `You are an elite Senior Director of Hockey Operations and Strategic Advisor for ${team.name} in the professional UNHL GM league.
+Provide an expert, realistic, and candid briefing for the General Manager in ENGLISH (The Athletic / TSN style).
+Use structured markdown, bullet points, clear recommendations, and direct actionable advice.`;
+
+      prompt = `
+CLUB DATA FOR ${team.name} (${team.code || "NHL"}):
+- Total Cap Hit: $${(teamCapHit / 1_000_000).toFixed(2)}M / Upper Limit: $${(capCeiling / 1_000_000).toFixed(2)}M
+- Cap Space: $${(capSpace / 1_000_000).toFixed(2)}M
+- Roster Vulnerabilities (below league average role scores): ${criticalSlots.join(", ") || "None"}
+- Roster Strengths: ${strongSlots.join(", ") || "Balanced lineup"}
+- Key Skaters:
+${topSkaters.map((s) => `  • ${s}`).join("\n")}
+- Goaltenders:
+${goalies.map((g) => `  • ${g}`).join("\n")}
+- Expiring contracts after this season:
+${pendingFreeAgents.length ? pendingFreeAgents.map((f) => `  • ${f}`).join("\n") : "  • None"}
+${opponentBrief}
+
+GM REQUEST / QUESTION:
+${userQuestion ? `"${userQuestion}"` : "Provide a comprehensive roster audit, highlight key vulnerabilities, and suggest 3 actionable GM moves."}
+
+Focus: ${focus}
+
+STRUCTURE:
+1. 📊 Team Diagnosis & Trajectory
+2. 🚨 Critical Vulnerabilities & Role Score Gaps
+3. 💼 Trade & Salary Cap Strategy
+4. 🏒 Coaching & Tactical Adjustments (including next opponent game plan)
+`;
+    }
 
     const response = await generateWithGemini({
       prompt,
@@ -130,6 +200,7 @@ Priprav pre mňa detailný rozbor s týmito bodmi:
       success: true,
       teamId: targetTeamId,
       teamName: team.name,
+      lang,
       model: response.modelUsed,
       tokensUsed: response.tokensUsed,
       analysis: response.text,

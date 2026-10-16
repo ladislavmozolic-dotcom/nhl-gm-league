@@ -16,6 +16,7 @@ import { playerValue, pickValueBySlot } from "@/lib/trade-value";
 import { getLeagueDate } from "./calendar-server";
 import { roundForDate } from "./calendar";
 import { projectProspect } from "./prospect-projection";
+import { generateTradeDm } from "@/lib/ai/trade-negotiator";
 
 const clean = (s: string) => s.replace(/\s*\([^)]*\)/g, "").trim();
 const grp = (pos: string | null) => { const P = (pos ?? "").toUpperCase(); if (/G/.test(P)) return "G"; if (/(^|\/)D(\/|$)|^D$/.test(P)) return "D"; if (/C/.test(P)) return "C"; return "W"; };
@@ -257,7 +258,14 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
       const humanName = (await prisma.team.findUnique({ where: { id: tr.fromTeamId }, select: { name: true } }))?.name ?? "the other club";
       if (d.action === "accept") {
         const { fromTeam, toTeam, fromNames, toNames } = await executeAcceptedTrade(tr.id);
-        await prisma.dmMessage.create({ data: { fromTeamId: tr.toTeamId, toTeamId: tr.fromTeamId, body: `✅ ${toTeam.name} accepted your trade (#${tr.id}) — ${fromTeam.name} gets ${toNames.join(", ") || "assets"}, you get ${fromNames.join(", ") || "assets"}. It's done.`, tradeUrl: `/trades/${tr.id}` } }).catch(() => {});
+        const dmBody = await generateTradeDm({
+          aiName: toTeam.name,
+          humanName: fromTeam.name,
+          action: "accept",
+          tradeId: tr.id,
+          dt: { aiGets: fromNames, aiGives: toNames },
+        });
+        await prisma.dmMessage.create({ data: { fromTeamId: tr.toTeamId, toTeamId: tr.fromTeamId, body: dmBody, tradeUrl: `/trades/${tr.id}` } }).catch(() => {});
         details.push(`${aiName} ACCEPTED #${tr.id} (${d.reason})`);
       } else if (d.action === "counter" && d.counter) {
         // same dry-run the human trade builder now does — a counter that would
@@ -266,11 +274,25 @@ export async function aiGmTradesDaily(): Promise<{ handled: number; details: str
         // instead of sending an offer that looks fine but can never be accepted.
         await collectMoveOps(d.counter);
         await prisma.trade.update({ where: { id: tr.id }, data: { status: "DECLINED", respondedAt: new Date() } });
-        const { tradeId } = await createTradeRecord(d.counter, { fromName: ai.name, toName: humanName, dmBody: `🔄 ${ai.name} sent you a counter-offer (on #${tr.id}) — ${d.counterNote ?? "we'd need a bit more."} Open it to review, Accept or Decline.` });
+        const counterDm = await generateTradeDm({
+          aiName: ai.name,
+          humanName,
+          action: "counter",
+          tradeId: tr.id,
+          dt: { counterNote: d.counterNote, contention: contention.get(tr.toTeamId) ?? "middle" },
+        });
+        const { tradeId } = await createTradeRecord(d.counter, { fromName: ai.name, toName: humanName, dmBody: counterDm });
         details.push(`${aiName} COUNTERED #${tr.id} → #${tradeId} (${d.reason})`);
       } else {
         await prisma.trade.update({ where: { id: tr.id }, data: { status: "DECLINED", respondedAt: new Date() } });
-        await prisma.dmMessage.create({ data: { fromTeamId: tr.toTeamId, toTeamId: tr.fromTeamId, body: declineText(ai.name, tr.id, d.detail), tradeUrl: `/trades/${tr.id}` } }).catch(() => {});
+        const declineDm = await generateTradeDm({
+          aiName: ai.name,
+          humanName,
+          action: "decline",
+          tradeId: tr.id,
+          dt: { ...d.detail, contention: contention.get(tr.toTeamId) ?? "middle" },
+        });
+        await prisma.dmMessage.create({ data: { fromTeamId: tr.toTeamId, toTeamId: tr.fromTeamId, body: declineDm, tradeUrl: `/trades/${tr.id}` } }).catch(() => {});
         details.push(`${aiName} DECLINED #${tr.id} (${d.reason})`); // numbers kept here (internal log only)
       }
       handled++;

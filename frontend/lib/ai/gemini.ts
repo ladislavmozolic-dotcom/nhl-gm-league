@@ -13,6 +13,7 @@ export interface GeminiGenerateOptions {
 export interface GeminiResponse {
   text: string;
   modelUsed: string;
+  model?: string;
   tokensUsed?: number;
 }
 
@@ -24,7 +25,15 @@ const CANDIDATE_MODELS = [
   "gemini-3.7-flash",
 ];
 
-export async function generateWithGemini(opts: GeminiGenerateOptions): Promise<GeminiResponse> {
+export async function generateWithGemini(
+  promptOrOpts: string | GeminiGenerateOptions,
+  maybeOpts?: Partial<GeminiGenerateOptions>
+): Promise<GeminiResponse> {
+  const opts: GeminiGenerateOptions =
+    typeof promptOrOpts === "string"
+      ? { prompt: promptOrOpts, ...(maybeOpts || {}) }
+      : promptOrOpts;
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not set in environment variables.");
@@ -89,6 +98,7 @@ export async function generateWithGemini(opts: GeminiGenerateOptions): Promise<G
       return {
         text,
         modelUsed: model,
+        model,
         tokensUsed: data.usageMetadata?.totalTokenCount,
       };
     } catch (err) {

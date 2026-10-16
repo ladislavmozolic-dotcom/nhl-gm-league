@@ -657,7 +657,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
 
   const replayGoals: Array<ReplayGoal & { src: GoalE }> = data.goals
     .filter((g) => g.replay)
-    .map((g) => ({ src: g, data: g.replay!, homeScoreAfter: g.homeScoreAfter, awayScoreAfter: g.awayScoreAfter, scorerName: cleanName(g.scorerName), assistNames: g.assistNames.map(cleanName), label: `${periodLabel(g.period, data.endedIn)} ${mmss(g.seconds)}` }));
+    .map((g) => ({ src: g, data: g.replay!, homeScoreAfter: g.homeScoreAfter, awayScoreAfter: g.awayScoreAfter, scorerName: cleanName(g.scorerName), assistNames: g.assistNames.map(cleanName), label: `${periodLabel(g.period, data.endedIn)} ${mmss(g.seconds)}`, scorerSeasonGoal: g.scorerSeasonGoal }));
   const replayIndexOf = (g: GoalE) => replayGoals.findIndex((r) => r.src === g);
 
   const ppFor = (teamId: number) => data.goals.filter((g) => g.teamId === teamId && g.strength === "PP").length;
@@ -1144,7 +1144,7 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
 
       {tab === "report" && data.story && (
         <div className="space-y-6">
-          <GameReportCard report={data.story.report} />
+          <GameReportCard report={data.story.report} gameId={data.id} />
           {data.story.flow.points.length > 2 && <GameFlowChart flow={data.story.flow} />}
           <ShotChartPanel data={data} />
           <EdgePanel data={data} />
