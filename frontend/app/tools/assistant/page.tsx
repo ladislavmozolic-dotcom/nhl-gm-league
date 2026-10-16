@@ -9,6 +9,7 @@ import { loadGmBriefing, type BriefingItem } from "@/lib/gm-assistant/gmBriefing
 import { PageHeader, Card } from "@/components/ui";
 import { getLang } from "@/lib/lang-server";
 import type { Lang } from "@/lib/i18n";
+import GeminiAdvisorCard from "@/components/ai/GeminiAdvisorCard";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,8 @@ export default async function GmAssistantPage() {
   return (
     <div className="py-2 flex flex-col gap-6">
       <PageHeader title="🧠 UNHL Intelligence" subtitle={cs ? "Explainable roster intelligence — každé zistenie s presnými číslami a hráčmi za ním." : "Explainable roster intelligence — exact numbers and live roster breakdown for every finding."} />
+
+      <GeminiAdvisorCard teamId={teamId} teamName={analysis?.teamName || "Tvoj tím"} />
 
       {briefing && <GmAssistantBriefing briefing={briefing} lang={lang} />}
 

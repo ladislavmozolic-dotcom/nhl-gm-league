@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import { generateWithGemini, isGeminiConfigured } from "@/lib/ai/gemini";
 
 export type SummaryResult = { summary: string; ai: boolean; count: number; note?: string };
 
@@ -69,7 +70,9 @@ export async function summarizeUnread(me: number, roomId: number, afterId: numbe
   if (hit && Date.now() - hit.at < 3600_000) return hit.res;
 
   const plain = (note?: string): SummaryResult => ({ summary: digest(rows, who, [meT?.code ?? "", meT?.gmNickname ?? "", meT?.name ?? ""]), ai: false, count: rows.length, note });
-  if (!process.env.ANTHROPIC_API_KEY) return plain("AI zhrnutie sa zapne po nastavení kľúča na serveri — zatiaľ stručný prehľad.");
+  if (!isGeminiConfigured() && !process.env.ANTHROPIC_API_KEY) {
+    return plain("AI zhrnutie sa zapne po nastavení kľúča (GEMINI_API_KEY) na serveri — zatiaľ stručný prehľad.");
+  }
 
   const now = Date.now();
   const recent = (usage.get(me) ?? []).filter((t) => now - t < 3600_000);
@@ -77,19 +80,34 @@ export async function summarizeUnread(me: number, roomId: number, afterId: numbe
   usage.set(me, [...recent, now]);
 
   try {
-    const client = new Anthropic();
     const transcript = rows.map((r) => line(r, who)).join("\n");
-    const res = await client.messages.create({
-      model: MODEL, max_tokens: 2000, output_config: { effort: "low" }, system: SYSTEM,
-      messages: [{ role: "user", content: `Čitateľ: ${who(me)}\nPočet správ: ${rows.length}\n\n<prepis>\n${transcript}\n</prepis>` }],
-    });
-    const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
-    if (res.stop_reason === "refusal" || !text) return plain("AI zhrnutie sa nepodarilo — zobrazený je stručný prehľad.");
+    const userPrompt = `Čitateľ: ${who(me)}\nPočet správ: ${rows.length}\n\n<prepis>\n${transcript}\n</prepis>`;
+
+    let text = "";
+    if (isGeminiConfigured()) {
+      const res = await generateWithGemini({
+        prompt: userPrompt,
+        systemInstruction: SYSTEM,
+        temperature: 0.3,
+        maxTokens: 2000,
+      });
+      text = res.text.trim();
+    } else if (process.env.ANTHROPIC_API_KEY) {
+      const client = new Anthropic();
+      const res = await client.messages.create({
+        model: MODEL, max_tokens: 2000, output_config: { effort: "low" }, system: SYSTEM,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
+      if (res.stop_reason === "refusal") text = "";
+    }
+
+    if (!text) return plain("AI zhrnutie sa nepodarilo — zobrazený je stručný prehľad.");
     const out: SummaryResult = { summary: text, ai: true, count: rows.length };
     cache.set(key, { at: Date.now(), res: out });
     return out;
   } catch (e) {
-    console.error("[chat] summary failed", e instanceof Anthropic.APIError ? `${e.status} ${e.message}` : e);
+    console.error("[chat] summary failed", e);
     return plain("AI zhrnutie je dočasne nedostupné — zobrazený je stručný prehľad.");
   }
 }
