@@ -38,6 +38,7 @@ export type EventType =
   | "RETURN"            // …and back on the bench
   | "GOALIE_CHANGE"     // a bench swaps its starter for the backup (called live; the automatic "shelled starter" pull stays silent)
   | "PUCK_RACE"        // V3: the race for a dumped-in puck — meta: won ("att" | "def"), goalie (he played it), next (who carries it out)
+  | "BOUNCE"            // V3: where a missed/blocked puck went — kind boards (back out front to playerName), rim (to the defence), block (the blocker's team clears)
   | "MATCHUP"           // V3: a coaching move shows — last-change matchup won (kind check|top) or a chosen line sent for a zone draw (ozone|dzone)
   | "LONG_SHIFT"        // V3: a unit is stuck on the ice far past a normal shift — meta: seconds, unit, names
   | "PRESSURE"         // V3: a team has had the puck in the other team's end for a long time — meta: seconds, against, tired
@@ -47,7 +48,7 @@ export type EventType =
   | "SHOOTOUT";         // one shootout attempt — only synthesized for the LIVE feed (the engine keeps attempts in result.shootout)
 
 // Rising importance — controls what gets persisted and how loud the PBP is.
-const LIVE_EXTRA = new Set<string>(["LINE_CHANGE", "PUCK_RACE", "LONG_SHIFT", "MATCHUP"]);
+const LIVE_EXTRA = new Set<string>(["LINE_CHANGE", "PUCK_RACE", "LONG_SHIFT", "MATCHUP", "BOUNCE"]);
 
 export type Importance = "MINOR" | "NOTABLE" | "MAJOR" | "HIGHLIGHT";
 

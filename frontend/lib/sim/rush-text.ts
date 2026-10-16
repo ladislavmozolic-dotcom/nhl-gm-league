@@ -103,3 +103,9 @@ export function matchupText(m: { kind?: string; mine?: string; theirs?: string; 
   if (m.kind === "ozone") return `Offensive-zone draw: ${t} sends out the ${m.mine} line.`;
   return m.late ? `Defensive-zone draw late in a close game: ${t} trusts the ${m.mine} line.` : `Defensive-zone draw: ${t} sends out the ${m.mine} line.`;
 }
+
+export function bounceText(m: { kind?: string }, name: string, other?: string | null): string {
+  if (m.kind === "boards") return `The puck comes hard off the end boards right out front to ${name}!`;
+  if (m.kind === "rim") return `${other ? `${other}'s miss` : "The miss"} rims around the boards — ${name} picks it up.`;
+  return `${name} gets to the loose puck after ${other ?? "the"} block and clears it.`;
+}

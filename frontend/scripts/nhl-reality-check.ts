@@ -2,7 +2,7 @@
 // Read-only: the current V3 default against real-NHL reference values (approximate league averages of the
 // 2023-24 and 2024-25 regular seasons — orientation, not exact targets). Distributions, score effects, goalie pulls.
 // Every ordered pair of the 32 NHL clubs × bases. Run: npx tsx scripts/nhl-reality-check.ts [bases=2] [seedBase=91000000]
-import { simulateGame, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING } from "../lib/sim/engine";
+import { simulateGame, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING } from "../lib/sim/engine";
 import { loadSettings } from "../lib/sim/settings";
 import { loadSimTeam } from "../lib/sim/index";
 import { ENGINE_V3 } from "../lib/sim/version";
@@ -12,6 +12,7 @@ const bases = Number(process.argv[2] ?? 2), seedBase = Number(process.argv[3] ??
 if (process.argv[4]) Object.assign(PERIOD_TUNING, JSON.parse(process.argv[4]));
 if (process.argv[5]) Object.assign(SCORE_TUNING, JSON.parse(process.argv[5]));
 if (process.argv[6]) Object.assign(SIX_TUNING, JSON.parse(process.argv[6]));
+if (process.argv[7]) Object.assign(BOUNCE_TUNING, JSON.parse(process.argv[7]));
 
 // ≈ NHL reference (rounded; per game = both teams)
 const NHL: Record<string, number> = {
@@ -43,6 +44,7 @@ const pulls: number[] = [];
     add("ppOpp", r.home.ppOpp + r.away.ppOpp); add("ppG", goals.filter((g) => g.strength === "PP").length);
     add("ot", r.endedIn !== "REG" ? 1 : 0); add("so", r.endedIn === "SO" ? 1 : 0);
     add("home", r.winner === H ? 1 : 0);
+    add("fav", r.winner === (teams[i].avgOV >= teams[j].avgOV ? teams[i].id : teams[j].id) ? 1 : 0);
     add("shutout", (r.home.goals === 0 ? 1 : 0) + (r.away.goals === 0 ? 1 : 0));
     add("eng", goals.filter((g) => g.meta?.emptyNet).length);
     for (const g of goals) add(`p${Math.min(g.period, 4)}`, 1);
@@ -89,6 +91,7 @@ const pulls: number[] = [];
     ["Games past regulation %", pct("ot"), NHL.ot],
     ["Shootouts % of games", pct("so"), NHL.so],
     ["Home team wins %", pct("home"), NHL.home],
+    ["Higher-rated team wins % (accepted ≈62.4)", pct("fav"), 60],
     ["Shutouts / game", per("shutout"), NHL.shutout],
     ["Empty-net goals / game", per("eng"), NHL.eng],
     ["Goals in 1st period %", pct("p1", pg), NHL.p1],

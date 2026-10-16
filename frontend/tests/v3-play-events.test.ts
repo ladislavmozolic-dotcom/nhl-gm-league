@@ -229,14 +229,14 @@ test("V3 power plays end with a recap (length, shots, goals); V2 keeps the plain
 
 test("V3 a player doesn't throw two in-play hits within a few seconds", () => {
   let hits = 0;
-  for (let seed = 1; seed <= 60; seed++) {
+  for (let seed = 1; seed <= 120; seed++) {
     const r = run(seed, ENGINE_V3);
     const last = new Map<number, number>();
     for (const e of (r.events ?? []).filter((x) => x.type === "HIT").sort((a, b) => (a.period - b.period) || (a.seconds - b.seconds) || (a.seq - b.seq))) {
       const t = (e.period - 1) * 1200 + e.seconds;
       const prev = last.get(e.playerId!);
-      // (a hit that hurts somebody is created by the injury roll itself, not the in-play dice, so only count ordinary neighbours)
-      if (prev != null && !(r.events ?? []).some((i) => (i.type === "INJURY" || i.type === "KNOCK") && i.period === e.period && i.seconds === e.seconds && i.playerId === e.targetId)) assert.ok(t - prev >= 6 || t === prev, `${e.playerName} hit again after ${t - prev}s`);
+      // both paths (in-play hits and the hit that hurts somebody) share one cooldown
+      if (prev != null) assert.ok(t - prev >= 6, `${e.playerName} hit again after ${t - prev}s`);
       last.set(e.playerId!, t); hits++;
     }
   }
@@ -336,4 +336,16 @@ test("V3 back-to-back: the tired club gets a feed note at puck drop; flag off / 
   assert.ok(r.playByPlay.some((l) => l.period === 1 && /second night of a back-to-back/.test(l.text)));
   assert.ok(!simulateGame(b2b(), makeTeam(2, 64), { seed: 3, engineVersion: ENGINE_V3, experimentalV3: { backToBack: false } }).playByPlay.some((l) => /back-to-back/.test(l.text)));
   assert.ok(!simulateGame(b2b(), makeTeam(2, 64), { seed: 3, engineVersion: ENGINE_V2 }).playByPlay.some((l) => /back-to-back/.test(l.text)));
+});
+
+test("V3 bounces: missed and blocked pucks go somewhere (out front, rimmed to the defence, cleared); V2 / bounces:false have none", () => {
+  const re = /off the end boards right out front|rims around the boards|gets to the loose puck after/;
+  const kinds = new Set<string>();
+  for (let seed = 1; seed <= 20; seed++) {
+    const r = run(seed, ENGINE_V3);
+    for (const l of r.playByPlay.filter((x) => re.test(x.text))) kinds.add(/end boards/.test(l.text) ? "boards" : /rims/.test(l.text) ? "rim" : "block");
+    assert.equal(run(seed, ENGINE_V2).playByPlay.filter((l) => re.test(l.text)).length, 0);
+    assert.equal(simulateGame(makeTeam(1, 60 + (seed % 9)), makeTeam(2, 62 + ((seed * 3) % 9)), { seed, engineVersion: ENGINE_V3, experimentalV3: { bounces: false } }).playByPlay.filter((l) => re.test(l.text)).length, 0);
+  }
+  assert.deepEqual([...kinds].sort(), ["block", "boards", "rim"]);
 });

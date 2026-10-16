@@ -10,7 +10,7 @@ import { fightText, type FightMeta } from "./fight-text";
 import { RNG } from "./rng";
 import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } from "./types";
 import type { SimEvent } from "./events";
-import { RUSH_LABEL, overGlassText, pressureText, longShiftText, matchupText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
+import { RUSH_LABEL, overGlassText, pressureText, longShiftText, matchupText, bounceText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 const PERIOD_SECONDS = 1200;
 const OT_SECONDS = 300; // 5:00 for regular season OT
@@ -297,6 +297,8 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         add(p, e.seconds, tId, "penalty", `Penalty shot awarded to ${e.playerName ?? "?"}${why ? ` — ${why}` : ""}.`, true);
       } else if (e.type === "PUCK_RACE") {
         add(p, e.seconds, tId, "entry", puckRaceText((e.meta ?? {}) as { won?: "att" | "def"; goalie?: boolean; next?: string }, e.playerName ?? "?", e.targetName));
+      } else if (e.type === "BOUNCE") {
+        add(p, e.seconds, tId, "rebound", bounceText((e.meta ?? {}) as { kind?: string }, e.playerName ?? "?", e.targetName));
       } else if (e.type === "MATCHUP") {
         add(p, e.seconds, tId, "change", matchupText((e.meta ?? {}) as { kind?: string; mine?: string; theirs?: string; opp?: string; late?: boolean }, e.teamCode));
       } else if (e.type === "LONG_SHIFT") {

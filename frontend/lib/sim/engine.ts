@@ -175,6 +175,7 @@ type SimState = {
   v3LateTieCaution: boolean;         // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
   v3OtPace: boolean;                 // V3: 3-on-3 overtime has ~2x the attempts (each a real entry + shot); OT_TUNING.conv → ~2/3 of OT games end before the shootout (NHL-like)
+  v3Bounces: boolean;                // V3: where the puck goes after a block or a miss — off the end boards back out front, rimmed around to the defence, or the blocker's team takes it (BOUNCE_TUNING)
   v3BackToBack: boolean;             // V3: a club on the 2nd night of a back-to-back tires faster and fades late (B2B_TUNING)
   v3Roles: boolean;                  // V3: shooters shoot, playmakers pass (steeper SC-vs-PA shoot/pass choice) and a pass always goes to somebody else
   v3CoachNotes: boolean;             // V3: the feed says when a bench wins its matchup (last change) or sends a chosen line for a zone draw (no RNG)
@@ -191,6 +192,7 @@ type SimState = {
   shooterColdShots: Record<number, number>;  // V3: shots on goal since each skater's last goal this game
   goalieStreak: Record<number, number>;      // V3: consecutive saves since the goalie last allowed a goal
   lastGoalAgainst: Record<number, number>;   // V3: absolute game second of the last goal each goalie allowed
+  hitAtAbs: Record<number, number>; // V3: game second of each player's latest hit (any path) — the 6 s cooldown
   lastHit: { hitterId: number; hitterTeamId: number; targetId: number; targetName: string; absT: number } | null; // V3: the latest in-play hit — a bench may answer for it at the next fight
   lastShotAgainst: Record<number, number>; // V3: absolute game second of the last shot each goalie faced
   officials: { penaltyMult: number; evenUp: number } | null; // tonight's referee crew (null = neutral)
@@ -2062,6 +2064,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // zone) — no mid-rush changes, so the scorer always matches the on-ice unit.
     const carrying = (team: SimTeam) => state === "PLAY" && carrierTeam.id === team.id && zone !== "DEF";
     // V3: the puck has been in this team's end for a while — the other side has the puck, so there is no change to make
+    // V3 bounces: a defence that has been hemmed in for a while wins fewer loose pucks (tired, out of position)
+    const pinnedLoose = () => 1 - Math.min(0.75, Math.max(0, tick - zoneSince) / 25);
     const pinned = (team: SimTeam) => st.v3Pin && state === "PLAY" && carrierTeam.id !== team.id && zone === "OFF" && tick - zoneSince >= PIN_TUNING.hold && Math.max(shifts[team.id].fElapsed, shifts[team.id].dElapsed) < PIN_TUNING.maxShift;
     advanceShift(st, home.id, shifts[home.id], 1, rng, carrying(home) || pinned(home) || !!noChange[home.id], { oppSh: shifts[away.id], isHome: true }, shortenFor(home, tick));
     advanceShift(st, away.id, shifts[away.id], 1, rng, carrying(away) || pinned(away) || !!noChange[away.id], { oppSh: shifts[home.id], isHome: false }, shortenFor(away, tick));
@@ -2403,10 +2407,10 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     const dman = pickByAttr(rng, dPool, (s) => s.attrs.df ?? 50) ?? dPool[0] ?? carrier;
     // V3: a hit is thrown in the play — by a defender on the man with the puck, at this very second
     if (hitMean && rng.chance(hitMean[def.id] / HIT_DEF_TICKS)) {
-      const hp = onIceD(def).concat(onIceF(def)).filter((x) => tick - (lastHitAt[x.id] ?? -99) >= 6);
+      const hp = onIceD(def).concat(onIceF(def)).filter((x) => tick - (lastHitAt[x.id] ?? -99) >= 6 && base + tick - (st.hitAtAbs[x.id] ?? -99) >= 6);
       const hitter = hp.length ? hp[rng.weighted(hp.map((x) => x.hitting * x.iceTime * physFactor(x.weight)))] : null;
       if (hitter) {
-        lastHitAt[hitter.id] = tick;
+        lastHitAt[hitter.id] = tick; st.hitAtAbs[hitter.id] = base + tick;
         st.lines[def.id][hitter.id].hits++; st.box[def.id].hits++;
         st.lastHit = { hitterId: hitter.id, hitterTeamId: def.id, targetId: carrier.id, targetName: carrier.name, absT: base + tick };
         st.sink.emit({ period, seconds: tick, type: "HIT", teamId: def.id, teamCode: def.code ?? undefined, playerId: hitter.id, playerName: hitter.name, targetId: carrier.id, targetName: carrier.name, zone: "OFF", sector: pickZone(rng, HIT_ZONES), importance: "NOTABLE" });
@@ -2527,7 +2531,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     const crowd = carrierTeam === home ? st.crowdMult : 1;
     if (st.v3Pace && !rushCtx && setup !== "rebound" && tick - lastShotTick < PACE_TUNING.shotGap) continue; // a blocked / missed shot is not re-shot a second later
     if (st.v3Pace && !rushCtx && tick - zoneSince < PACE_TUNING.shotDwell) continue; // just arrived in the zone — nobody shoots in the first two seconds
-    if (!rushCtx && !rng.chance(0.29 * (st.v3Pace ? PACE_TUNING.shotBoost : 1) * (st.v3Dump ? DUMP_TUNING.boost : 1) * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * (st.v3Pin ? PIN_TUNING.base * (1 + PIN_TUNING.shots * Math.min(1, (tick - zoneSince) / 40)) : 1) * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd * (st.v3Rush ? RUSH_TUNING.gate : 1))) continue;
+    if (!rushCtx && !rng.chance(0.29 * (st.v3Pace ? PACE_TUNING.shotBoost : 1) * (st.v3Dump ? DUMP_TUNING.boost : 1) * atkFx.shotRate * def.tactics.oppShotRate * MISS_COMPENSATION * (st.v3Pin ? PIN_TUNING.base * (1 + PIN_TUNING.shots * Math.min(1, (tick - zoneSince) / 40)) : 1) * lateShell * faceoffSetPlay * adaptAtk * adaptDef * openIce * armUp * crowd * (st.v3Rush ? RUSH_TUNING.gate : 1) * (st.v3Bounces ? BOUNCE_TUNING.comp : 1))) continue;
     lastShotTick = tick;
     const R = rushCtx; rushCtx = null; // V3: a rush shot is taken now, whatever the ordinary shot dice say
     // Shoot-or-pass decision FIRST. A forward who elects to SHOOT sometimes walks
@@ -2557,6 +2561,12 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           st.lines[def.id][dman.id].blocks++; st.box[def.id].blocks++;
           st.sink.emit({ period, seconds: tick, type: "BLOCK", teamId: def.id, teamCode: def.code ?? undefined, playerId: dman.id, playerName: dman.name, targetId: carrier.id, targetName: carrier.name, zone: "OFF", sector: pickZone(rng, BLOCK_ZONES), importance: "NOTABLE" });
         }
+        // V3: a blocked shot is a loose puck — often the defence gets it and clears, not automatically back to the shooter's team
+        if (st.v3Bounces && rng.chance(BOUNCE_TUNING.blockLost * pinnedLoose())) {
+          const d = pickByAttr(rng, onIceD(def).concat(onIceF(def)), () => 1) ?? dman; // a loose puck: whoever is closest, not the best player
+          st.sink.emit({ period, seconds: tick, type: "BOUNCE", teamId: def.id, teamCode: def.code ?? undefined, playerId: d.id, playerName: d.name, targetId: dman.id, targetName: dman.name, importance: "MINOR", meta: { kind: "block" } });
+          carrierTeam = def; carrier = d; zone = "DEF"; setup = "carry"; press = 0; continue;
+        }
         setup = "carry"; continue;
       }
       // MISS — sails wide or off the iron, before it ever reaches the net (so it
@@ -2571,6 +2581,19 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           playerId: carrier.id, playerName: carrier.name, zone: "OFF",
           sector: pointShot ? "POINT" : undefined, importance: "NOTABLE",
         });
+        if (st.v3Bounces) { // V3: where does the missed shot go?
+          const u = rng.next();
+          if (u < BOUNCE_TUNING.live) { // hard off the end boards, right back out front
+            const to = pickByAttr(rng, onIceF(carrierTeam).filter((x) => x.id !== carrier.id), () => 1) ?? carrier;
+            st.sink.emit({ period, seconds: tick, type: "BOUNCE", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: to.id, playerName: to.name, targetId: carrier.id, targetName: carrier.name, importance: "MINOR", meta: { kind: "boards" } });
+            creator = carrier; carrier = to; setup = "rebound"; continue;
+          }
+          if (u < BOUNCE_TUNING.live + BOUNCE_TUNING.lost * pinnedLoose()) { // rims around the boards to the defence
+            const d = pickByAttr(rng, onIceD(def).concat(onIceF(def)), () => 1) ?? dman;
+            st.sink.emit({ period, seconds: tick, type: "BOUNCE", teamId: def.id, teamCode: def.code ?? undefined, playerId: d.id, playerName: d.name, targetId: carrier.id, targetName: carrier.name, importance: "MINOR", meta: { kind: "rim" } });
+            carrierTeam = def; carrier = d; zone = "DEF"; setup = "carry"; press = 0; continue;
+          }
+        }
         setup = "carry"; continue; // stays live off the end boards / behind the net
       }
       // shot danger: a D-man point shot is low, a one-timer off a pass or a rebound
@@ -2731,6 +2754,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       }
       // V3: a defence that has been pinned out there far too long is gassed — the later it gets, the likelier the goal
       // V3: the long change in the 2nd — tired players can't get off, the bench is far, more odd looks
+      if (st.v3Bounces && !defEmptyNet) p *= BOUNCE_TUNING.conv;
       if (st.v3LongChange && !defEmptyNet && period <= 3) p *= period === 1 ? PERIOD_TUNING.p1 : period === 2 ? PERIOD_TUNING.p2 : PERIOD_TUNING.p3;
       if (st.v3Pin && !defEmptyNet) p *= 1 + PIN_TUNING.conv * Math.max(0, Math.min(1, (Math.max(shifts[def.id].fElapsed, shifts[def.id].dElapsed) - 40) / 60));
       // Empty net (both engines — a real missing mechanic, not a v2 presentation
@@ -2976,11 +3000,13 @@ function maybeInjureOnIce(st: SimState, team: SimTeam, opp: SimTeam, onIce: SimS
   // V3: a hit that hurts somebody is a real hit — thrown on him in this very second, counted, and in the feed just before the injury
   const hitOn = (victim: SimSkater): SimSkater => {
     // V3: the hitter is somebody actually on the ice for the other side right now (not a player in the box or on the bench)
-    const oi = st.currentOnIce[opp.id], pool = st.v3PlayEvents && oi ? [...oi.f, ...oi.d].filter((x) => !st.injured.has(x.id)) : [];
+    const nowAbs = (period - 1) * PERIOD_SECONDS + tick;
+    const oi = st.currentOnIce[opp.id], onIce = st.v3PlayEvents && oi ? [...oi.f, ...oi.d].filter((x) => !st.injured.has(x.id)) : [];
+    const rested = onIce.filter((x) => nowAbs - (st.hitAtAbs[x.id] ?? -99) >= 6), pool = rested.length ? rested : onIce; // nobody throws two hits in a few seconds
     const by = pool.length ? pool[st.rng.weighted(pool.map((s) => s.hitting * s.iceTime * physFactor(s.weight)))] : pickHitter(st, opp);
     if (st.v3PlayEvents) {
-      st.lines[opp.id][by.id].hits++; st.box[opp.id].hits++;
-      st.lastHit = { hitterId: by.id, hitterTeamId: opp.id, targetId: victim.id, targetName: victim.name, absT: (period - 1) * PERIOD_SECONDS + tick };
+      st.lines[opp.id][by.id].hits++; st.box[opp.id].hits++; st.hitAtAbs[by.id] = nowAbs;
+      st.lastHit = { hitterId: by.id, hitterTeamId: opp.id, targetId: victim.id, targetName: victim.name, absT: nowAbs };
       st.sink.emit({ period, seconds: tick, type: "HIT", teamId: opp.id, teamCode: opp.code ?? undefined, playerId: by.id, playerName: by.name, targetId: victim.id, targetName: victim.name, zone: "OFF", sector: pickZone(st.rng, HIT_ZONES), importance: "NOTABLE" });
     }
     return by;
@@ -3246,6 +3272,7 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
+export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.1, conv: 1.015 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
 export const B2B_TUNING = { drain: 1.3, early: 0.92, late: 0.87 }; // V3 back-to-back: shift-fatigue speed, team edge in periods 1-2 / 3+
 export const ROLE_TUNING = { exp: 1.6, creator: 75 }; // V3 roles: SC-vs-PA exponent of the shoot-or-pass choice (V2: 0.7); % of goals whose primary assist is the real passer
 export const SIX_TUNING = { rate: 2.3, conv: 1.8, enShots: 0.3, pullSec: 150 }; // V3 6-on-5: attack shot rate / finishing (×, replaces 1.22), the leader's shot rate at the empty net, default pull window
@@ -3349,7 +3376,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { backToBack?: boolean; roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
+  experimentalV3?: { bounces?: boolean; backToBack?: boolean; roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3432,6 +3459,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3CoachNotes: isV3 && (opts.experimentalV3?.coachNotes ?? true),
     v3Roles: isV3 && (opts.experimentalV3?.roles ?? true),
     v3BackToBack: isV3 && (opts.experimentalV3?.backToBack ?? true),
+    v3Bounces: isV3 && (opts.experimentalV3?.bounces ?? true),
     v3Dump: isV3 && (opts.experimentalV3?.dump ?? true),
     v3Pin: isV3 && (opts.experimentalV3?.pin ?? true),
     v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),
@@ -3440,6 +3468,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3Rush: isV3 && (opts.experimentalV3?.transitionRush ?? CFG.v3TransitionRush ?? false), // opt-in: Admin → Simulation (the other V3 flags default on)
     shooterGoalAt: {}, shooterColdShots: {},
     goalieStreak: {}, lastGoalAgainst: {},
+    hitAtAbs: {},
     lastHit: null,
     lastShotAgainst: {},
     officials: CFG.officialsEnabled && opts.officials ? opts.officials : null,
