@@ -18,10 +18,10 @@ export interface GeminiResponse {
 
 const CANDIDATE_MODELS = [
   process.env.GEMINI_MODEL || "gemini-4-argon",
-  "gemini-2.5-pro",
-  "gemini-2.5-flash",
-  "gemini-1.5-pro",
-  "gemini-1.5-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
 ];
 
 export async function generateWithGemini(opts: GeminiGenerateOptions): Promise<GeminiResponse> {
@@ -69,7 +69,7 @@ export async function generateWithGemini(opts: GeminiGenerateOptions): Promise<G
 
       if (!res.ok) {
         const errText = await res.text();
-        if (res.status === 404 || res.status === 400) {
+        if (res.status === 404 || res.status === 400 || res.status === 429) {
           console.warn(`[Gemini] Model ${model} returned ${res.status}. Falling back...`);
           lastError = new Error(`Gemini ${model} failed (${res.status}): ${errText}`);
           continue;
