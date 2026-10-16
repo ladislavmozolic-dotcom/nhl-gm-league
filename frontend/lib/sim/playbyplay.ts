@@ -5,7 +5,7 @@
 // offsides, misses) is still RNG colour. Without an event stream (volume model),
 // it falls back to the legacy post-hoc reconstruction.
 
-import { goalHow, saveWhere, shotHow } from "./shot-text";
+import { goalHow, goalPlay, saveWhere, shotHow } from "./shot-text";
 import { fightText, type FightMeta } from "./fight-text";
 import { RNG } from "./rng";
 import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } from "./types";
@@ -265,7 +265,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const assistNames = ((e.meta as { assistNames?: string[] } | undefined)?.assistNames) ?? [];
         const gm = e.meta as { rush?: string; penaltyShot?: boolean } | undefined;
         const tag = (en ? " (EN)" : e.strength && e.strength !== "EV" ? ` (${e.strength})` : "") + (gm?.penaltyShot ? " (penalty shot)" : gm?.rush ? ` (${RUSH_LABEL[gm.rush] ?? "rush"})` : "");
-        const gh = st3 && !en ? goalHow(e.shotType, e.sector) : "";
+        const gh = st3 && !en ? goalHow(e.shotType, e.sector) + goalPlay((e.meta as { play?: string } | undefined)?.play) : "";
         add(p, e.seconds, tId, "shot", `Shot by ${e.playerName ?? "?"}.`);
         const gameOver = p >= 4; // sudden-death OT winner
         add(p, e.seconds, tId, "goal",

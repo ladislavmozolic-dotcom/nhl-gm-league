@@ -29,3 +29,8 @@ export const goalHow = (shotType?: string | null, sector?: string | null): strin
   const h = shotHow(shotType, sector);
   return h ? ` with a ${h}` : "";
 };
+
+/** How the goal went in beyond the shot itself: a rebound, a wraparound, a point shot that changed direction. */
+export function goalPlay(play?: string | null): string {
+  return play === "rebound" ? " — he was first to the rebound" : play === "wrap" ? " — a wraparound from behind the net" : play === "deflect" ? " — it changed direction off a body in front" : "";
+}

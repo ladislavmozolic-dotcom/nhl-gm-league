@@ -2,7 +2,7 @@
 // (no engine imports) — wording mirrors lib/sim/playbyplay.ts so live and the final report read alike.
 
 import type { SimEvent } from "./events";
-import { goalHow, saveWhere, shotHow } from "./shot-text";
+import { goalHow, goalPlay, saveWhere, shotHow } from "./shot-text";
 import { fightText, type FightMeta } from "./fight-text";
 import { RUSH_LABEL, overGlassText, pressureText, longShiftText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
@@ -38,7 +38,7 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
       const tag = (mm?.emptyNet ? " (EN)" : e.strength && e.strength !== "EV" ? ` (${e.strength})` : "") + (m<{ penaltyShot?: boolean }>(e)?.penaltyShot ? " (penalty shot)" : m<{ rush?: string }>(e)?.rush ? ` (${RUSH_LABEL[m<{ rush?: string }>(e)!.rush!] ?? "rush"})` : "");
       const a = mm?.assistNames ?? [];
       const gh = mm?.emptyNet ? "" : goalHow(e.shotType, e.sector);
-      return { ...base, kind: "goal", major: true, text: `GOAL${tag} — ${e.playerName ?? "?"}${gh}${a.length ? `, assisted by ${a.join(" and ")}` : ", unassisted"}.` };
+      return { ...base, kind: "goal", major: true, text: `GOAL${tag} — ${e.playerName ?? "?"}${gh}${goalPlay(m<{ play?: string }>(e)?.play)}${a.length ? `, assisted by ${a.join(" and ")}` : ", unassisted"}.` };
     }
     case "SAVE": {
       const sm = m<{ rush?: string; danger?: number | string }>(e);

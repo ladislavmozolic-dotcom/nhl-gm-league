@@ -2745,6 +2745,12 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
         if (!defEmptyNet) gLine.goalsAgainst++;
         recordGoal(st, carrierTeam, def, period, tick, strength, defEmptyNet, carrier, { sector, shotType, xg }, undefined, setup !== "carry" ? creator : null);
         if (R) { const ge = st.sink.all(); for (let i = ge.length - 1; i >= 0; i--) if (ge[i].type === "GOAL") { ge[i].meta = { ...(ge[i].meta ?? {}), rush: R.kind }; break; } }
+        // V3: how the goal went in — a rebound, a wraparound from behind the net, a point shot that changed direction (wording only, no RNG)
+        if (st.v3Pin && !defEmptyNet) {
+          const play = setup === "rebound" ? "rebound" : shotType === "BACKHAND" && setup === "carry" && (sector === "NET_FRONT" || sector === "PERIMETER") ? "wrap"
+            : sector === "POINT" && (tick + carrier.id) % 3 === 0 ? "deflect" : undefined;
+          if (play) { const ge = st.sink.all(); for (let i = ge.length - 1; i >= 0; i--) if (ge[i].type === "GOAL") { ge[i].meta = { ...(ge[i].meta ?? {}), play }; break; } }
+        }
         if (failedChallenge) {
           st.sink.emit({ period, seconds: tick, type: "CHALLENGE", teamId: def.id, teamCode: def.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "MAJOR", meta: { kind: failedChallenge, won: false } });
           const server = onIceF(def)[0] ?? def.forwards[0];

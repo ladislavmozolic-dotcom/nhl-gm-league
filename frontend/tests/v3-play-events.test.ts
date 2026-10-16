@@ -272,3 +272,19 @@ test("V3 long shift: a unit stuck on the ice for 75+ s gets a note; V2 has none"
   }
   assert.ok(n >= 5 && n <= 40 * 6, `long-shift notes over 40 games: ${n}`);
 });
+
+test("V3 goals tell how they went in (rebound / wraparound / deflection) in both feeds; V2 doesn't", () => {
+  const seen = new Set<string>();
+  for (let seed = 1; seed <= 60; seed++) {
+    const r = run(seed, ENGINE_V3);
+    for (const e of (r.events ?? []).filter((x) => x.type === "GOAL" && (x.meta as { play?: string } | undefined)?.play)) {
+      const play = (e.meta as { play: string }).play; seen.add(play);
+      const live = describeLiveEvent(e)!.text;
+      const bit = play === "rebound" ? "first to the rebound" : play === "wrap" ? "wraparound" : "changed direction";
+      assert.ok(live.includes(bit), live);
+      assert.ok(r.playByPlay.some((l) => l.kind === "goal" && l.text.includes(bit)), "same in the play-by-play");
+    }
+    assert.ok(!run(seed, ENGINE_V2).playByPlay.some((l) => /first to the rebound|wraparound|changed direction/.test(l.text)));
+  }
+  assert.ok(seen.has("rebound") && seen.has("deflect"), [...seen].join(","));
+});
