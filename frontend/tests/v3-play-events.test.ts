@@ -301,3 +301,16 @@ test("live game flow: xG timeline from the stream — one mark per goal, totals 
     assert.ok(Math.abs(last - (f.homeXg - f.awayXg)) < 0.01, `${last} vs ${f.homeXg - f.awayXg}`);
   }
 });
+
+test("V3 coaching moves show in the feed (matchups, zone-draw lines), at most once per kind per team per period; V2 has none", () => {
+  const re = /uses the last change|gets its top line|zone draw: /;
+  let n = 0;
+  for (let seed = 1; seed <= 30; seed++) {
+    const r = run(seed, ENGINE_V3);
+    const lines = r.playByPlay.filter((l) => re.test(l.text));
+    n += lines.length;
+    assert.ok(lines.length <= 2 * 3 * 4 + 4, `per game: ${lines.length}`);
+    assert.equal(run(seed, ENGINE_V2).playByPlay.filter((l) => re.test(l.text)).length, 0);
+  }
+  assert.ok(n >= 30, `notes over 30 games: ${n}`);
+});

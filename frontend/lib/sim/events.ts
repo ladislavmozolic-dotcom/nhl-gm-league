@@ -38,6 +38,7 @@ export type EventType =
   | "RETURN"            // …and back on the bench
   | "GOALIE_CHANGE"     // a bench swaps its starter for the backup (called live; the automatic "shelled starter" pull stays silent)
   | "PUCK_RACE"        // V3: the race for a dumped-in puck — meta: won ("att" | "def"), goalie (he played it), next (who carries it out)
+  | "MATCHUP"           // V3: a coaching move shows — last-change matchup won (kind check|top) or a chosen line sent for a zone draw (ozone|dzone)
   | "LONG_SHIFT"        // V3: a unit is stuck on the ice far past a normal shift — meta: seconds, unit, names
   | "PRESSURE"         // V3: a team has had the puck in the other team's end for a long time — meta: seconds, against, tired
   | "WHISTLE"           // V3: a named stoppage (offside, puck out of play, tie-up, hand pass, high stick) — meta: reason

@@ -175,6 +175,7 @@ type SimState = {
   v3LateTieCaution: boolean;         // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
   v3OtPace: boolean;                 // V3: 3-on-3 overtime has ~2x the attempts (each a real entry + shot); OT_TUNING.conv → ~2/3 of OT games end before the shootout (NHL-like)
+  v3CoachNotes: boolean;             // V3: the feed says when a bench wins its matchup (last change) or sends a chosen line for a zone draw (no RNG)
   v3SixOnFive: boolean;              // V3: a pulled goalie is a real 6-on-5 push (more and better looks), the leader mostly clears instead of shooting at the empty net; the default 90 s pull reads as 2:30
   v3ScoreEffects: boolean;           // V3: in the 3rd a team down 1-2 pushes and the team in front sits back (NHL: the trailing side gets ~56% of the shots)
   v3LongChange: boolean;             // V3: the 2nd period's long change — more goals in the 2nd, slightly fewer in the 1st/3rd (goal-neutral, PERIOD_TUNING)
@@ -1249,7 +1250,8 @@ type ShiftState = {
   fWeights: number[]; dWeights: number[];
   fCenterIds: Array<number | undefined>;
   fIdx: number; dIdx: number; fElapsed: number; dElapsed: number;
-  tiredNoted?: boolean; // V3: the 'stuck on a long shift' note was already written for this shift
+  tiredNoted?: boolean;
+  matchNote?: { mine: number; theirs: number; kind: "check" | "top" }; // V3: last change just won the matchup the coach wanted (written to the feed by the tick loop) // V3: the 'stuck on a long shift' note was already written for this shift
   fTopIdx: number; fCheckIdx: number; // which fLines index is this team's top-scoring / most defensive trio
 };
 // Classify a team's forward lines by role from real attributes (not manager-set line
@@ -1412,6 +1414,7 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
       else if (oppFIdx === matchup.oppSh.fCheckIdx) bias = sh.fTopIdx;
     }
     sh.fIdx = pick(sh.fLines, sh.fWeights, sh.fIdx, bias, 3);
+    if (bias !== undefined && sh.fIdx === bias && matchup) sh.matchNote = { mine: bias, theirs: matchup.oppSh.fIdx, kind: bias === sh.fCheckIdx ? "check" : "top" };
     sh.fElapsed = 0;
   }
   const dShiftLimit = 42 + rng.int(20);
@@ -1871,6 +1874,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
 
   // ---- game management (bench, officials, stoppages) ----
   const coach: Record<number, CoachingPrefs> = { [home.id]: coachingOf(home), [away.id]: coachingOf(away) };
+  const coachNoted = new Set<string>(); // V3 coach notes already written (team:period:kind)
   let foZone: number | null = null;            // team whose DEFENSIVE zone hosts the next draw (null = centre ice)
   const noChange: Record<number, boolean> = {}; // iced the puck → that unit stays out for the draw
   const delayedSeen = new Set<Penalty>();
@@ -2058,6 +2062,16 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     const pinned = (team: SimTeam) => st.v3Pin && state === "PLAY" && carrierTeam.id !== team.id && zone === "OFF" && tick - zoneSince >= PIN_TUNING.hold && Math.max(shifts[team.id].fElapsed, shifts[team.id].dElapsed) < PIN_TUNING.maxShift;
     advanceShift(st, home.id, shifts[home.id], 1, rng, carrying(home) || pinned(home) || !!noChange[home.id], { oppSh: shifts[away.id], isHome: true }, shortenFor(home, tick));
     advanceShift(st, away.id, shifts[away.id], 1, rng, carrying(away) || pinned(away) || !!noChange[away.id], { oppSh: shifts[home.id], isHome: false }, shortenFor(away, tick));
+    for (const tm of [home, away]) { // V3: the home bench got the matchup it wanted on a line change
+      const sh = shifts[tm.id], n = sh.matchNote;
+      if (!n) continue;
+      sh.matchNote = undefined;
+      const opp = tm === home ? away : home, key = `${tm.id}:${period}:${n.kind}`;
+      if (!st.v3CoachNotes || coachNoted.has(key)) continue; // once per kind per period — a note, not spam
+      coachNoted.add(key);
+      const lead = (l: SimSkater[] | undefined) => (l ?? []).find((x) => x.isCenter)?.name ?? l?.[0]?.name ?? "?";
+      st.sink.emit({ period, seconds: tick, type: "MATCHUP", teamId: tm.id, teamCode: tm.code ?? undefined, importance: "MINOR", meta: { kind: n.kind, mine: lead(sh.fLines[n.mine]), theirs: lead(shifts[opp.id].fLines[n.theirs]), opp: opp.code ?? opp.name } });
+    }
     if (st.v3Pin) for (const tm of [home, away]) { // no RNG: only a note when a unit is stuck out far past a normal shift
       const sh = shifts[tm.id];
       if (Math.max(sh.fElapsed, sh.dElapsed) < 5) sh.tiredNoted = false;
@@ -2296,7 +2310,15 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           };
           let best = sh.fIdx;
           sh.fLines.forEach((l, i) => { if (score(l) > score(sh.fLines[best] ?? [])) best = i; });
-          if (best !== sh.fIdx) { flushShift(st, team.id, sh.fLines[sh.fIdx] ?? []); sh.fIdx = best; sh.fElapsed = 0; }
+          if (best !== sh.fIdx) {
+            flushShift(st, team.id, sh.fLines[sh.fIdx] ?? []); sh.fIdx = best; sh.fElapsed = 0;
+            const kind = defending ? "dzone" : "ozone", key = `${team.id}:${period}:${kind}`;
+            if (st.v3CoachNotes && !coachNoted.has(key)) {
+              coachNoted.add(key);
+              const l = sh.fLines[best] ?? [];
+              st.sink.emit({ period, seconds: tick, type: "MATCHUP", teamId: team.id, teamCode: team.code ?? undefined, importance: "MINOR", meta: { kind, mine: (l.find((x) => x.isCenter) ?? bestFo(l) ?? l[0])?.name ?? "?", late: defending && late } });
+            }
+          }
         }
       }
       const zoneDraw = foZone != null && CFG.faceoffSpecialistEnabled;
@@ -3320,7 +3342,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
+  experimentalV3?: { coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3400,6 +3422,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3LongChange: isV3 && (opts.experimentalV3?.longChange ?? true),
     v3ScoreEffects: isV3 && (opts.experimentalV3?.scoreEffects ?? true),
     v3SixOnFive: isV3 && (opts.experimentalV3?.sixOnFive ?? true),
+    v3CoachNotes: isV3 && (opts.experimentalV3?.coachNotes ?? true),
     v3Dump: isV3 && (opts.experimentalV3?.dump ?? true),
     v3Pin: isV3 && (opts.experimentalV3?.pin ?? true),
     v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),

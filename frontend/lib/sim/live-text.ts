@@ -4,7 +4,7 @@
 import type { SimEvent } from "./events";
 import { goalHow, goalPlay, saveWhere, shotHow } from "./shot-text";
 import { fightText, type FightMeta } from "./fight-text";
-import { RUSH_LABEL, overGlassText, pressureText, longShiftText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
+import { RUSH_LABEL, overGlassText, pressureText, longShiftText, matchupText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 export type LiveLine = { seq: number; period: number; seconds: number; teamId?: number; /** set when this line means a skater has left the game */ outPlayerId?: number; /** replaces the period/clock label (e.g. "SO") */ tag?: string; kind: "goal" | "penalty" | "save" | "note" | "period"; major: boolean; text: string };
 
@@ -54,6 +54,7 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
       return { ...base, kind: "penalty", major: true, text: `${e.playerName} — ${mm?.penalty ?? "infraction"}${mm?.on ? ` on ${mm.on}` : ""} (${mm?.minutes ?? 2} min, ${mm?.severity ?? "Minor"}).` };
     }
     case "EJECTION": return { ...base, outPlayerId: e.playerId, kind: "penalty", major: true, text: `${e.playerName ?? "?"} is ejected from the game.` };
+    case "MATCHUP": return { ...base, kind: "note", major: false, text: matchupText(m<{ kind?: string; mine?: string; theirs?: string; opp?: string; late?: boolean }>(e) ?? {}, e.teamCode) };
     case "LONG_SHIFT": return { ...base, kind: "note", major: false, text: longShiftText(m<{ seconds?: number; unit?: string; names?: string[] }>(e) ?? {}, e.teamCode) };
     case "PUCK_RACE": return { ...base, kind: "note", major: false, text: puckRaceText(m<{ won?: "att" | "def"; goalie?: boolean; next?: string }>(e) ?? {}, e.playerName ?? "?", e.targetName) };
     case "PRESSURE": return { ...base, kind: "note", major: false, text: pressureText(m<{ seconds?: number; against?: string; tired?: boolean }>(e) ?? {}, e.teamCode) };
