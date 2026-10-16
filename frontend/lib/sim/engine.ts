@@ -1244,6 +1244,7 @@ type ShiftState = {
   fWeights: number[]; dWeights: number[];
   fCenterIds: Array<number | undefined>;
   fIdx: number; dIdx: number; fElapsed: number; dElapsed: number;
+  tiredNoted?: boolean; // V3: the 'stuck on a long shift' note was already written for this shift
   fTopIdx: number; fCheckIdx: number; // which fLines index is this team's top-scoring / most defensive trio
 };
 // Classify a team's forward lines by role from real attributes (not manager-set line
@@ -2052,6 +2053,16 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     const pinned = (team: SimTeam) => st.v3Pin && state === "PLAY" && carrierTeam.id !== team.id && zone === "OFF" && tick - zoneSince >= PIN_TUNING.hold && Math.max(shifts[team.id].fElapsed, shifts[team.id].dElapsed) < PIN_TUNING.maxShift;
     advanceShift(st, home.id, shifts[home.id], 1, rng, carrying(home) || pinned(home) || !!noChange[home.id], { oppSh: shifts[away.id], isHome: true }, shortenFor(home, tick));
     advanceShift(st, away.id, shifts[away.id], 1, rng, carrying(away) || pinned(away) || !!noChange[away.id], { oppSh: shifts[home.id], isHome: false }, shortenFor(away, tick));
+    if (st.v3Pin) for (const tm of [home, away]) { // no RNG: only a note when a unit is stuck out far past a normal shift
+      const sh = shifts[tm.id];
+      if (Math.max(sh.fElapsed, sh.dElapsed) < 5) sh.tiredNoted = false;
+      else if (!sh.tiredNoted && state === "PLAY" && Math.max(sh.fElapsed, sh.dElapsed) >= 75) {
+        sh.tiredNoted = true;
+        const f = sh.fElapsed >= sh.dElapsed;
+        const unit = (f ? sh.fLines[sh.fIdx] : sh.dPairs[sh.dIdx]) ?? [];
+        st.sink.emit({ period, seconds: tick, type: "LONG_SHIFT", teamId: tm.id, teamCode: tm.code ?? undefined, importance: "MINOR", meta: { seconds: Math.round(f ? sh.fElapsed : sh.dElapsed), unit: f ? "forwards" : "defence", names: unit.slice(0, 3).map((x) => x.name) } });
+      }
+    }
     // Delayed penalty: the referee's arm is up — the other side pulls its goalie for
     // an extra attacker until an offender touches the puck (whistle; the penalty
     // starts right then). A goal in the meantime washes a plain minor out.

@@ -88,3 +88,9 @@ export function ppEndText(who: string, m?: { seconds?: number; shots?: number; g
   const goal = (m.goals ?? 0) > 0 ? `${m.goals} goal${m.goals === 1 ? "" : "s"}` : "no goal";
   return `${who} power play is over — ${t}, ${shots}, ${goal}.`;
 }
+
+export function longShiftText(m: { seconds?: number; unit?: string; names?: string[] }, team?: string | null): string {
+  const who = m.names?.length ? `${m.names.join(", ")}` : `${team ?? "The"} ${m.unit ?? "unit"}`;
+  const t = m.seconds ?? 75;
+  return `${team ? `${team}: ` : ""}${who} ${m.names?.length ? "have" : "has"} been out for ${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")} — legs are getting heavy.`;
+}

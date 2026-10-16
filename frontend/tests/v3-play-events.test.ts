@@ -260,3 +260,15 @@ test("V3 overtime has more attempts and every one starts with the puck coming in
   }
   assert.ok(otGames >= 15 && shots / otGames > 2.5, `OT games ${otGames}, shots per OT game ${(shots / Math.max(1, otGames)).toFixed(1)}`);
 });
+
+test("V3 long shift: a unit stuck on the ice for 75+ s gets a note; V2 has none", () => {
+  let n = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const r = run(seed, ENGINE_V3);
+    const lines = r.playByPlay.filter((l) => /legs are getting heavy/.test(l.text));
+    n += lines.length;
+    for (const l of lines) assert.match(l.text, /been out for 1:[1-9]\d|been out for [2-9]:\d\d/);
+    assert.equal(run(seed, ENGINE_V2).playByPlay.filter((l) => /legs are getting heavy/.test(l.text)).length, 0);
+  }
+  assert.ok(n >= 5 && n <= 40 * 6, `long-shift notes over 40 games: ${n}`);
+});
