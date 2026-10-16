@@ -149,6 +149,17 @@ async function getTeamMatchup(teamId: number, fallbackName: string) {
     num: String(g?.number ?? 30),
   };
 
+  // Backup goalie
+  const backupId = linesData?.situations?.others?.backup;
+  let bg = backupId ? playerMap.get(backupId) : null;
+  if (!bg) {
+    bg = goalies.find((gl) => gl.id !== g?.id) || null;
+  }
+  const backup = {
+    name: bg ? formatShortName(bg.name) : "Náhradník",
+    num: String(bg?.number ?? (g?.number === 1 ? 30 : 1)),
+  };
+
   // Extra attacker
   const extraFwd = forwards.find((f) => !usedFwdIds.has(f.id)) || forwards[0];
   const extra = {
@@ -165,6 +176,7 @@ async function getTeamMatchup(teamId: number, fallbackName: string) {
     defense,
     defensePairs,
     goalie,
+    backup,
     extra,
   };
 }

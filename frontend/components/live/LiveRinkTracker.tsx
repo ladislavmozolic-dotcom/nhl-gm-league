@@ -17,6 +17,19 @@ export interface DefensePairData {
   rd: { name: string; num: string };
 }
 
+export interface RecordedShot {
+  id: string;
+  x: number;
+  y: number;
+  team: "home" | "away";
+  teamName: string;
+  shooterName: string;
+  result: "GOAL" | "SAVE" | "MISS" | "BLOCK";
+  period: string;
+  timeStr: string;
+  xg?: number;
+}
+
 export interface LiveRinkTrackerProps {
   gameId?: number;
   homeTeamId?: number;
@@ -306,6 +319,22 @@ export default function LiveRinkTracker({
   const awayDefensePairsRef = useRef<DefensePairData[]>(AWAY_DEFENSE_PAIRS);
   const homeDefensePairsRef = useRef<DefensePairData[]>(HOME_DEFENSE_PAIRS);
 
+  // Goalie State (Starter & Backup)
+  const [awayGoalie, setAwayGoalie] = useState<{ name: string; num: string }>({ name: "I. Shesterkin", num: "31" });
+  const [homeGoalie, setHomeGoalie] = useState<{ name: string; num: string }>({ name: "J. Markström", num: "25" });
+  const [awayBackup, setAwayBackup] = useState<{ name: string; num: string }>({ name: "J. Quick", num: "32" });
+  const [homeBackup, setHomeBackup] = useState<{ name: string; num: string }>({ name: "J. Allen", num: "34" });
+
+  // Shot Map Overlay State
+  const [showShotMap, setShowShotMap] = useState<boolean>(true);
+  const recordedShotsRef = useRef<RecordedShot[]>([]);
+  const [hoveredShot, setHoveredShot] = useState<{ shot: RecordedShot; x: number; y: number } | null>(null);
+
+  // Momentum State (0 = 100% away, 50 = balanced, 100 = 100% home)
+  const [momentum, setMomentum] = useState<number>(50);
+  const momentumRef = useRef<number>(50);
+  const momentumTimerRef = useRef<number>(0);
+
   // HUD and Commentaries
   const [puckCarrierName, setPuckCarrierName] = useState(awayTeamName + " (#10)");
   const [zoneText, setZoneText] = useState("⚡ SÚBOJ V STREDNOM PÁSME");
@@ -395,6 +424,10 @@ export default function LiveRinkTracker({
           setAwayDefensePairs(awayM.defensePairs);
           awayDefensePairsRef.current = awayM.defensePairs;
         }
+        if (homeM.goalie) setHomeGoalie(homeM.goalie);
+        if (homeM.backup) setHomeBackup(homeM.backup);
+        if (awayM.goalie) setAwayGoalie(awayM.goalie);
+        if (awayM.backup) setAwayBackup(awayM.backup);
 
         // Apply real names and jersey numbers to active players
         const hLine1 = homeM.forwardLines?.[0];
@@ -461,7 +494,7 @@ export default function LiveRinkTracker({
   const [hoveredPlayer, setHoveredPlayer] = useState<{ player: Player; x: number; y: number } | null>(null);
 
   // Web Audio Synth
-  const playSound = useCallback((type: "pass" | "receive" | "shot" | "post" | "horn") => {
+  const playSound = useCallback((type: "pass" | "receive" | "shot" | "post" | "horn" | "whistle") => {
     if (!audioEnabled || typeof window === "undefined") return;
     try {
       const AudioCtor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -520,6 +553,20 @@ export default function LiveRinkTracker({
         gain.connect(ctx.destination);
         osc.start(t);
         osc.stop(t + 0.9);
+      } else if (type === "whistle") {
+        const freqs = [2400, 2680];
+        freqs.forEach((f) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(f, t);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.5);
+        });
       } else if (type === "horn") {
         const freqs = [174.61, 220.0, 261.63, 349.23];
         freqs.forEach((f) => {
@@ -623,6 +670,40 @@ export default function LiveRinkTracker({
     setBenchVersion((v) => (v + 1) % 100000);
   }, [homeTeamName, awayTeamName, addCommentary]);
 
+  const switchGoalie = useCallback((team: "home" | "away") => {
+    const isHome = team === "home";
+    const currentStarter = isHome ? homeGoalie : awayGoalie;
+    const currentBackup = isHome ? homeBackup : awayBackup;
+    if (!currentBackup) return;
+
+    if (isHome) {
+      setHomeGoalie(currentBackup);
+      setHomeBackup(currentStarter);
+    } else {
+      setAwayGoalie(currentBackup);
+      setAwayBackup(currentStarter);
+    }
+
+    const goalieId = isHome ? "home-g" : "away-g";
+    const gPlayer = playersRef.current.find((p) => p.id === goalieId);
+    if (gPlayer) {
+      gPlayer.name = currentBackup.name;
+      gPlayer.num = currentBackup.num;
+      gPlayer.energy = 100;
+      gPlayer.shiftSeconds = 0;
+    }
+
+    playSound("whistle");
+    const tName = isHome ? homeTeamName : awayTeamName;
+    addCommentary(
+      "STRIEDANIE BRANKÁRA 🔄",
+      "border-purple-500",
+      "bg-purple-950 text-purple-200 font-bold",
+      `Tím ${tName} strieda v bráne! Do bránky nastupuje ${currentBackup.name} (#${currentBackup.num}).`
+    );
+    setBenchVersion((v) => (v + 1) % 100000);
+  }, [homeGoalie, awayGoalie, homeBackup, awayBackup, homeTeamName, awayTeamName, playSound, addCommentary]);
+
   // Process real match live events if connected to engine
   const seenEventSeqsRef = useRef<Set<number>>(new Set());
   useEffect(() => {
@@ -631,9 +712,11 @@ export default function LiveRinkTracker({
       if (seenEventSeqsRef.current.has(ev.seq)) continue;
       seenEventSeqsRef.current.add(ev.seq);
 
+      const isHome = ev.teamId === homeTeamId || (ev.teamCode && ev.teamCode === homeTeamName);
+
       if (ev.type === "GOAL") {
         playSound("horn");
-        const tCode = ev.teamCode || (ev.teamId ? "TÍM" : "");
+        const tCode = ev.teamCode || (ev.teamId ? (isHome ? homeTeamName : awayTeamName) : "");
         const scorer = ev.playerName || "Hráč";
         setGoalOverlay({ visible: true, text: `🚨 GÓÓÓL! ${scorer.toUpperCase()} ${tCode ? `(${tCode})` : ""}` });
         setTimeout(() => setGoalOverlay({ visible: false, text: "" }), 3000);
@@ -643,15 +726,80 @@ export default function LiveRinkTracker({
         const nextAway = (activeAwayLineRef.current % 4) + 1;
         switchForwardLine("home", nextHome);
         switchForwardLine("away", nextAway);
+
+        // Record on shot map & adjust momentum
+        const mins = Math.floor(ev.seconds / 60);
+        const secs = (ev.seconds % 60).toString().padStart(2, "0");
+        const timeStr = `${ev.period}.T ${mins}:${secs}`;
+        const baseOffset = (ev.seq * 137.5) % 1;
+        const angle = baseOffset * Math.PI * 2;
+        const rad = 0.04 + (((ev.seq * 93) % 100) / 100) * 0.10;
+        const shotX = isHome
+          ? Math.max(0.09, Math.min(0.36, 0.20 + Math.cos(angle) * rad))
+          : Math.max(0.64, Math.min(0.91, 0.80 + Math.cos(angle) * rad));
+        const shotY = Math.max(0.18, Math.min(0.82, 0.50 + Math.sin(angle) * (rad * 1.6)));
+
+        recordedShotsRef.current.push({
+          id: `ev-goal-${ev.seq}`,
+          x: typeof ev.meta?.x === "number" ? ev.meta.x : shotX,
+          y: typeof ev.meta?.y === "number" ? ev.meta.y : shotY,
+          team: isHome ? "home" : "away",
+          teamName: isHome ? homeTeamName : awayTeamName,
+          shooterName: scorer,
+          result: "GOAL",
+          period: `${ev.period}. Tretina`,
+          timeStr,
+          xg: ev.xg,
+        });
+        if (recordedShotsRef.current.length > 100) recordedShotsRef.current.shift();
+
+        if (isHome) {
+          momentumRef.current = Math.min(94, momentumRef.current + 18);
+        } else {
+          momentumRef.current = Math.max(6, momentumRef.current - 18);
+        }
+        setMomentum(Math.round(momentumRef.current));
       } else if (ev.type === "SHOT" || ev.type === "SAVE") {
         playSound("shot");
         if (ev.playerName) {
           addCommentary("STRELA ⚡", "border-sky-500", "bg-sky-500/20 text-sky-300", `${ev.playerName} zakončuje na bránku!`);
         }
+        const mins = Math.floor(ev.seconds / 60);
+        const secs = (ev.seconds % 60).toString().padStart(2, "0");
+        const timeStr = `${ev.period}.T ${mins}:${secs}`;
+        const baseOffset = (ev.seq * 137.5) % 1;
+        const angle = baseOffset * Math.PI * 2;
+        const rad = 0.04 + (((ev.seq * 93) % 100) / 100) * 0.10;
+        const shotX = isHome
+          ? Math.max(0.09, Math.min(0.36, 0.20 + Math.cos(angle) * rad))
+          : Math.max(0.64, Math.min(0.91, 0.80 + Math.cos(angle) * rad));
+        const shotY = Math.max(0.18, Math.min(0.82, 0.50 + Math.sin(angle) * (rad * 1.6)));
+
+        recordedShotsRef.current.push({
+          id: `ev-shot-${ev.seq}`,
+          x: typeof ev.meta?.x === "number" ? ev.meta.x : shotX,
+          y: typeof ev.meta?.y === "number" ? ev.meta.y : shotY,
+          team: isHome ? "home" : "away",
+          teamName: isHome ? homeTeamName : awayTeamName,
+          shooterName: ev.playerName || "Hráč",
+          result: "SAVE",
+          period: `${ev.period}. Tretina`,
+          timeStr,
+          xg: ev.xg,
+        });
+        if (recordedShotsRef.current.length > 100) recordedShotsRef.current.shift();
+
+        if (isHome) {
+          momentumRef.current = Math.min(92, momentumRef.current + 8);
+        } else {
+          momentumRef.current = Math.max(8, momentumRef.current - 8);
+        }
+        setMomentum(Math.round(momentumRef.current));
       } else if (ev.type === "PENALTY") {
         addCommentary("TREST 🛑", "border-amber-500", "bg-amber-500/20 text-amber-300", `Vylúčenie: ${ev.playerName || "Hráč"} (${ev.targetName || "2 min"})`);
+      } else if (ev.type === "GOALIE_CHANGE") {
+        switchGoalie(isHome ? "home" : "away");
       } else if (ev.type === "LINE_CHANGE") {
-        const isHome = ev.teamId === homeTeamId || (ev.teamCode && ev.teamCode === homeTeamName);
         const meta = ev.meta as { unit?: string; label?: string; names?: string[] } | undefined;
         if (meta?.unit === "F" || !meta?.unit) {
           const match = meta?.label?.match(/\d+/);
@@ -664,7 +812,7 @@ export default function LiveRinkTracker({
         }
       }
     }
-  }, [events, standaloneControls, playSound, addCommentary, switchForwardLine, switchDefensePair, homeTeamId, homeTeamName]);
+  }, [events, standaloneControls, playSound, addCommentary, switchForwardLine, switchDefensePair, switchGoalie, homeTeamId, homeTeamName, awayTeamName]);
 
   // Goal trigger
   const triggerGoal = useCallback((scorerName?: string, teamName?: string) => {
@@ -684,7 +832,20 @@ export default function LiveRinkTracker({
     const nextAway = (activeAwayLineRef.current % 4) + 1;
     switchForwardLine("home", nextHome);
     switchForwardLine("away", nextAway);
-  }, [awayTeamName, playSound, addCommentary, switchForwardLine]);
+
+    // Update last shot to GOAL & update momentum
+    if (recordedShotsRef.current.length > 0) {
+      const lastShot = recordedShotsRef.current[recordedShotsRef.current.length - 1];
+      lastShot.result = "GOAL";
+      if (sName) lastShot.shooterName = sName;
+    }
+    if (sTeam === homeTeamName) {
+      momentumRef.current = Math.min(94, momentumRef.current + 18);
+    } else {
+      momentumRef.current = Math.max(6, momentumRef.current - 18);
+    }
+    setMomentum(Math.round(momentumRef.current));
+  }, [awayTeamName, homeTeamName, playSound, addCommentary, switchForwardLine]);
 
   // DRAW HOCKEY NET
   const drawGoalNet = (ctx: CanvasRenderingContext2D, gx: number, isLeft: boolean, w: number, h: number) => {
@@ -912,6 +1073,47 @@ export default function LiveRinkTracker({
     drawFaceoff(w * 0.18, h * 0.72);
     drawFaceoff(w * 0.82, h * 0.28);
     drawFaceoff(w * 0.82, h * 0.72);
+
+    // SHOT MAP OVERLAY
+    if (showShotMap && recordedShotsRef.current.length > 0) {
+      for (const shot of recordedShotsRef.current) {
+        const sx = shot.x * w;
+        const sy = shot.y * h;
+
+        if (shot.result === "GOAL") {
+          // Goal: Red glowing ring + center dot
+          ctx.save();
+          ctx.shadowColor = "rgba(239, 68, 68, 0.85)";
+          ctx.shadowBlur = 8;
+          ctx.fillStyle = "#ef4444";
+          ctx.beginPath();
+          ctx.arc(sx, sy, 5.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = "#ffffff";
+          ctx.stroke();
+
+          // Small white inner core
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(sx, sy, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        } else {
+          // Save / Shot: Blue for away, Red for home, with crisp white ring
+          const isAway = shot.team === "away";
+          ctx.save();
+          ctx.fillStyle = isAway ? "rgba(56, 189, 248, 0.85)" : "rgba(248, 113, 113, 0.85)";
+          ctx.beginPath();
+          ctx.arc(sx, sy, 4.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = "#ffffff";
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
 
     ctx.restore();
 
@@ -1622,6 +1824,39 @@ export default function LiveRinkTracker({
       puck.y = puck.passFromY + (puck.passToY - puck.passFromY) * t;
 
       if (t >= 1.0) {
+        // Record shot on the shot map
+        const isAwayShot = puck.passToX > 0.5;
+        const shotTeam = isAwayShot ? "away" : "home";
+        const tName = isAwayShot ? awayTeamName : homeTeamName;
+        const shooter = players.find((p) => Math.hypot(p.x - puck.passFromX, p.y - puck.passFromY) < 0.09);
+        const shooterName = shooter ? shooter.name : (isAwayShot ? awayForwardLinesRef.current[0]?.c?.name || "Útočník" : homeForwardLinesRef.current[0]?.c?.name || "Útočník");
+        const mins = Math.floor(gameClockSeconds / 60);
+        const secs = (gameClockSeconds % 60).toString().padStart(2, "0");
+        const currentClock = `${mins}:${secs}`;
+
+        recordedShotsRef.current.push({
+          id: `sim-shot-${Date.now()}-${Math.random()}`,
+          x: puck.passFromX,
+          y: puck.passFromY,
+          team: shotTeam,
+          teamName: tName,
+          shooterName,
+          result: "SAVE",
+          period: periodStr || "1. Tretina",
+          timeStr: currentClock,
+          xg: 0.06 + Math.round(Math.random() * 0.18 * 100) / 100,
+        });
+        if (recordedShotsRef.current.length > 100) {
+          recordedShotsRef.current.shift();
+        }
+
+        // Momentum shift
+        if (isAwayShot) {
+          momentumRef.current = Math.max(8, momentumRef.current - 7);
+        } else {
+          momentumRef.current = Math.min(92, momentumRef.current + 7);
+        }
+
         // Only increment local mock shots if in standalone sandbox mode
         if (standaloneControls) {
           if (puck.passToX > 0.5) setSogAwayState((s) => s + 1);
@@ -1639,6 +1874,19 @@ export default function LiveRinkTracker({
       puck.reboundVy *= Math.pow(0.92, dt * 60);
     }
 
+    // Momentum dynamics & decay
+    if (phaseRef.current === "AWAY_OZONE" || phaseRef.current === "AWAY_SHOT") {
+      momentumRef.current = Math.max(8, momentumRef.current - 0.20 * dt * simSpeed);
+    } else if (phaseRef.current === "HOME_OZONE" || phaseRef.current === "HOME_SHOT") {
+      momentumRef.current = Math.min(92, momentumRef.current + 0.20 * dt * simSpeed);
+    }
+    momentumRef.current += (50 - momentumRef.current) * (0.015 * dt * simSpeed);
+    momentumTimerRef.current += dt * simSpeed;
+    if (momentumTimerRef.current >= 0.2) {
+      momentumTimerRef.current = 0;
+      setMomentum(Math.round(momentumRef.current));
+    }
+
     // Game Clock countdown
     clockTimerRef.current += dt * simSpeed;
     if (clockTimerRef.current >= 1.0) {
@@ -1646,7 +1894,7 @@ export default function LiveRinkTracker({
       clockTimerRef.current -= step;
       setGameClockSeconds((sec) => Math.max(0, sec - step));
     }
-  }, [isPlaying, simSpeed, isShortenBench, isPullGoalie, playSound, addCommentary, triggerGoal, standaloneControls, isLive, awayTeamName, homeTeamName, switchForwardLine, switchDefensePair]);
+  }, [isPlaying, simSpeed, isShortenBench, isPullGoalie, playSound, addCommentary, triggerGoal, standaloneControls, isLive, awayTeamName, homeTeamName, switchForwardLine, switchDefensePair, gameClockSeconds, periodStr]);
 
   // ANIMATION LOOP
   useEffect(() => {
@@ -1831,8 +2079,19 @@ export default function LiveRinkTracker({
 
     if (found) {
       setHoveredPlayer({ player: found, x: e.clientX - rect.left, y: e.clientY - rect.top });
+      setHoveredShot(null);
     } else {
       setHoveredPlayer(null);
+      if (showShotMap) {
+        const foundShot = recordedShotsRef.current.find((s) => Math.hypot(s.x - mx, s.y - my) < 0.024);
+        if (foundShot) {
+          setHoveredShot({ shot: foundShot, x: e.clientX - rect.left, y: e.clientY - rect.top });
+        } else {
+          setHoveredShot(null);
+        }
+      } else {
+        setHoveredShot(null);
+      }
     }
   };
 
@@ -1932,6 +2191,22 @@ export default function LiveRinkTracker({
               {isPlaying ? "⏸ Pauza" : "▶ Spustiť"}
             </button>
 
+            {/* Shot Map Toggle (🎯 Mapa striel) */}
+            <button
+              onClick={() => setShowShotMap((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                showShotMap
+                  ? "bg-amber-950 text-amber-300 border-amber-600 shadow-sm shadow-amber-900"
+                  : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+              }`}
+              title="Prepnúť interaktívnu mapu striel na ľade"
+            >
+              <span>🎯 Mapa striel:</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] ${showShotMap ? "bg-amber-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
+                {showShotMap ? "ZAP" : "VYP"}
+              </span>
+            </button>
+
             {/* Boxscore toggle button (if provided by parent) */}
             {onToggleBoxscore && (
               <button
@@ -2012,6 +2287,36 @@ export default function LiveRinkTracker({
             <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-red-500/60 p-2 flex items-center justify-center shadow-lg">
               <img src={homeLogoUrl} alt={homeTeamName} className="w-full h-full object-contain filter drop-shadow" />
             </div>
+          </div>
+        </div>
+
+        {/* Momentum Meter */}
+        <div className="mt-4 pt-3 border-t border-slate-800/80">
+          <div className="flex items-center justify-between text-[11px] font-bold mb-1.5 px-1">
+            <span className="flex items-center gap-1.5 text-sky-400">
+              <span className="w-2 h-2 rounded-full bg-sky-400"></span>
+              <span>{awayTeamName}</span>
+              <span className="font-mono font-black">{100 - momentum}%</span>
+            </span>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-extrabold flex items-center gap-1">
+              <span>⚡</span> HYBNOSŤ HRY (MOMENTUM) <span>⚡</span>
+            </span>
+            <span className="flex items-center gap-1.5 text-red-400">
+              <span className="font-mono font-black">{momentum}%</span>
+              <span>{homeTeamName}</span>
+              <span className="w-2 h-2 rounded-full bg-red-400"></span>
+            </span>
+          </div>
+          <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-800 flex shadow-inner">
+            <div
+              className="h-full bg-gradient-to-r from-blue-600 via-sky-500 to-sky-400 rounded-l-full transition-all duration-300 ease-out"
+              style={{ width: `${100 - momentum}%` }}
+            ></div>
+            <div className="w-1 h-full bg-amber-400 shrink-0 shadow-sm z-10"></div>
+            <div
+              className="h-full bg-gradient-to-r from-red-400 via-red-500 to-rose-600 rounded-r-full transition-all duration-300 ease-out"
+              style={{ width: `${momentum}%` }}
+            ></div>
           </div>
         </div>
       </section>
@@ -2126,6 +2431,44 @@ export default function LiveRinkTracker({
               );
             })}
           </div>
+
+          {/* Away Goalie & Backup Goalie Card */}
+          <div className="mt-1 pt-2 border-t border-slate-800/80">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wide">Brankár v bráne</span>
+              <button
+                onClick={() => switchGoalie("away")}
+                className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 hover:bg-slate-800 text-sky-300 border border-slate-700 flex items-center gap-1 transition"
+                title={`Striedať brankára: Nasadiť ${awayBackup?.name || "náhradníka"}`}
+              >
+                <span>🔄</span> Striedať
+              </button>
+            </div>
+            <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded bg-blue-950 border border-blue-800 text-blue-300 font-mono font-bold text-[10px] flex items-center justify-center">
+                  {awayGoalie?.num || "31"}
+                </span>
+                <div>
+                  <div className="font-bold text-white text-[11px]">{awayGoalie?.name || "Brankár"} <span className="text-sky-400 text-[10px] font-mono">G</span></div>
+                  <div className="text-[9px] text-slate-400">
+                    Náhr: <span className="text-slate-300 font-bold">{awayBackup?.name || "Náhradník"} (#{awayBackup?.num || "32"})</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] font-black text-emerald-400">
+                  {Math.round(playersRef.current.find((p) => p.id === "away-g")?.energy ?? 95)}%
+                </span>
+                <div className="w-12 bg-slate-950 h-1.5 rounded-full overflow-hidden mt-0.5 border border-slate-800">
+                  <div
+                    className="bg-emerald-500 h-full"
+                    style={{ width: `${playersRef.current.find((p) => p.id === "away-g")?.energy ?? 95}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </aside>
 
         {/* Center: Rink & Commentary (6 cols) */}
@@ -2139,9 +2482,17 @@ export default function LiveRinkTracker({
 
             {/* Rink Canvas Container */}
             <div className="relative w-full aspect-[2/1] max-h-[380px] rounded-2xl overflow-hidden border-2 border-slate-600/90 bg-[#e2e8f0] shadow-2xl">
-              <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseLeave={() => setHoveredPlayer(null)} className="w-full h-full block cursor-crosshair" />
+              <canvas
+                ref={canvasRef}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={() => {
+                  setHoveredPlayer(null);
+                  setHoveredShot(null);
+                }}
+                className="w-full h-full block cursor-crosshair"
+              />
 
-              {/* Hover Tooltip */}
+              {/* Hover Tooltip - Player */}
               {hoveredPlayer && (
                 <div
                   className="absolute pointer-events-none px-2.5 py-1 rounded-xl bg-slate-950/95 border border-slate-700 text-xs shadow-2xl z-30 transform -translate-x-1/2 -translate-y-12"
@@ -2152,6 +2503,28 @@ export default function LiveRinkTracker({
                   </div>
                   <div className="text-[10px] text-slate-300 mt-0.5">
                     Energia: <strong className={hoveredPlayer.player.energy < 50 ? "text-amber-400" : "text-emerald-400"}>{Math.round(hoveredPlayer.player.energy)}%</strong> • Striedanie: {Math.round(hoveredPlayer.player.shiftSeconds)}s
+                  </div>
+                </div>
+              )}
+
+              {/* Hover Tooltip - Shot Dot */}
+              {hoveredShot && !hoveredPlayer && (
+                <div
+                  className="absolute pointer-events-none px-3 py-1.5 rounded-xl bg-slate-950/95 border border-slate-700 text-xs shadow-2xl z-30 transform -translate-x-1/2 -translate-y-14"
+                  style={{ left: hoveredShot.x, top: hoveredShot.y }}
+                >
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] ${hoveredShot.shot.result === "GOAL" ? "bg-red-600 text-white font-black" : "bg-sky-950 text-sky-300 border border-sky-700"}`}>
+                      {hoveredShot.shot.result === "GOAL" ? "🚨 GÓL" : "🧤 STRELA"}
+                    </span>
+                    <span className="text-white">{hoveredShot.shot.shooterName}</span>
+                    <span className="text-slate-400 text-[10px]">({hoveredShot.shot.teamName})</span>
+                  </div>
+                  <div className="text-[10px] text-slate-300 mt-0.5 flex items-center gap-2">
+                    <span>Čas: <strong className="font-mono text-white">{hoveredShot.shot.timeStr}</strong></span>
+                    {hoveredShot.shot.xg != null && (
+                      <span>xG: <strong className="font-mono text-amber-400">{hoveredShot.shot.xg.toFixed(2)}</strong></span>
+                    )}
                   </div>
                 </div>
               )}
@@ -2252,6 +2625,44 @@ export default function LiveRinkTracker({
                 </div>
               );
             })}
+          </div>
+
+          {/* Home Goalie & Backup Goalie Card */}
+          <div className="mt-1 pt-2 border-t border-slate-800/80">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wide">Brankár v bráne</span>
+              <button
+                onClick={() => switchGoalie("home")}
+                className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 hover:bg-slate-800 text-red-300 border border-slate-700 flex items-center gap-1 transition"
+                title={`Striedať brankára: Nasadiť ${homeBackup?.name || "náhradníka"}`}
+              >
+                <span>🔄</span> Striedať
+              </button>
+            </div>
+            <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded bg-red-950 border border-red-800 text-red-300 font-mono font-bold text-[10px] flex items-center justify-center">
+                  {homeGoalie?.num || "25"}
+                </span>
+                <div>
+                  <div className="font-bold text-white text-[11px]">{homeGoalie?.name || "Brankár"} <span className="text-red-400 text-[10px] font-mono">G</span></div>
+                  <div className="text-[9px] text-slate-400">
+                    Náhr: <span className="text-slate-300 font-bold">{homeBackup?.name || "Náhradník"} (#{homeBackup?.num || "34"})</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] font-black text-emerald-400">
+                  {Math.round(playersRef.current.find((p) => p.id === "home-g")?.energy ?? 92)}%
+                </span>
+                <div className="w-12 bg-slate-950 h-1.5 rounded-full overflow-hidden mt-0.5 border border-slate-800">
+                  <div
+                    className="bg-emerald-500 h-full"
+                    style={{ width: `${playersRef.current.find((p) => p.id === "home-g")?.energy ?? 92}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
           </div>
         </aside>
       </div>
