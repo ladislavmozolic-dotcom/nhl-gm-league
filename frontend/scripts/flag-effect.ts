@@ -5,7 +5,7 @@ import { loadSettings } from "../lib/sim/settings";
 import { loadSimTeam } from "../lib/sim/index";
 import { ENGINE_V3 } from "../lib/sim/version";
 import { prisma } from "../lib/prisma";
-const FL=["fatigueDeployment","coachAdaptation","checkingMatchup","qualityDAssists","faceoffPressure","reboundClearance","momentumTimeout","assistSpread","emotionalDiscipline","finishingCurve","goalieRhythm","blockSkill","goalieComposure","overtimeStars","ppPuckMovement","speedDrawsPenalties","netFront","shootoutDuel","garbageTime","shooterForm"];
+const FL=["fatigueDeployment","coachAdaptation","checkingMatchup","qualityDAssists","faceoffPressure","reboundClearance","momentumTimeout","assistSpread","emotionalDiscipline","finishingCurve","goalieRhythm","blockSkill","goalieComposure","overtimeStars","ppPuckMovement","speedDrawsPenalties","netFront","shootoutDuel","garbageTime","shooterForm","lateTieCaution"];
 const mk=(off:string[])=>Object.fromEntries(FL.map(f=>[f,!off.includes(f)]));
 const corr=(a:number[],b:number[])=>{const n=a.length,ma=a.reduce((x,y)=>x+y)/n,mb=b.reduce((x,y)=>x+y)/n;let sab=0,sa=0,sb=0;for(let i=0;i<n;i++){sab+=(a[i]-ma)*(b[i]-mb);sa+=(a[i]-ma)**2;sb+=(b[i]-mb)**2;}return sab/Math.sqrt(sa*sb);};
 (async()=>{

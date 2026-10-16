@@ -4,27 +4,59 @@
     {
       "name": "gratuityos",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "/Users/mozolicladislav/ManagerApp/gratuityos", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/mozolicladislav/ManagerApp/gratuityos",
+        "run",
+        "dev"
+      ],
       "port": 3100
     },
     {
       "name": "nhl-gm-league",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "/Users/mozolicladislav/ManagerApp/nhl-gm-league/frontend", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/mozolicladislav/ManagerApp/nhl-gm-league/frontend",
+        "run",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "nhl-gm-league-preview",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "/Users/mozolicladislav/ManagerApp/nhl-gm-league/frontend", "run", "dev", "--", "--port", "3010"],
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/mozolicladislav/ManagerApp/nhl-gm-league/frontend",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3010"
+      ],
       "port": 3010
     },
     {
       "name": "nhl-gm-league-scratch",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "/Users/mozolicladislav/ManagerApp/nhl-gm-league/frontend", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/mozolicladislav/ManagerApp/nhl-gm-league/frontend",
+        "run",
+        "dev"
+      ],
       "port": 3020,
       "autoPort": true
+    },
+    {
+      "name": "nhl-gm-league-sandbox",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/mozolicladislav/ManagerApp/nhl-gm-league/frontend && SANDBOX_DATABASE_URL=$(grep -E '^DATABASE_URL=' .env | head -1 | cut -d= -f2- | tr -d '\"' | sed 's#/profinhl_engine$#/profinhl_engine_sandbox#') npm run dev:sandbox"
+      ],
+      "port": 3001
     }
   ]
 }

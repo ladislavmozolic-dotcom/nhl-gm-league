@@ -38,6 +38,7 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}    # UNHL Chat web push (empty = push disabled)
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}   # optional: enables AI "summarize unread" in chat
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}         # optional: enables Gemini 4 Argon / 3.5 Flash GM advisor
       CHAT_SUMMARY_MODEL: ${CHAT_SUMMARY_MODEL:-}  # optional model override (default claude-opus-5-5)
       GIPHY_API_KEY: ${GIPHY_API_KEY:-}   # optional: enables the GIF search tab in chat
       CHAT_ORIGIN: ${CHAT_ORIGIN:-}   # e.g. https://chat.unhl.eu — standalone chat origin (empty = chat stays at /chat on the main site)

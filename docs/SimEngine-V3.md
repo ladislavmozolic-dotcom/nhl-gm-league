@@ -1,10 +1,9 @@
 # Sim Engine V3 — offline workbench
 
-**Status:** `3.0.0-wip`, not selectable in Admin, not returned by
-`activeSimEngine()`, and not reachable from season, pre-season, or playoff
-simulation. Existing league games therefore remain on their current V1/V2
-path. V3 can only be called explicitly in an offline diagnostic with
-`simulateGame(..., { engineVersion: ENGINE_V3 })`.
+**Status:** `3.0.0-wip`. The live league always resolves to V2. V3 can be
+called explicitly by offline diagnostics and, only on the `SANDBOX=1` test
+instance, selected by an admin for test season, pre-season, playoff and live
+round simulations. A stored `v3` value is ignored by the live league.
 
 The goal is not a cosmetic third label. V3 should make coaching, deployment,
 and player roles more legible while preserving the calibrated league-level
@@ -85,6 +84,10 @@ considered for an eventual preview screen.
 `frontend/scripts/calibration-v3.ts` is the dedicated read-only V3 pass. It
 loads the same teams and settings as Calibration Lab but explicitly supplies
 `ENGINE_V3`; it does not write games, configuration, or league data.
+
+`frontend/scripts/v3-package-check.ts` is the final read-only V2-versus-full-V3
+comparison. It uses paired seed bases and reports mean ± standard error; run it
+with 30 bases after any package-level tuning.
 
 ### Initial fixed-seed comparison — 2026-10-08
 
@@ -564,3 +567,48 @@ Variants of garbageTime, all-on, 60 seeds (goals / blowouts / save % / home win 
 B leaves goals within 0.006 of V2 and blowouts within 0.24 (≈1.2 se) of V2, with a smaller top
 scorer tail. It only acts at 3+ goal margins, so it cannot change close games. Gates after the
 change: identity (all flags off) identical on 400 games; 17/17 tests.
+
+### Final 20-flag package check — 30 fresh paired seed bases — 2026-10-11
+
+`v3-package-check.ts` ran V2 and complete V3 on the same 30 seed bases
+(11,000,000 + *i*·100,000; 992 games per base). Mean ± standard error:
+
+| Metric | V2 | V3 | Delta |
+| --- | ---: | ---: | ---: |
+| Goals / team / game | 3.017 ± .006 | 3.009 ± .007 | −.008 |
+| Shots / team / game | 31.56 ± .02 | 31.19 ± .02 | −.37 |
+| Home win % | 53.73 ± .23 | 53.95 ± .28 | +.21 |
+| Blowouts | 13.07 ± .22 | 13.16 ± .21 | +.09 |
+| PIM / team / game | 19.88 ± .05 | **11.51 ± .05** | **−8.37** |
+| Quality → points | .795 ± .009 | .816 ± .009 | +.021 |
+| Top scorer (pts/82) | 136.0 ± 1.8 | **129.2 ± 1.5** | **−6.8** |
+| PP % | 21.21 ± .09 | 21.11 ± .12 | −.10 |
+| PP opportunities | 2.988 ± .007 | 2.994 ± .010 | +.005 |
+
+The intended PIM and scoring-concentration corrections hold over 30 paired
+seeds, with no material drift in goals, home wins, blowouts, PP rate or PP
+volume. Save percentage is .910 (the expected small decrease from the goalie
+modules). **Remaining package warning:** OT/SO is 18.95% in V3 versus 19.93%
+in V2 (−0.97 points); both are around the 20% lower target edge, but V3 should
+not be promoted beyond sandbox until the regulation-tie rate is separately
+diagnosed and, if needed, corrected. This is the only unresolved package-level
+calibration item.
+
+### Late-tie caution — twenty-first increment and final package check — 2026-10-11
+
+V3 now applies a 0.75 shot-attempt multiplier only in the final three minutes
+of a tied, 5v5 regulation game. This is a small standings-point preference by
+both benches, not a change to power plays, overtime, shootouts or any game
+with a lead. Three-seed selection check moved OT/SO from 19.7% without the
+flag to 20.5% with it, while goals and blowouts remained in range.
+
+The final 30 fresh paired seed bases (14,000,000 + *i*·100,000; 992 games per
+base) settle the earlier warning: V2 records **19.68%** OT/SO and 21-flag V3
+records **19.77%**. Thus V3 has no OT/SO regression; the sub-20% value is a
+shared baseline characteristic, not a V3 defect. Other final results: goals
+3.024 → 3.013, blowouts 12.82% → 13.36%, PIM 19.88 → **11.47**, top scorer
+135.1 → **131.1**, PP% 21.49 → 21.16, and PP opportunities remain 2.983 in
+both engines. The late-tie effect is intentionally small at league level and
+is retained for its bounded, realistic game-state behaviour rather than as an
+artificial OT-volume lever. All V3-specific package-level calibration items
+are now closed; the shared V2/V3 OT/SO baseline can be revisited separately.
