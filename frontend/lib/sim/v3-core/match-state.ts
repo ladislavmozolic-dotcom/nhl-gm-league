@@ -7,6 +7,7 @@ export type RelativeZone = "DEFENSIVE" | "NEUTRAL" | "OFFENSIVE";
 export type CoreStrength = "EVEN" | "POWER_PLAY" | "SHORT_HANDED";
 
 export type CoreOnIce = { forwards: number[]; defense: number[] };
+export type CoreReboundOpportunity = { teamId: number; expiresAt: number };
 
 export type V3CoreMatchState = {
   homeTeamId: number;
@@ -22,6 +23,7 @@ export type V3CoreMatchState = {
   fatigue: Record<number, number>; // 0..1; 0 fresh, 1 exhausted
   pressure: Record<number, number>; // 0..1; pressure currently applied to this team
   momentum: Record<number, number>; // -1..1; team-relative game flow
+  rebound: CoreReboundOpportunity | null; // loose puck after a goalie save, consumed by the next attacking decision
 };
 
 export type MatchStateInit = Pick<V3CoreMatchState, "homeTeamId" | "awayTeamId"> & Partial<Pick<V3CoreMatchState, "period" | "secondsIntoPeriod" | "score" | "onIce" | "fatigue" | "pressure" | "momentum">>;
@@ -49,6 +51,7 @@ export function createMatchState(init: MatchStateInit): V3CoreMatchState {
     fatigue: { [home]: clamp(init.fatigue?.[home] ?? 0, 0, 1), [away]: clamp(init.fatigue?.[away] ?? 0, 0, 1) },
     pressure: { [home]: clamp(init.pressure?.[home] ?? 0, 0, 1), [away]: clamp(init.pressure?.[away] ?? 0, 0, 1) },
     momentum: { [home]: clamp(init.momentum?.[home] ?? 0, -1, 1), [away]: clamp(init.momentum?.[away] ?? 0, -1, 1) },
+    rebound: null,
   };
 }
 
@@ -69,6 +72,18 @@ export function withScore(state: V3CoreMatchState, teamId: number, goals: number
   return { ...state, score: { ...state.score, [teamId]: Math.max(0, goals) } };
 }
 
+/** Gives the attacking side one short, explicit follow-up decision after a rebound. */
+export function withReboundOpportunity(state: V3CoreMatchState, teamId: number, seconds = 8): V3CoreMatchState {
+  opponentId(state, teamId);
+  return { ...state, rebound: { teamId, expiresAt: state.totalSeconds + Math.max(1, seconds) } };
+}
+
+/** A rebound can produce one dangerous follow-up, never an unlimited shot loop. */
+export function consumeReboundOpportunity(state: V3CoreMatchState, teamId: number): V3CoreMatchState {
+  if (state.rebound?.teamId !== teamId || state.rebound.expiresAt <= state.totalSeconds) return state;
+  return { ...state, rebound: null };
+}
+
 /** Perspective consumed by the future decision engine. */
 export function viewForTeam(state: V3CoreMatchState, teamId: number) {
   const opponent = opponentId(state, teamId);
@@ -85,5 +100,6 @@ export function viewForTeam(state: V3CoreMatchState, teamId: number) {
     pressure: state.pressure[teamId],
     momentum: state.momentum[teamId],
     onIce: state.onIce[teamId],
+    hasRebound: state.rebound?.teamId === teamId && state.rebound.expiresAt > state.totalSeconds,
   };
 }

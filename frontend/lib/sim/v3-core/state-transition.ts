@@ -11,7 +11,10 @@ export function advanceCoreClock(state: V3CoreMatchState, seconds = 5): V3CoreMa
   const totalSeconds = clamp(state.totalSeconds + Math.max(0, seconds), 0, REGULATION_SECONDS);
   const period = Math.min(3, Math.floor(Math.max(0, totalSeconds - 1) / 1200) + 1);
   const secondsIntoPeriod = totalSeconds === REGULATION_SECONDS ? 1200 : totalSeconds - (period - 1) * 1200;
-  return { ...state, totalSeconds, period, secondsIntoPeriod };
+  return {
+    ...state, totalSeconds, period, secondsIntoPeriod,
+    rebound: state.rebound && state.rebound.expiresAt <= totalSeconds ? null : state.rebound,
+  };
 }
 
 /** Replaces a unit on the ice and lets a fresh shift shed part of its fatigue. */

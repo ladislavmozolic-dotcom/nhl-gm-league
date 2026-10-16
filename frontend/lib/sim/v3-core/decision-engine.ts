@@ -20,6 +20,7 @@ export type CoreDecisionInput = {
   fatigue: number; // 0..1
   scoreMargin: number;
   secondsRemaining: number;
+  rebound?: boolean; // a loose puck is available after a save
   carrier: CorePlayerProfile;
   tactics?: { risk?: number; forecheck?: number }; // 0..1
 };
@@ -45,6 +46,7 @@ export function decideCoreAction(input: CoreDecisionInput): CoreDecision {
   const forecheck = clamp(input.tactics?.forecheck ?? 0.5);
   const lateDesperation = input.scoreMargin < 0 && input.secondsRemaining < 300 ? 0.12 : 0;
   const safeLead = input.scoreMargin > 0 && input.secondsRemaining < 300 ? 0.1 : 0;
+  const rebound = input.rebound ? 0.26 : 0;
   const skill = {
     sk: norm(input.carrier.skating), ph: norm(input.carrier.puckHandling), pa: norm(input.carrier.passing),
     sc: norm(input.carrier.shooting), df: norm(input.carrier.defense), st: norm(input.carrier.physical),
@@ -74,8 +76,8 @@ export function decideCoreAction(input: CoreDecisionInput): CoreDecision {
     candidates.push(
       // A legitimate shooting lane must compete with the extra-pass option.
       // The later resolver and goalie layer decide whether the shot is good.
-      add("SHOOT", 0.4 + skill.sc * 0.38 + lateDesperation * 1.2 + risk * 0.08),
-      add("PASS", 0.21 + skill.pa * 0.34 + input.pressure * 0.08),
+      add("SHOOT", 0.4 + skill.sc * 0.38 + lateDesperation * 1.2 + risk * 0.08 + rebound),
+      add("PASS", 0.21 + skill.pa * 0.34 + input.pressure * 0.08 - rebound * 0.15),
       add("CARRY", 0.13 + skill.sk * 0.25 + skill.ph * 0.12 - input.pressure * 0.08),
     );
   }

@@ -5,7 +5,7 @@ import { decideCoreAction, type CoreAction, type CorePlayerProfile } from "./dec
 import { resolveCoreAction } from "./action-resolver";
 import type { CoreGoalieProfile } from "./goalie-resolver";
 import { resolveCoreShotResult, type CoreShotOutcome } from "./shot-result";
-import { createMatchState, opponentId, viewForTeam, withPossession, withScore, type CoreOnIce, type CoreZone, type RelativeZone, type V3CoreMatchState } from "./match-state";
+import { consumeReboundOpportunity, createMatchState, opponentId, viewForTeam, withPossession, withReboundOpportunity, withScore, type CoreOnIce, type CoreZone, type RelativeZone, type V3CoreMatchState } from "./match-state";
 import { applyCoreTickState, withCoreLineChange } from "./state-transition";
 
 export type CorePrototypeLines = { forwards: number[][]; defense: number[][] };
@@ -54,7 +54,8 @@ export function runCorePrototype(input: { home: CorePrototypeTeam; away: CorePro
     const actor = choose(rng, playersOnIce(team, state.onIce[teamId]));
     const defender = choose(rng, playersOnIce(opponent, state.onIce[opponent.id]));
     const view = viewForTeam(state, teamId);
-    const decision = decideCoreAction({ hasPossession: view.hasPossession, zone: view.relativeZone, pressure: view.pressure, fatigue: view.fatigue, scoreMargin: view.scoreMargin, secondsRemaining: Math.max(0, 3600 - state.totalSeconds), carrier: actor, tactics: team.tactics });
+    const decision = decideCoreAction({ hasPossession: view.hasPossession, zone: view.relativeZone, pressure: view.pressure, fatigue: view.fatigue, scoreMargin: view.scoreMargin, secondsRemaining: Math.max(0, 3600 - state.totalSeconds), rebound: view.hasRebound, carrier: actor, tactics: team.tactics });
+    if (view.hasRebound) state = consumeReboundOpportunity(state, teamId);
     // The decision layer ranks intent; a live game samples that ranked spectrum
     // with the seeded RNG. Always taking rank #1 made every average O-zone
     // possession a pass and produced an unrealistically sterile prototype.
@@ -85,7 +86,7 @@ export function runCorePrototype(input: { home: CorePrototypeTeam; away: CorePro
         events.push({ tick, teamId, action: "GOAL", outcome: "GOAL", reason: shot.reason });
       } else if (kind === "REBOUND") {
         events.push({ tick, teamId, action: "REBOUND", outcome: "REBOUND", reason: shot.reason });
-        state = withPossession(state, teamId, zoneFor(state, teamId, "OFFENSIVE"));
+        state = withReboundOpportunity(withPossession(state, teamId, zoneFor(state, teamId, "OFFENSIVE")), teamId);
       } else {
         events.push({ tick, teamId: kind === "BLOCK" ? opponent.id : teamId, action: kind, outcome: kind, reason: shot.reason });
         const other = opponentId(state, teamId);
