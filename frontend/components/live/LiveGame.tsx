@@ -6,6 +6,7 @@ import { usePoll, useServerNow } from "./useLive";
 import LiveBoard from "./LiveBoard";
 import CoachPanel from "./CoachPanel";
 import LiveRinkTracker from "./LiveRinkTracker";
+import dynamic from "next/dynamic";
 import GameFlowChart from "@/components/GameFlowChart";
 import { liveFlow } from "@/lib/sim/live-flow";
 import { liveLineStats } from "@/lib/sim/live-lines";
@@ -13,6 +14,12 @@ import LiveBoxscore, { type LiveGoalItem, type LivePenaltyItem } from "./LiveBox
 import { describeLiveEvents, fmtClock, fmtRemainingClock, periodLabel, type LiveLine } from "@/lib/sim/live-text";
 import type { SimEvent } from "@/lib/sim/events";
 import type { GoalieInfo } from "@/lib/sim/live";
+
+// three.js loads only when the 3D rink is switched on
+const Live3DView = dynamic(() => import("@/components/replay3d/Live3DView"), {
+  ssr: false,
+  loading: () => <div className="w-full aspect-video rounded-xl bg-[#070b12] border border-slate-800 flex items-center justify-center text-sm text-slate-400">Načítavam 3D arénu…</div>,
+});
 
 type Side = { id: number; code: string | null; name: string };
 type View = {
@@ -68,6 +75,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
   const mine = coachTeams.map((t) => t.id);
 
   const [showRink, setShowRink] = useState(false);
+  const [show3d, setShow3d] = useState(false);
   const [showBoxscore, setShowBoxscore] = useState(true);
   const [feedTab, setFeedTab] = useState<"pbp" | "boxscore">("pbp");
 
@@ -75,6 +83,8 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
     try {
       const savedRink = localStorage.getItem("v3_live_rink_enabled");
       if (savedRink !== null) setShowRink(savedRink === "true");
+      const saved3d = localStorage.getItem("v3_live_3d_enabled");
+      if (saved3d !== null) setShow3d(saved3d === "true");
       const savedBox = localStorage.getItem("v3_live_boxscore_enabled");
       if (savedBox !== null) setShowBoxscore(savedBox === "true");
     } catch {}
@@ -85,6 +95,16 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       const next = !prev;
       try {
         localStorage.setItem("v3_live_rink_enabled", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const toggle3d = () => {
+    setShow3d((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("v3_live_3d_enabled", String(next));
       } catch {}
       return next;
     });
@@ -235,6 +255,22 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
                   {showRink ? "ZAP" : "VYP"}
                 </span>
               </button>
+
+              {/* 3D Rink toggle button */}
+              <button
+                onClick={toggle3d}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                  show3d
+                    ? "bg-violet-950 text-violet-300 border-violet-600 shadow-sm shadow-violet-900"
+                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200"
+                }`}
+                title="Prepnúť 3D klzisko (rekonštrukcia z udalostí zápasu)"
+              >
+                <span>🧊 3D Klzisko:</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] ${show3d ? "bg-violet-500 text-slate-950 font-black" : "bg-slate-700 text-slate-300"}`}>
+                  {show3d ? "ZAP" : "VYP"}
+                </span>
+              </button>
               <span className="text-slate-300 font-semibold text-sm normal-case tracking-normal">{status}</span>
             </div>
           </div>
@@ -279,6 +315,24 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
             showRink={showRink}
             onToggleRink={toggleRink}
             statusText={status}
+          />
+        </div>
+      )}
+
+      {/* 3b. 3D RINK — the same live events, staged in 3D */}
+      {show3d && (
+        <div className="mb-3">
+          <Live3DView
+            gameId={gameId}
+            home={home}
+            away={away}
+            homeLogoUrl={logos[home.id] || null}
+            events={eventsList}
+            score={view && view.status !== "pending" ? view.score : { home: 0, away: 0 }}
+            shots={view && view.status !== "pending" ? view.shots : { home: 0, away: 0 }}
+            periodText={view ? periodLabel(view.period) : ""}
+            clockText={view ? (view.status === "final" ? "0:00" : view.shootout ? "SO" : fmtRemainingClock(view.clock, view.period)) : "20:00"}
+            status={view?.status ?? null}
           />
         </div>
       )}

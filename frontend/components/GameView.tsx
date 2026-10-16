@@ -10,6 +10,15 @@ import GameReportCard from "@/components/GameReportCard";
 import GameFlowChart from "@/components/GameFlowChart";
 import { useLang } from "@/components/LangProvider";
 import { presetLabel } from "@/lib/tactics-i18n";
+import dynamic from "next/dynamic";
+import type { GoalReplayData } from "@/lib/replay3d/goal-replay";
+import type { ReplayGoal } from "@/components/replay3d/GoalReplayModal";
+
+// three.js only loads when someone actually opens a 3D replay
+const GoalReplayModal = dynamic(() => import("@/components/replay3d/GoalReplayModal"), {
+  ssr: false,
+  loading: () => <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center text-slate-300 text-sm font-bold">Načítavam 3D arénu…</div>,
+});
 
 // ---- types (shape passed from the server page) ------------------------------
 type Skater = {
@@ -41,7 +50,7 @@ type Side = {
   record?: { w: number; l: number; otl: number } | null;
 };
 type GoalAssist = { name: string; slug: string | null; total: number | null };
-type GoalE = { period: number; seconds: number; teamId: number; scorerName: string; scorerSlug?: string | null; scorerSeasonGoal?: number; assistNames: string[]; assists?: GoalAssist[]; strength: string; emptyNet: boolean; homeScoreAfter: number; awayScoreAfter: number; onIceForNames?: string[]; onIceAgainstNames?: string[] };
+type GoalE = { period: number; seconds: number; teamId: number; scorerName: string; scorerSlug?: string | null; scorerSeasonGoal?: number; assistNames: string[]; assists?: GoalAssist[]; strength: string; emptyNet: boolean; homeScoreAfter: number; awayScoreAfter: number; onIceForNames?: string[]; onIceAgainstNames?: string[]; replay?: GoalReplayData | null };
 type PenE = { period: number; seconds: number; teamId: number; playerName: string; type: string; minutes: number; severity: string; givesPP: boolean; offsetting: boolean };
 type PbpE = { period: number; seconds: number; time: string; teamId: number | null; kind: string; text: string; major: boolean };
 type ShootoutE = { round: number; teamId: number; teamCode: string | null; shooterName: string; shooterSlug: string | null; result: "goal" | "save" | "miss" };
@@ -631,6 +640,7 @@ function EdgePanel({ data }: { data: Data }) {
 export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: React.ReactNode }) {
   const [tab, setTab] = useState("summary");
   const [metric, setMetric] = useState<"shots" | "goals" | "pp" | "hits" | "fo" | "blocks" | "xg">("shots");
+  const [replayAt, setReplayAt] = useState<number | null>(null);
   const router = useRouter();
   const tabs = [
     { id: "summary", label: "Summary" },
@@ -644,6 +654,11 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
   const nameOf = (id: number) => (id === data.homeTeamId ? data.home.name : data.away.name);
   const codeOf = (id: number) => (id === data.homeTeamId ? data.home.code : data.away.code) || nameOf(id);
   const periods = Array.from(new Set([...data.goals.map((g) => g.period), ...data.penalties.map((p) => p.period)])).sort((a, b) => a - b);
+
+  const replayGoals: Array<ReplayGoal & { src: GoalE }> = data.goals
+    .filter((g) => g.replay)
+    .map((g) => ({ src: g, data: g.replay!, homeScoreAfter: g.homeScoreAfter, awayScoreAfter: g.awayScoreAfter, scorerName: cleanName(g.scorerName), assistNames: g.assistNames.map(cleanName), label: `${periodLabel(g.period, data.endedIn)} ${mmss(g.seconds)}` }));
+  const replayIndexOf = (g: GoalE) => replayGoals.findIndex((r) => r.src === g);
 
   const ppFor = (teamId: number) => data.goals.filter((g) => g.teamId === teamId && g.strength === "PP").length;
   // Fighting majors, misconducts and offsetting/brawl minors never put the other
@@ -705,6 +720,9 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
 
   return (
     <div className="max-w-[1360px] mx-auto px-2 sm:px-4 space-y-6 pb-16">
+      {replayAt != null && replayGoals.length > 0 && (
+        <GoalReplayModal gameId={data.id} home={data.home} away={data.away} goals={replayGoals} start={Math.min(replayAt, replayGoals.length - 1)} onClose={() => setReplayAt(null)} />
+      )}
       <div className="flex items-center justify-between text-xs text-slate-400">
         <button
           onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) router.back(); else router.push("/scores"); }}
@@ -860,7 +878,11 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
             <div className="grid grid-cols-2 bg-slate-900/95 text-xs font-black tracking-wider text-slate-300 border-b border-slate-800">
               <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between">
                 <span className="flex items-center gap-2"><span>🚨</span> GOALS</span>
-                <span className="text-[11px] font-normal text-slate-500 font-mono hidden sm:inline">Running score & players on ice</span>
+                {replayGoals.length > 0 ? (
+                  <button type="button" onClick={() => setReplayAt(0)} className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition" title="Všetky góly zápasu v 3D">🎬 3D zostrih</button>
+                ) : (
+                  <span className="text-[11px] font-normal text-slate-500 font-mono hidden sm:inline">Running score & players on ice</span>
+                )}
               </div>
               <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between border-l border-slate-800 text-slate-300">
                 <span className="flex items-center gap-2"><span>⏱️</span> PENALTIES</span>
@@ -922,8 +944,13 @@ export default function GameView({ data, intelSlot }: { data: Data; intelSlot?: 
                                     )}
                                     {g.scorerSeasonGoal != null && <span className="text-sm font-bold text-amber-400">({g.scorerSeasonGoal})</span>}
                                   </div>
-                                  <span className="text-xs font-mono font-extrabold px-2.5 py-1 rounded bg-slate-900 border border-slate-700/70 text-slate-200 shrink-0">
-                                    {scoringCode} {scoringScore} – {opponentScore} {opponentCode}
+                                  <span className="flex items-center gap-1.5 shrink-0">
+                                    {replayIndexOf(g) >= 0 && (
+                                      <button type="button" onClick={() => setReplayAt(replayIndexOf(g))} className="text-[11px] font-black px-2 py-1 rounded bg-sky-600/90 hover:bg-sky-500 text-white transition" title="3D replay gólu">▶ 3D</button>
+                                    )}
+                                    <span className="text-xs font-mono font-extrabold px-2.5 py-1 rounded bg-slate-900 border border-slate-700/70 text-slate-200">
+                                      {scoringCode} {scoringScore} – {opponentScore} {opponentCode}
+                                    </span>
                                   </span>
                                 </div>
 

@@ -725,6 +725,36 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   const homeSt = teamStandings.find((s) => s.teamId === game.homeTeamId);
   const awaySt = teamStandings.find((s) => s.teamId === game.awayTeamId);
 
+  // 3D replay inputs: each GOAL event's shot facts + both on-ice units with numbers/positions
+  const goalEvRows = await prisma.gameEvent.findMany({
+    where: { gameId: game.id, type: "GOAL" },
+    select: { period: true, seconds: true, teamId: true, playerId: true, targetId: true, sector: true, shotType: true, xg: true, meta: true },
+  });
+  const replayIds = [...new Set([
+    ...game.goalEvents.flatMap((g) => [g.scorerId, ...g.assistIds, ...g.onIceForIds, ...g.onIceAgainstIds]),
+    ...goalEvRows.map((e) => e.targetId).filter((x): x is number => x != null),
+    ...game.goalieStats.map((s) => s.playerId),
+  ])];
+  const replayPeople = replayIds.length ? await prisma.player.findMany({ where: { id: { in: replayIds } }, select: { id: true, name: true, number: true, position: true } }) : [];
+  const rpById = new Map(replayPeople.map((p) => [p.id, { id: p.id, name: cleanName(p.name), number: p.number, pos: p.position }]));
+  const rp = (id: number, fallback = "") => rpById.get(id) ?? { id, name: cleanName(fallback), number: null, pos: null };
+  const starter = (teamId: number) => game.goalieStats.find((s) => s.teamId === teamId && s.started)?.playerId ?? game.goalieStats.find((s) => s.teamId === teamId)?.playerId;
+  const replayOf = (g: (typeof game.goalEvents)[number]) => {
+    const ev = goalEvRows.find((e) => e.period === g.period && e.seconds === g.seconds && e.teamId === g.teamId && (e.playerId == null || e.playerId === g.scorerId));
+    const meta = (ev?.meta ?? {}) as { play?: string; rush?: string };
+    const oppId = g.teamId === game.homeTeamId ? game.awayTeamId : game.homeTeamId;
+    const oppG = ev?.targetId ?? starter(oppId);
+    const ownG = g.onIceForIds.length >= 6 ? undefined : starter(g.teamId); // 6 skaters = own net empty
+    return {
+      period: g.period, seconds: g.seconds, teamId: g.teamId, strength: g.strength, emptyNet: g.emptyNet,
+      scorerId: g.scorerId, scorerName: cleanName(g.scorerName), assistIds: g.assistIds, assistNames: g.assistNames.map(cleanName),
+      sector: ev?.sector ?? null, shotType: ev?.shotType ?? null, play: meta.play ?? null, rush: meta.rush ?? null, xg: ev?.xg ?? null,
+      forSkaters: g.onIceForIds.map((id, i) => rp(id, g.onIceForNames[i])),
+      againstSkaters: g.onIceAgainstIds.map((id, i) => rp(id, g.onIceAgainstNames[i])),
+      goalie: oppG != null ? rp(oppG) : null, ownGoalie: ownG != null ? rp(ownG) : null,
+    };
+  };
+
   let runningHomeScore = 0;
   let runningAwayScore = 0;
 
@@ -779,6 +809,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
         }),
         strength: g.strength, emptyNet: g.emptyNet,
         onIceForNames: g.onIceForNames.map(cleanName), onIceAgainstNames: g.onIceAgainstNames.map(cleanName),
+        replay: g.strength !== "SO" ? replayOf(g) : null,
       };
     }),
     penalties: game.penaltyEvents.map((p) => ({

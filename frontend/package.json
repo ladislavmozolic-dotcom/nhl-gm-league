@@ -29,6 +29,7 @@
     "react-dom": "19.2.4",
     "resend": "^6.26.0",
     "sanitize-html": "^2.17.7",
+    "three": "0.186.0",
     "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
@@ -38,6 +39,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sanitize-html": "^2.16.1",
+    "@types/three": "0.186.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
