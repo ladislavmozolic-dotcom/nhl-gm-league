@@ -123,9 +123,44 @@ export class RinkScene {
   private goalGlow: Record<string, THREE.Sprite> = {};
   private disposables: Array<{ dispose(): void }> = [];
   private small = false;
+  private logos: Record<"home" | "away", HTMLImageElement | null> = { home: null, away: null };
 
-  constructor(canvas: HTMLCanvasElement, opts: { homeKit: Kit; awayKit: Kit; homeLogoUrl?: string | null; occupancy?: number | null; homeCode?: string | null; awayCode?: string | null; homeName?: string | null }) {
+  constructor(canvas: HTMLCanvasElement, opts: {
+    homeKit: Kit;
+    awayKit: Kit;
+    homeLogoUrl?: string | null;
+    awayLogoUrl?: string | null;
+    occupancy?: number | null;
+    homeCode?: string | null;
+    awayCode?: string | null;
+    homeName?: string | null;
+  }) {
     this.kits = { home: opts.homeKit, away: opts.awayKit };
+
+    // Load team crest logos for jersey and helmet application
+    if (opts.homeLogoUrl) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = opts.homeLogoUrl;
+      img.onload = () => {
+        this.logos.home = img;
+        for (const r of this.rigs.values()) {
+          if (r.side === "home") r.setLogo(img);
+        }
+      };
+    }
+    if (opts.awayLogoUrl) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = opts.awayLogoUrl;
+      img.onload = () => {
+        this.logos.away = img;
+        for (const r of this.rigs.values()) {
+          if (r.side === "away") r.setLogo(img);
+        }
+      };
+    }
+
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     // phones / small screens: fewer pixels, a smaller shadow map and a thinner crowd keep it smooth
     this.small = Math.min(window.innerWidth, window.innerHeight) < 600;
@@ -277,7 +312,7 @@ export class RinkScene {
       const sig = `${a.side}|${a.role}|${a.number}`;
       if (r && r.root.userData.sig === sig) continue;
       if (r) { this.scene.remove(r.root); disposeRig(r); }
-      const nr = makeRig(this.scene, a, this.kits[a.side]); nr.root.userData.sig = sig; this.rigs.set(a.id, nr);
+      const nr = makeRig(this.scene, a, this.kits[a.side], this.logos[a.side]); nr.root.userData.sig = sig; this.rigs.set(a.id, nr);
     }
     this.order = actors.map((a) => a.id);
     this.actorsById = new Map(actors.map((a) => [a.id, a]));
@@ -325,32 +360,25 @@ export class RinkScene {
       while (dh < -Math.PI) dh += 2 * Math.PI;
       r.prevHeading = s.h;
 
-      const v = Math.min(1, s.speed / 20);
-      const turnRate = dt > 0.001 ? Math.max(-1, Math.min(1, (dh / dt) * 0.2)) : 0;
-      const targetBank = turnRate * v * 0.38;
+      // Velocity normalization & stationary detection
+      const isMoving = s.speed > 1.8;
+      const v = Math.min(1, Math.max(0, (s.speed - 1.5) / 16));
+      const turnRate = dt > 0.001 ? Math.max(-1, Math.min(1, (dh / dt) * 0.22)) : 0;
+      const targetBank = turnRate * Math.min(1, s.speed / 12) * 0.42;
       r.bankAngle += (targetBank - r.bankAngle) * Math.min(1, dt * 9);
 
-      // Stride cycle frequency (faster strides when sprinting)
-      r.phase += dt * (3.0 + s.speed * 0.36);
-      const strideL = Math.sin(r.phase);
-      const strideR = -strideL;
+      // Only advance stride cycle when actually moving!
+      if (isMoving) {
+        r.phase = (r.phase + dt * (3.0 + s.speed * 0.28)) % (Math.PI * 2);
+      }
 
       // Check if skater is carrying the puck
       const distToPuck = Math.hypot(s.x - frame.p.x, s.z - frame.p.z);
       const hasPuck = distToPuck < 4.2;
 
-      // Athletic hockey crouch: center of gravity drops as speed increases
-      r.pelvis.position.y = -0.12 - 0.22 * v;
-      // Lateral weight shift over the gliding skate
-      r.pelvis.position.z = Math.sin(r.phase) * 0.16 * v;
-      // Banking into turn + subtle pelvic roll
-      r.pelvis.rotation.x = r.bankAngle + Math.sin(r.phase) * 0.05 * v;
+      // Pelvis tilt & turn banking
+      r.pelvis.rotation.x = r.bankAngle;
       r.pelvis.rotation.z = -0.05 * v;
-
-      // Athletic forward pitch of spine
-      r.upper.rotation.z = -0.22 - 0.28 * v;
-      r.upper.rotation.x = Math.sin(r.phase) * 0.05 * v;
-      r.upper.position.y = 3.05;
 
       if (r.goalie) {
         // --- GOALIE BIOMECHANICS ---
@@ -447,28 +475,89 @@ export class RinkScene {
         r.thighR.rotation.set(0.1, 0, -0.3);
         r.shinL.rotation.set(0, 0, -0.4);
         r.shinR.rotation.set(0, 0, -0.5);
+      } else if (!isMoving) {
+        // --- ATHLETIC READY HOCKEY STANCE (Stationary / Coasting) ---
+        // Skates planted flat on ice, knees bent in ready position
+        r.pelvis.position.set(0, -0.16, 0);
+        r.upper.position.set(0, 3.05, 0);
+        r.upper.rotation.set(0, 0, -0.2);
+
+        r.thighL.rotation.set(0.08, 0, 0.22);
+        r.shinL.rotation.set(0, 0, -0.42);
+        r.skateL.rotation.set(0, 0, 0.2);
+
+        r.thighR.rotation.set(-0.08, 0, 0.22);
+        r.shinR.rotation.set(0, 0, -0.42);
+        r.skateR.rotation.set(0, 0, 0.2);
+
+        // Relaxed hands on stick
+        r.stick.position.set(0.92, 0.6, 0.45);
+        r.stick.rotation.set(0, 0, 0.05);
+        r.armL.rotation.set(0.1, 0, 0.65);
+        r.armR.rotation.set(-0.1, 0, 0.82);
+        r.forearmL.rotation.set(0, 0, -0.48);
+        r.forearmR.rotation.set(0, 0, -0.58);
       } else {
-        // --- NATURAL NHL SKATING STRIDE & STICKHANDLING ---
-        // Left Leg: 40-45° lateral push-off when extending, knee flex when recovering
-        const pushL = Math.max(0, -strideL);
-        const glideL = Math.max(0, strideL);
-        r.thighL.rotation.z = 0.35 * v - strideL * 0.58 * v; // Hip push backward
-        r.thighL.rotation.x = -0.1 - pushL * 0.42 * v; // 45° lateral push-off!
-        r.shinL.rotation.z = -0.42 - pushL * 0.35 * v + glideL * 0.45 * v; // Knee flexion/extension
-        r.skateL.rotation.z = -r.thighL.rotation.z - r.shinL.rotation.z; // Keeps blade aligned to ice
+        // --- DYNAMIC 3-PHASE SKATING STRIDE (Push-off, Recovery, Glide) ---
+        r.pelvis.position.y = -0.14 - 0.24 * v;
+        r.upper.position.y = 3.05;
+        r.upper.rotation.z = -0.22 - 0.28 * v;
 
-        // Right Leg: in opposition
-        const pushR = Math.max(0, -strideR);
-        const glideR = Math.max(0, strideR);
-        r.thighR.rotation.z = 0.35 * v - strideR * 0.58 * v;
-        r.thighR.rotation.x = 0.1 + pushR * 0.42 * v;
-        r.shinR.rotation.z = -0.42 - pushR * 0.35 * v + glideR * 0.45 * v;
-        r.skateR.rotation.z = -r.thighR.rotation.z - r.shinR.rotation.z;
+        const cycle = (r.phase / (Math.PI * 2)) % 1; // 0.0 to 1.0
 
-        // Stickhandling & Arm Mechanics
+        if (cycle < 0.5) {
+          // PHASE A: Left Leg Push/Recover, Right Leg Glide
+          const t = cycle / 0.5; // 0 to 1
+          r.pelvis.position.z = 0.18 * v; // Weight shifts over right glide skate
+
+          if (t < 0.6) {
+            // Power push-off: 45° lateral hip drive & full knee extension
+            const push = t / 0.6;
+            r.thighL.rotation.z = 0.15 + push * 0.65 * v;
+            r.thighL.rotation.x = -0.1 - Math.sin(push * Math.PI) * 0.55 * v;
+            r.shinL.rotation.z = -0.45 + push * 0.45 * v;
+            r.skateL.rotation.z = -r.thighL.rotation.z - r.shinL.rotation.z;
+          } else {
+            // Recovery: Foot leaves ice, high knee flexion, circular return
+            const rec = (t - 0.6) / 0.4;
+            r.thighL.rotation.z = 0.8 * (1 - rec) * v;
+            r.thighL.rotation.x = -0.1 * (1 - rec);
+            r.shinL.rotation.z = -0.45 - Math.sin(rec * Math.PI) * 0.48 * v;
+            r.skateL.rotation.z = 0.1;
+          }
+
+          // Right leg (Supporting glide): Glides smoothly on ice bearing body weight
+          r.thighR.rotation.set(0.08, 0, 0.16 * v);
+          r.shinR.rotation.set(0, 0, -0.38 - 0.2 * v);
+          r.skateR.rotation.set(0, 0, 0.22 * v);
+        } else {
+          // PHASE B: Right Leg Push/Recover, Left Leg Glide (Mirror image)
+          const t = (cycle - 0.5) / 0.5; // 0 to 1
+          r.pelvis.position.z = -0.18 * v; // Weight shifts over left glide skate
+
+          if (t < 0.6) {
+            const push = t / 0.6;
+            r.thighR.rotation.z = 0.15 + push * 0.65 * v;
+            r.thighR.rotation.x = 0.1 + Math.sin(push * Math.PI) * 0.55 * v;
+            r.shinR.rotation.z = -0.45 + push * 0.45 * v;
+            r.skateR.rotation.z = -r.thighR.rotation.z - r.shinR.rotation.z;
+          } else {
+            const rec = (t - 0.6) / 0.4;
+            r.thighR.rotation.z = 0.8 * (1 - rec) * v;
+            r.thighR.rotation.x = 0.1 * (1 - rec);
+            r.shinR.rotation.z = -0.45 - Math.sin(rec * Math.PI) * 0.48 * v;
+            r.skateR.rotation.z = 0.1;
+          }
+
+          // Left leg (Supporting glide)
+          r.thighL.rotation.set(-0.08, 0, 0.16 * v);
+          r.shinL.rotation.set(0, 0, -0.38 - 0.2 * v);
+          r.skateL.rotation.set(0, 0, 0.22 * v);
+        }
+
+        // Stickhandling & Arm Dynamics
         if (hasPuck) {
-          // Puck carrier: hands and stick sweep smoothly side-to-side (dangling / stickhandling)
-          const stickWag = Math.sin(r.phase * 1.6) * 0.28;
+          const stickWag = Math.sin(r.phase * 1.6) * 0.32;
           r.upper.rotation.y = stickWag * 0.35;
           r.stick.position.set(0.92, 0.65, 0.45 + stickWag * 0.35);
           r.stick.rotation.set(0, stickWag * 0.4, 0);
@@ -478,13 +567,13 @@ export class RinkScene {
           r.forearmL.rotation.set(0, 0, -0.52);
           r.forearmR.rotation.set(0, 0, -0.68);
         } else {
-          // Non-carrier: natural arm pump in counter-balance to strides
+          const armSwing = Math.sin(r.phase) * 0.35 * v;
           r.upper.rotation.y = 0;
           r.stick.position.set(0.92, 0.65, 0.45);
           r.stick.rotation.set(0, 0, 0);
 
-          r.armL.rotation.set(0, 0, 0.68 + strideR * 0.32 * v);
-          r.armR.rotation.set(0, 0, 0.88 + strideL * 0.32 * v);
+          r.armL.rotation.set(0, 0, 0.68 + armSwing);
+          r.armR.rotation.set(0, 0, 0.88 - armSwing);
           r.forearmL.rotation.set(0, 0, -0.45);
           r.forearmR.rotation.set(0, 0, -0.55);
         }

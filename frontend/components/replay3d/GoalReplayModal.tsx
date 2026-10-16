@@ -8,7 +8,7 @@ import Replay3DPlayer, { type ReplayHud } from "./Replay3DPlayer";
 import { goalClip, computeGoalTelemetry, type GoalReplayData } from "@/lib/replay3d/goal-replay";
 import { teamKit } from "@/lib/replay3d/team-colors";
 
-type Team = { teamId: number; name: string; code?: string | null; logoUrl: string | null };
+type Team = { teamId: number; name: string; code?: string | null; slug?: string | null; logoUrl: string | null };
 export type ReplayGoal = {
   data: GoalReplayData;
   homeScoreAfter: number;
@@ -24,8 +24,8 @@ export default function GoalReplayModal({ gameId, home, away, goals, start, onCl
 }) {
   const [i, setI] = useState(start);
   const g = goals[i];
-  const homeKit = useMemo(() => teamKit(home.code, home.name, true), [home.code, home.name]);
-  const awayKit = useMemo(() => teamKit(away.code, away.name, false), [away.code, away.name]);
+  const homeKit = useMemo(() => teamKit(home, true), [home]);
+  const awayKit = useMemo(() => teamKit(away, false), [away]);
   const clip = useMemo(() => goalClip(g.data, home.teamId, gameId), [g, home.teamId, gameId]);
   const side = g.data.teamId === home.teamId ? "home" : "away";
   const scoringTeam = side === "home" ? home : away;
@@ -151,6 +151,7 @@ export default function GoalReplayModal({ gameId, home, away, goals, start, onCl
           homeKit={homeKit}
           awayKit={awayKit}
           homeLogoUrl={home.logoUrl}
+          awayLogoUrl={away.logoUrl}
           focusId={`${side}-${g.data.scorerId}`}
           hud={hud}
           occupancy={occupancy}

@@ -59,6 +59,7 @@ export default function Replay3DPlayer({
   homeKit,
   awayKit,
   homeLogoUrl,
+  awayLogoUrl,
   focusId,
   hud,
   onEnded,
@@ -69,6 +70,7 @@ export default function Replay3DPlayer({
   homeKit: Kit;
   awayKit: Kit;
   homeLogoUrl?: string | null;
+  awayLogoUrl?: string | null;
   focusId?: string | null;
   hud: ReplayHud;
   onEnded?: () => void;
@@ -162,6 +164,7 @@ export default function Replay3DPlayer({
         homeKit,
         awayKit,
         homeLogoUrl,
+        awayLogoUrl,
         occupancy,
         homeCode: hud.home.code,
         awayCode: hud.away.code,
