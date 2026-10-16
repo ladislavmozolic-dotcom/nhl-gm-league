@@ -11,7 +11,7 @@ import { makeRig, disposeRig, type Rig } from "./players";
 import { RINK, POSE, type Actor, type ClipFrame } from "@/lib/replay3d/reconstruct";
 import type { Kit } from "@/lib/replay3d/team-colors";
 
-export type CameraMode = "broadcast" | "end" | "goalcam" | "follow" | "top" | "free";
+export type CameraMode = "broadcast" | "end" | "reverse" | "goalcam" | "ice" | "follow" | "top" | "free";
 
 const PX = 10.24; // ice texture pixels per foot
 
@@ -165,7 +165,7 @@ export class RinkScene {
     const iceGeo = new THREE.ShapeGeometry(iceShape, 32); iceGeo.rotateX(-Math.PI / 2);
     const pos = iceGeo.attributes.position as THREE.BufferAttribute, uv = iceGeo.attributes.uv as THREE.BufferAttribute;
     for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) + 100) / 200, 1 - (pos.getZ(i) + 42.5) / 85);
-    const iceMat = new THREE.MeshPhysicalMaterial({ map: iceTexture(null), roughness: 0.35, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.12 });
+    const iceMat = new THREE.MeshPhysicalMaterial({ map: iceTexture(null), roughness: 0.22, metalness: 0.04, clearcoat: 1.0, clearcoatRoughness: 0.08, reflectivity: 0.88 });
     this.ice = new THREE.Mesh(iceGeo, iceMat); this.ice.receiveShadow = true;
     this.scene.add(this.ice);
     if (opts.homeLogoUrl) {
@@ -387,13 +387,44 @@ export class RinkScene {
       const focus = this.focusId ? this.rigs.get(this.focusId)?.root.position : null;
       const want = new THREE.Vector3(), look = new THREE.Vector3();
       switch (this.mode) {
-        case "end": want.set(d * 128, 26, P.z * 0.25); look.set(d * 55, 0, P.z * 0.4); break;
-        case "goalcam": want.set(d * (RINK.goalLine + 2.6), 2.6, 0); look.set(P.x, 1.5, P.z); break;
-        case "follow": { const t = focus ?? P; want.set(t.x - d * 30, 13, t.z * 0.8 + 6); look.set(t.x + d * 14, 1, t.z * 0.8); break; }
-        case "top": want.set(P.x * 0.15, 185, 0.01); look.set(P.x * 0.15, 0, 0); break;
-        default: { const cx = Math.max(-62, Math.min(62, P.x * 0.85)); want.set(cx, 54, 80); look.set(cx, 0, 1); } // high gondola, clears the near stands
+        case "end":
+          // Behind the glass looking down the slot
+          want.set(d * 126, 25, P.z * 0.25);
+          look.set(d * 52, 1, P.z * 0.35);
+          break;
+        case "reverse":
+          // Low reverse angle behind the net looking out into the scoring zone
+          want.set(d * 106, 11, P.z * 0.4);
+          look.set(d * 62, 2.2, P.z * 0.5);
+          break;
+        case "goalcam":
+          // Looking directly across the goal line from inside the net
+          want.set(d * (RINK.goalLine + 2.8), 2.5, 0);
+          look.set(Math.max(-20, Math.min(20, P.x)), 1.4, Math.max(-10, Math.min(10, P.z)));
+          break;
+        case "ice":
+          // Dynamic low ice-level cable/rail cam along boards tracking the rush
+          want.set(P.x - d * 22, 5.2, d > 0 ? 38 : -38);
+          look.set(P.x + d * 10, 2.0, P.z * 0.7);
+          break;
+        case "follow": {
+          const t = focus ?? P;
+          want.set(t.x - d * 28, 12, t.z * 0.7 + 5);
+          look.set(t.x + d * 14, 2.0, t.z * 0.7);
+          break;
+        }
+        case "top":
+          want.set(P.x * 0.15, 185, 0.01);
+          look.set(P.x * 0.15, 0, 0);
+          break;
+        default: {
+          // Broadcast high cam: lead ahead of the puck slightly with smooth operator inertia
+          const cx = Math.max(-60, Math.min(60, P.x * 0.8 + d * 4));
+          want.set(cx, 52, 78);
+          look.set(cx + d * 2, 0, 0);
+        }
       }
-      const k = snap ? 1 : 1 - Math.exp(-dt * (this.mode === "goalcam" ? 10 : 3.2));
+      const k = snap ? 1 : 1 - Math.exp(-dt * (this.mode === "goalcam" ? 10 : 3.6));
       this.camPos.lerp(want, k); this.camLook.lerp(look, k);
       this.camera.position.copy(this.camPos); this.camera.lookAt(this.camLook);
     } else {

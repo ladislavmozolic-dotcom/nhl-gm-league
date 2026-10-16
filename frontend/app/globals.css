@@ -249,3 +249,18 @@ input[type="number"] {
   .lines-goalie-stage { min-height: 280px; }
   .lines-goalie-details { padding: 1rem; }
 }
+
+@keyframes wipe {
+  0% {
+    transform: translateX(-120%) skewX(-20deg);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(120%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+

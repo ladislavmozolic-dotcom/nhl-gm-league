@@ -55,3 +55,82 @@ export function goalClip(d: GoalReplayData, homeTeamId: number, gameId: number):
     seed: momentSeed(gameId, d.period, d.seconds, d.teamId, d.scorerId),
   });
 }
+
+export type GoalTelemetry = {
+  speedMph: number;
+  speedKmh: number;
+  distanceFt: number;
+  distanceM: number;
+  shotTypeLabel: string;
+  playLabel: string;
+  xgFormatted: string | null;
+  isHighDanger: boolean;
+};
+
+export function computeGoalTelemetry(d: GoalReplayData, seed = 0): GoalTelemetry {
+  // Deterministic pseudo-random jitter from seed
+  const r = (k: number) => {
+    let s = (seed + k * 1013) % 2147483647;
+    s = (s * 16807) % 2147483647;
+    return (s % 1000) / 1000;
+  };
+
+  const st = (d.shotType ?? "WRIST").toUpperCase();
+  let baseSpeed = 82;
+  let spread = 8;
+  if (st.includes("SLAP")) { baseSpeed = 95; spread = 9; }
+  else if (st.includes("ONE") || st.includes("TIMER")) { baseSpeed = 93; spread = 8; }
+  else if (st.includes("SNAP")) { baseSpeed = 86; spread = 7; }
+  else if (st.includes("WRIST")) { baseSpeed = 81; spread = 7; }
+  else if (st.includes("BACK")) { baseSpeed = 68; spread = 8; }
+  else if (st.includes("TIP") || d.play === "deflect") { baseSpeed = 64; spread = 10; }
+
+  const speedMph = Math.round((baseSpeed + (r(1) - 0.5) * spread * 2) * 10) / 10;
+  const speedKmh = Math.round(speedMph * 1.60934 * 10) / 10;
+
+  const sec = (d.sector ?? "SLOT").toUpperCase();
+  let baseDist = 25;
+  let distSpread = 6;
+  if (sec.includes("NET") || sec.includes("CREASE")) { baseDist = 13; distSpread = 5; }
+  else if (sec.includes("POINT")) { baseDist = 56; distSpread = 8; }
+  else if (sec.includes("CIRCLE")) { baseDist = 38; distSpread = 7; }
+  else if (sec.includes("PERIMETER")) { baseDist = 44; distSpread = 8; }
+  else { baseDist = 24; distSpread = 7; } // SLOT
+
+  const distanceFt = Math.max(6, Math.round(baseDist + (r(2) - 0.5) * distSpread * 2));
+  const distanceM = Math.round(distanceFt * 0.3048 * 10) / 10;
+
+  const shotTypeLabel =
+    d.play === "deflect" ? "DEFLECTION" :
+    d.play === "wrap" ? "WRAPAROUND" :
+    d.play === "rebound" ? "REBOUND" :
+    st.includes("ONE") ? "ONE-TIMER" :
+    st.includes("SLAP") ? "SLAP SHOT" :
+    st.includes("SNAP") ? "SNAP SHOT" :
+    st.includes("BACK") ? "BACKHAND" :
+    st.includes("WRIST") ? "WRIST SHOT" : "SHOT";
+
+  const playLabel =
+    d.rush === "BREAKAWAY" ? "BREAKAWAY" :
+    d.rush === "2ON1" ? "2-ON-1 RUSH" :
+    d.rush === "3ON2" ? "3-ON-2 RUSH" :
+    d.play === "rebound" ? "SECOND CHANCE" :
+    d.play === "wrap" ? "WRAPAROUND" :
+    d.emptyNet ? "EMPTY NET" :
+    d.strength === "PP" ? "POWER PLAY" :
+    d.strength === "SH" ? "SHORTHANDED" : "EVEN STRENGTH";
+
+  const xgFormatted = d.xg != null ? d.xg.toFixed(2) : null;
+  const isHighDanger = (d.xg != null && d.xg >= 0.22) || sec.includes("NET") || d.rush === "BREAKAWAY";
+
+  return {
+    speedMph,
+    speedKmh,
+    distanceFt,
+    distanceM,
+    shotTypeLabel,
+    playLabel,
+    xgFormatted,
+    isHighDanger,
+  };
+}

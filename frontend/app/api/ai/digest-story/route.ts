@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
     const target = body.target ?? null;
 
     const cookieLang = await getLang();
-    const lang: Lang = (body.lang as Lang) || cookieLang || "cs";
+    const lang: Lang = (body.lang as Lang) || cookieLang || "en";
+    const isEnglish = lang !== "cs";
 
     const digest = await dailyDigest(season, target);
     if (!digest || digest.gameCount === 0) {
@@ -24,7 +25,53 @@ export async function POST(req: NextRequest) {
       .map((s) => `${s.away} ${s.awayGoals} : ${s.homeGoals} ${s.home} (${s.endedIn})`)
       .join("\n");
 
-    const promptContext = `
+    let promptContext = "";
+    let systemInstruction = "";
+    let userPrompt = "";
+
+    if (isEnglish) {
+      promptContext = `
+DATE / ROUND: ${digest.date ?? `Round ${digest.round}`}
+TOTAL GAMES: ${digest.gameCount}
+
+SCORES:
+${scoresSummary}
+
+GAME OF THE NIGHT:
+${digest.gameOfNight ? `${digest.gameOfNight.away} vs ${digest.gameOfNight.home} (${digest.gameOfNight.awayGoals}-${digest.gameOfNight.homeGoals}) - Note: ${digest.gameOfNight.note}` : "None"}
+
+PLAYER OF THE NIGHT:
+${digest.playerOfNight ? `${digest.playerOfNight.name} (${digest.playerOfNight.team}): ${digest.playerOfNight.goals ?? 0}G, ${digest.playerOfNight.assists ?? 0}A, ${digest.playerOfNight.points ?? 0} PTS` : "None"}
+
+TOP GOALTENDER:
+${digest.bestGoalie ? `${digest.bestGoalie.name} (${digest.bestGoalie.team}): ${digest.bestGoalie.saves} saves (${digest.bestGoalie.svPct}% SV%), GSAx: ${digest.bestGoalie.gsax}` : "None"}
+
+UPSET OF THE NIGHT:
+${digest.upset ? `${digest.upset.away} vs ${digest.upset.home} (${digest.upset.awayGoals}-${digest.upset.homeGoals}) - ${digest.upset.note}` : "None"}
+
+BIGGEST HIT:
+${digest.biggestHit ? `${digest.biggestHit.hitter} hit ${digest.biggestHit.victim} (${digest.biggestHit.note})` : "None"}
+
+INJURY REPORT:
+${digest.injuries.length ? digest.injuries.map((i) => `- ${i.name} (${i.team}): ${i.part} (${i.severity}, out for ${i.days} days)`).join("\n") : "Clean night with zero injuries."}
+
+TEAM FORM / STREAKS:
+- Hottest Team: ${digest.hottest ? `${digest.hottest.name} (${digest.hottest.streakLen}-game win streak, L10: ${digest.hottest.last10})` : "N/A"}
+- Cold Ice: ${digest.coldest ? `${digest.coldest.name} (${digest.coldest.streakLen} games winless, L10: ${digest.coldest.last10})` : "N/A"}
+`;
+
+      systemInstruction = `You are the Editor-in-Chief of the official UNHL Daily Digest magazine.
+CRITICAL LANGUAGE REQUIREMENT: You MUST write the entire story in standard ENGLISH. Never output Slovak or Czech.
+STRUCTURE:
+1. **Punchy Headline of the Night**
+2. **The Story of the Night** (2-3 paragraphs) - summarizing the action, star performances, upsets.
+3. **Quick Hits** - bulleted highlights (biggest hit, key injury updates, hot/cold streaks).
+
+Write with flair, authority, and authentic hockey journalism prose.`;
+
+      userPrompt = `${promptContext}\n\nWrite the editorial story of the night entirely in ENGLISH according to the instructions above:`;
+    } else {
+      promptContext = `
 DÁTUM / KOLO: ${digest.date ?? `Kolo ${digest.round}`}
 POČET ZÁPASOV: ${digest.gameCount}
 
@@ -54,37 +101,23 @@ FORMA TÍMOV:
 - V kríze: ${digest.coldest ? `${digest.coldest.name} (${digest.coldest.streakLen} zápasov bez výhry, bilancia z 10: ${digest.coldest.last10})` : "N/A"}
 `;
 
-    let systemInstruction = "";
-    if (lang === "cs") {
       systemInstruction = `Si šéfredaktor prestížneho hokejového magazínu UNHL.
-Tvojou úlohou je napísať pútavý, novinársky redakčný sumár hokejovej noci v slovenčine (Príbeh dnešnej noci).
+DÔLEŽITÁ JAZYKOVÁ POŽIADAVKA: Celý článok MUSÍ byť napísaný v SLOVENČINE (resp. češtine).
 DODRŽUJ TENTO FORMÁT:
 1. **Úderný titulok dňa** (Headline).
 2. **Príbeh noci** (2-3 odseky) - dynamický opis diania na klziskách, čo bola hlavná téma večera, vyzdvihnutie hrdinov a prekvapení.
 3. **Zápisník redakcie (Quick Hits)** - odrážkový zoznam (hity, zranenia, série tímov).
 
 Píš dynamicky, pútavo a s rešpektom k ligovým výsledkom.`;
-    } else if (lang === "en") {
-      systemInstruction = `You are the Editor-in-Chief of the official UNHL Daily Digest magazine.
-Write an engaging, authentic daily hockey story (The Story of the Night) in English.
-STRUCTURE:
-1. **Punchy Headline of the Night**
-2. **The Story of the Night** (2-3 paragraphs) - summarizing the action, star performances, upsets.
-3. **Quick Hits** - bulleted highlights (biggest hit, key injury updates, hot/cold streaks).
 
-Write with flair and authority.`;
-    } else {
-      systemInstruction = `You are an NHL sports editor. Write a nightly hockey digest story in language: ${lang}.`;
+      userPrompt = `${promptContext}\n\nNapíš redakčný príbeh noci v slovenčine podľa inštrukcií:`;
     }
 
-    const aiResponse = await generateWithGemini(
-      promptContext + "\n\nNapíš redakčný príbeh noci podľa inštrukcií:",
-      {
-        systemInstruction,
-        temperature: 0.6,
-        maxTokens: 1400,
-      }
-    );
+    const aiResponse = await generateWithGemini(userPrompt, {
+      systemInstruction,
+      temperature: 0.6,
+      maxTokens: 1400,
+    });
 
     return NextResponse.json({
       success: true,

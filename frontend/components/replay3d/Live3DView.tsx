@@ -140,7 +140,7 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
       const prevT = t;
       if (!over) t = Math.min(it.clip.duration, t + dt * speed);
       if (soundRef.current) for (const c of it.clip.cues) if (c.t > prevT && c.t <= t) {
-        if (c.kind === "goal") { if (it.kind !== "replay") { playSfx("horn"); playSfx("crowd"); } }
+        if (c.kind === "goal") { if (it.kind !== "replay") { playSfx("horn"); playSfx("crowd"); playSfx("twine"); } else { playSfx("twine"); } }
         else if (c.kind === "shot") playSfx("shot");
         else if (c.kind === "pass") playSfx("pass");
         else if (c.kind === "post") playSfx("post");

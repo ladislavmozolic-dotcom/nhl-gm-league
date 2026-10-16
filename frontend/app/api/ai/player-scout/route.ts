@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
     }
 
     const cookieLang = await getLang();
-    const lang: Lang = (body.lang as Lang) || cookieLang || "cs";
+    const lang: Lang = (body.lang as Lang) || cookieLang || "en";
+    const isEnglish = lang !== "cs";
 
     const player = await prisma.player.findUnique({
       where: { id: playerId },
@@ -40,7 +41,47 @@ export async function POST(req: NextRequest) {
     const bestRole = role?.slots?.length ? [...role.slots].sort((a, b) => a.rank - b.rank)[0] : null;
     const similarNames = similar?.players?.map((p) => `${cleanName(p.name)} (${p.teamCode || "FA"}, OV ${p.overall})`).join(", ");
 
-    const promptContext = `
+    let promptContext = "";
+    let systemInstruction = "";
+    let userPrompt = "";
+
+    if (isEnglish) {
+      promptContext = `
+PLAYER: ${cleanName(player.name)}
+POSITION: ${player.position ?? "N/A"}
+CURRENT TEAM: ${player.team?.name ?? "Free Agent"}
+AGE: ${player.age ?? "N/A"} years old
+OVERALL RATING (OV): ${player.overall ?? "N/A"}
+CONTRACT: ${player.capHit ? `$${(player.capHit / 1_000_000).toFixed(2)}M` : "No contract"}, term: ${player.contractYears ?? 0} years remaining, status: ${player.rosterType ?? "N/A"}
+
+RATINGS:
+${
+  isGoalie
+    ? `- Goaltending Overall: ${player.overall}`
+    : `- Checking / Physical (CK): ${player.ck ?? "N/A"}
+- Passing / Playmaking (PA): ${player.pa ?? "N/A"}
+- Shooting / Scoring (SC): ${player.sc ?? "N/A"}
+- Defense / Two-Way (DF): ${player.df ?? "N/A"}`
+}
+
+LEAGUE BENCHMARK & ROLE:
+- Ideal Lineup Slot: ${bestRole ? `${bestRole.slotLabel} (Ranked #${bestRole.rank} of ${bestRole.outOf} in league)` : "Unknown"}
+- Closest Statistical Comparables in UNHL: ${similarNames || "None apparent"}
+`;
+
+      systemInstruction = `You are a Director of Pro Scouting for an NHL franchise.
+CRITICAL LANGUAGE REQUIREMENT: You MUST write the ENTIRE scouting report in ENGLISH. Never use Slovak or Czech.
+STRUCTURE:
+1. **Player Profile & Style of Play** (1 paragraph) - player archetype and on-ice identity (sniper, playmaker, shutdown defenseman, two-way center, etc.).
+2. **Key Strengths & Weaknesses** (bullet points).
+3. **NHL Comparable** (e.g., 'Plays a similar high-motor game to Brad Marchand because...').
+4. **Scout's Verdict for GM** (1 paragraph) - cap efficiency, contract value, role fit, trade/re-sign recommendation.
+
+Use authentic hockey scouting language.`;
+
+      userPrompt = `${promptContext}\n\nWrite the complete pro scouting report entirely in ENGLISH according to the instructions above:`;
+    } else {
+      promptContext = `
 HRÁČ: ${cleanName(player.name)}
 POZÍCIA: ${player.position ?? "N/A"}
 TÍM: ${player.team?.name ?? "Voľný hráč (Free Agent)"}
@@ -63,10 +104,8 @@ POZÍCIA V LIGE & ROLA:
 - Typovo najpodobnejší hráči v UNHL: ${similarNames || "Žiadni zjavní"}
 `;
 
-    let systemInstruction = "";
-    if (lang === "cs") {
       systemInstruction = `Si hlavný riaditeľ skautingu tímu NHL (Director of Pro Scouting).
-Tvojou úlohou je napísať autentický, vecný a odborný skautský posudok na hráča v slovenčine.
+DÔLEŽITÁ JAZYKOVÁ POŽIADAVKA: Celý report MUSÍ byť napísaný v SLOVENČINE (resp. češtine).
 DODRŽUJ TENTO FORMÁT:
 1. **Profil hráča a štýl hry** (1 odsek) - typologické zaradenie, ako sa prezentuje na ľade (sniper, play-maker, defenzívny špecialista, power-forward atď.).
 2. **Kľúčové silné stránky a slabiny** (bodový zoznam).
@@ -74,28 +113,15 @@ DODRŽUJ TENTO FORMÁT:
 4. **Skautský verdikt pre GM (Scouting Verdict)** (1 odsek) - pomer cena/výkon vzhľadom na plat, odporúčanie, či predĺžiť zmluvu, trejdovať ho alebo nasadzovať do špeciálnych formácií.
 
 Používaj autentickú hokejovú terminológiu. Píš pútavo a s rešpektom k jeho reálnym atribútom.`;
-    } else if (lang === "en") {
-      systemInstruction = `You are a Director of Pro Scouting for an NHL franchise.
-Write an authentic, insightful pro scouting report on the player in English.
-STRUCTURE:
-1. **Player Profile & Style of Play** (1 paragraph) - player archetype and on-ice identity.
-2. **Key Strengths & Weaknesses** (bullet points).
-3. **NHL Comparable** (e.g. 'Plays a similar high-motor game to Brad Marchand...').
-4. **Scout's Verdict for GM** (1 paragraph) - cap efficiency, contract value, role fit, trade/re-sign recommendation.
 
-Use authentic hockey scouting language.`;
-    } else {
-      systemInstruction = `You are a Director of Pro Scouting for an NHL team. Write a scouting report in language: ${lang}.`;
+      userPrompt = `${promptContext}\n\nVypracuj kompletný skautský report v slovenčine podľa pokynov:`;
     }
 
-    const aiResponse = await generateWithGemini(
-      promptContext + "\n\nVypracuj kompletný skautský report podľa pokynov:",
-      {
-        systemInstruction,
-        temperature: 0.6,
-        maxTokens: 1200,
-      }
-    );
+    const aiResponse = await generateWithGemini(userPrompt, {
+      systemInstruction,
+      temperature: 0.6,
+      maxTokens: 1200,
+    });
 
     return NextResponse.json({
       success: true,

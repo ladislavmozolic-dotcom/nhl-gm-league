@@ -278,6 +278,49 @@ export class Arena {
       im.frustumCulled = false;
       this.group.add(im);
     }
+
+    // crowd camera flashes (flashbulbs going off in stands when a goal is scored)
+    const flashCount = Math.min(140, Math.floor(filled.length * 0.16));
+    const flashPos: number[] = [];
+    const flashPhase = new Float32Array(flashCount);
+    for (let i = 0; i < flashCount; i++) {
+      const idx = Math.floor(rnd() * filled.length);
+      const s = filled[idx];
+      flashPos.push(s.x, s.y + 3.4 + rnd() * 0.6, s.z);
+      flashPhase[i] = rnd() * 100;
+    }
+    const flashGeo = new THREE.BufferGeometry();
+    flashGeo.setAttribute("position", new THREE.Float32BufferAttribute(flashPos, 3));
+    flashGeo.setAttribute("aPhase", new THREE.Float32BufferAttribute(flashPhase, 1));
+    const flashMat = new THREE.PointsMaterial({
+      map: glowTexture(),
+      size: 18,
+      sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+      color: "#ffffff",
+      opacity: 0.95,
+    });
+    flashMat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, this.uniforms);
+      sh.vertexShader = sh.vertexShader
+        .replace("#include <common>", "#include <common>\nattribute float aPhase;\nuniform float uTime;\nuniform float uCheerHome;\nuniform float uCheerAway;")
+        .replace("#include <begin_vertex>", `#include <begin_vertex>
+          float cheer = max(uCheerHome, uCheerAway);
+          float cycle = fract(uTime * 5.0 + aPhase * 0.37);
+          float flash = step(0.92, cycle) * cheer;
+          gl_PointSize *= (0.15 + flash * 2.8);
+        `);
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform float uCheerHome;\nuniform float uCheerAway;")
+        .replace("#include <premultiplied_alpha_fragment>", `#include <premultiplied_alpha_fragment>
+          float cheer = max(uCheerHome, uCheerAway);
+          gl_FragColor.a *= clamp(cheer * 1.5, 0.0, 1.0);
+        `);
+    };
+    const flashMesh = new THREE.Points(flashGeo, flashMat);
+    this.group.add(flashMesh);
   }
 
   /** Lambert with a little vertex shader: idle sway + team-specific jumping on a goal. */
@@ -298,6 +341,8 @@ export class Arena {
     return mat;
   }
 
+  private roofRigMesh?: THREE.InstancedMesh;
+
   private roof() {
     const top = TIERS[1].y0 + TIERS[1].rows * TIERS[1].rise + 30;
     const roof = new THREE.Mesh(new THREE.PlaneGeometry(500, 400), new THREE.MeshBasicMaterial({ color: "#07090e" }));
@@ -305,6 +350,7 @@ export class Arena {
     // light rigs over the ice
     const n = this.o.small ? 24 : 48;
     const rig = new THREE.InstancedMesh(new THREE.BoxGeometry(2.6, 0.5, 1.4), new THREE.MeshStandardMaterial({ color: "#222", emissive: "#fff7e6", emissiveIntensity: 3 }), n);
+    this.roofRigMesh = rig;
     const m = new THREE.Matrix4();
     const halo: number[] = [];
     for (let i = 0; i < n; i++) {
@@ -338,6 +384,19 @@ export class Arena {
     const ease = (cur: number, until: number, lvl: number) => { const want = this.clock < until ? lvl : 0; return cur + (want - cur) * Math.min(1, dt * (want > cur ? 6 : 1.2)); };
     this.uniforms.uCheerHome.value = ease(this.uniforms.uCheerHome.value, this.cheerHomeUntil, this.cheerLevel.home);
     this.uniforms.uCheerAway.value = ease(this.uniforms.uCheerAway.value, this.cheerAwayUntil, this.cheerLevel.away);
-    if (this.ribbon) this.ribbon.offset.x = (this.ribbon.offset.x + dt * 0.02) % 1;
+
+    const cheerMax = Math.max(this.uniforms.uCheerHome.value, this.uniforms.uCheerAway.value);
+    if (this.ribbon) {
+      const ribbonSpeed = 0.02 + cheerMax * 0.08;
+      this.ribbon.offset.x = (this.ribbon.offset.x + dt * ribbonSpeed) % 1;
+    }
+    if (this.roofRigMesh) {
+      const mat = this.roofRigMesh.material as THREE.MeshStandardMaterial;
+      if (cheerMax > 0.1) {
+        mat.emissiveIntensity = 3.0 + Math.sin(this.clock * 16) * 1.5 * cheerMax;
+      } else {
+        mat.emissiveIntensity = 3.0;
+      }
+    }
   }
 }

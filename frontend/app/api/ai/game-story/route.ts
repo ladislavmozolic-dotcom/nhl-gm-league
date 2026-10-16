@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     }
 
     const cookieLang = await getLang();
-    const lang: Lang = (body.lang as Lang) || cookieLang || "cs";
+    const lang: Lang = (body.lang as Lang) || cookieLang || "en";
+    const isEnglish = lang !== "cs";
 
     const game = await prisma.game.findUnique({
       where: { id: gameId },
@@ -98,13 +99,17 @@ export async function POST(req: NextRequest) {
     const goalsList = rawEvents.map((g) => {
       const min = Math.floor(g.seconds / 60);
       const sec = String(g.seconds % 60).padStart(2, "0");
-      const scorer = g.playerId ? playerMap.get(g.playerId) ?? "Neznámy strelec" : "Neznámy strelec";
+      const scorer = g.playerId ? playerMap.get(g.playerId) ?? (isEnglish ? "Unknown scorer" : "Neznámy strelec") : (isEnglish ? "Unknown scorer" : "Neznámy strelec");
       const teamCode = g.teamId === game.homeTeamId ? game.homeTeam.code || game.homeTeam.name : game.awayTeam.code || game.awayTeam.name;
       const meta = (g.meta ?? {}) as { assistNames?: string[]; emptyNet?: boolean };
-      const assists = meta.assistNames?.length ? `(asistencie: ${meta.assistNames.join(", ")})` : "(bez asistencie)";
+      const assists = meta.assistNames?.length
+        ? (isEnglish ? `(assists: ${meta.assistNames.join(", ")})` : `(asistencie: ${meta.assistNames.join(", ")})`)
+        : (isEnglish ? "(unassisted)" : "(bez asistencie)");
       const str = g.strength && g.strength !== "EV" ? ` [${g.strength}]` : "";
-      const en = meta.emptyNet ? " [do prázdnej brány]" : "";
-      return `Tretina ${g.period}, ${min}:${sec} - ${teamCode}: ${scorer} ${assists}${str}${en}`;
+      const en = meta.emptyNet ? (isEnglish ? " [empty net]" : " [do prázdnej brány]") : "";
+      return isEnglish
+        ? `Period ${g.period}, ${min}:${sec} - ${teamCode}: ${scorer} ${assists}${str}${en}`
+        : `Tretina ${g.period}, ${min}:${sec} - ${teamCode}: ${scorer} ${assists}${str}${en}`;
     });
 
     // Top performers
@@ -134,7 +139,43 @@ export async function POST(req: NextRequest) {
         };
       });
 
-    const promptContext = `
+    let promptContext = "";
+    let systemInstruction = "";
+    let userPrompt = "";
+
+    if (isEnglish) {
+      const outcome = game.endedIn === "REG" ? "Regulation" : game.endedIn === "OT" ? "Overtime" : "Shootout";
+      promptContext = `
+GAME: ${game.awayTeam.name} at ${game.homeTeam.name}
+FINAL SCORE: ${game.awayGoals} - ${game.homeGoals} (${outcome})
+SHOTS ON GOAL: ${game.awayShots ?? 0} - ${game.homeShots ?? 0}
+EXPECTED GOALS (xG): ${game.awayXg?.toFixed(2) ?? "0"} - ${game.homeXg?.toFixed(2) ?? "0"}
+GOALS BY PERIOD (Away / Home): ${game.awayGoalsByPeriod?.join("-") ?? "N/A"} / ${game.homeGoalsByPeriod?.join("-") ?? "N/A"}
+
+SCORING SUMMARY:
+${goalsList.length ? goalsList.join("\n") : "No goals scored in regulation."}
+
+GOALTENDERS:
+${goalies.map((g) => `- ${g.name} (${g.team}): ${g.saves} saves on ${g.shotsAgainst} shots (${g.svPct} SV%, GSAx: ${g.gsax})`).join("\n")}
+
+TOP PERFORMERS:
+${skaters.slice(0, 5).map((s) => `- ${s.name} (${s.team}): ${s.g}G, ${s.a}A, ${s.pts} PTS (${s.shots} SOG)`).join("\n")}
+`;
+
+      systemInstruction = `You are a premier NHL sports beat writer and senior hockey journalist (The Athletic / TSN / Sportsnet style).
+CRITICAL LANGUAGE REQUIREMENT: You MUST write the ENTIRE recap in standard ENGLISH. Never output Slovak, Czech, or any other language.
+STRUCTURE:
+1. **Compelling Headline** - punchy, featuring the hero, key turning point, or goaltender.
+2. **The Lead** (1 paragraph) - summary of the final score, outcome, and arena vibe.
+3. **Game Story & Flow** (2-3 paragraphs) - period-by-period progression, key goals, turning points.
+4. **Goaltending & Stars of the Night** (1 paragraph) - goalie performances and top performers.
+5. **Key Takeaway** (1-2 sentences) - what this outcome means going forward for both clubs.
+
+Use authentic North American hockey terminology (rebound, top shelf, breakaways, power play, penalty kill, blue line).`;
+
+      userPrompt = `${promptContext}\n\nWrite the complete post-game story entirely in ENGLISH following the instructions above:`;
+    } else {
+      promptContext = `
 ZÁPAS: ${game.awayTeam.name} vs ${game.homeTeam.name}
 KONEČNÝ VÝSLEDOK: ${game.awayGoals} : ${game.homeGoals} (${game.endedIn === "REG" ? "v riadnom hracom čase" : game.endedIn === "OT" ? "po predĺžení" : "po samostatných nájazdoch"})
 STRELY: ${game.awayShots ?? 0} : ${game.homeShots ?? 0}
@@ -151,10 +192,8 @@ NAJLEPŠÍ HRÁČI:
 ${skaters.slice(0, 5).map((s) => `- ${s.name} (${s.team}): ${s.g}G + ${s.a}A = ${s.pts} bodov (${s.shots} striel)`).join("\n")}
 `;
 
-    let systemInstruction = "";
-    if (lang === "cs") {
       systemInstruction = `Si renomovaný hokejový novinár a redaktor (štýl Denník Šport, HokejPortal, TSN).
-Tvojou úlohou je napísať profesionálnu, pútavú a dramatickú novinársku pozápasovú reportáž v slovenčine na základe poskytnutých faktov.
+DÔLEŽITÁ JAZYKOVÁ POŽIADAVKA: Celá reportáž MUSÍ byť napísaná v SLOVENČINE (resp. češtine).
 DODRŽUJ TENTO FORMÁT:
 1. **Chytľavý novinársky titulok** (Headline) - úderný, vyzdvihujúci kľúčového hráča alebo zvrat.
 2. **Úvod / Lead** (1 odsek) - zhrnutie výsledku a atmosféry.
@@ -162,30 +201,16 @@ DODRŽUJ TENTO FORMÁT:
 4. **Brankári a hrdinovia duelu** (1 odsek) - zhodnotenie výkonu v bránkovisku a kľúčových hráčov.
 5. **Kľúčové ponaučenie (Key Takeaway)** (1-2 vety) - čo tento výsledok znamená pre oba tímy.
 
-Používaj autentickú hokejovú terminológiu (brejk, presilovka, oslabenie, modrá čiara, zavesil, betóny, lapačka, power-play). Nepíš výmysly mimo poskytnutých dát.`;
-    } else if (lang === "en") {
-      systemInstruction = `You are an elite NHL sports beat writer and journalist (The Athletic / TSN / Sportsnet style).
-Write an authentic, engaging, and dramatic game recap based on the provided match data.
-STRUCTURE:
-1. **Compelling Headline** - punchy, featuring the hero or key turning point.
-2. **The Lead** (1 paragraph) - summary of the final score, outcome, and vibe.
-3. **Game Story & Flow** (2-3 paragraphs) - period-by-period progression, key goals, turning points.
-4. **Goaltending & Stars of the Night** (1 paragraph) - goalie performances and top performers.
-5. **Key Takeaway** (1-2 sentences) - what this outcome means going forward for both clubs.
+Používaj autentickú hokejovú terminológiu (brejk, presilovka, oslabenie, modrá čiara, zavesil, betóny, lapačka, power-play).`;
 
-Use authentic hockey terminology (rebound, top shelf, breakaways, power play, penalty kill, blue line).`;
-    } else {
-      systemInstruction = `You are an elite hockey journalist. Write an authentic, engaging game recap based on the provided match data in language: ${lang}.`;
+      userPrompt = `${promptContext}\n\nNapíš kompletnú pozápasovú reportáž v slovenčine podľa inštrukcií:`;
     }
 
-    const aiResponse = await generateWithGemini(
-      promptContext + "\n\nNapíš kompletnú pozápasovú reportáž podľa inštrukcií:",
-      {
-        systemInstruction,
-        temperature: 0.6,
-        maxTokens: 1500,
-      }
-    );
+    const aiResponse = await generateWithGemini(userPrompt, {
+      systemInstruction,
+      temperature: 0.6,
+      maxTokens: 1500,
+    });
 
     return NextResponse.json({
       success: true,

@@ -22,10 +22,11 @@ export type TradeDmParams = {
 
 export async function generateTradeDm(params: TradeDmParams): Promise<string> {
   const { aiName, humanName, action, tradeId, dt, lang = "cs" } = params;
+  const isEnglish = lang !== "cs";
 
   // Fallback template builder if Gemini is unavailable
   const fallback = () => {
-    if (lang === "cs") {
+    if (!isEnglish) {
       if (action === "accept") {
         return `✅ ${aiName} prijal tvoju ponuku na výmenu (#${tradeId}). Prestup bol oficiálne zrealizovaný a potvrdený ligou.`;
       }
@@ -60,7 +61,36 @@ export async function generateTradeDm(params: TradeDmParams): Promise<string> {
   }
 
   try {
-    const promptContext = `
+    let promptContext = "";
+    let systemInstruction = "";
+    let userPrompt = "";
+
+    if (isEnglish) {
+      promptContext = `
+SENDER (AI GM): ${aiName}
+RECIPIENT (Opposing GM): ${humanName}
+ACTION: ${action.toUpperCase()}
+TRADE PROPOSAL: #${tradeId}
+AI TEAM CONTEXT: ${dt?.contention === "contender" ? "Contending for Stanley Cup" : dt?.contention === "rebuild" ? "Rebuilding & acquiring draft picks" : "Balanced team"}
+ASSETS AI GIVES UP: ${Array.isArray(dt?.aiGives) ? dt.aiGives.join(", ") : dt?.aiGives ?? "Players/picks"}
+ASSETS AI RECEIVES: ${Array.isArray(dt?.aiGets) ? dt.aiGets.join(", ") : dt?.aiGets ?? "Players/picks"}
+PROTECTED STAR INVOLVED: ${dt?.franchise || dt?.star || "None"}
+COUNTER-OFFER NOTE: ${dt?.counterNote || "N/A"}
+`;
+
+      systemInstruction = `You are the General Manager of ${aiName} in the UNHL online hockey league.
+CRITICAL LANGUAGE REQUIREMENT: You MUST write the message entirely in standard ENGLISH. Never output Slovak or Czech.
+Write a concise (2-3 sentences), authentic direct message to the GM of ${humanName} regarding trade proposal #${tradeId}.
+Tone:
+- Direct, professional hockey GM style.
+- If DECLINE, explain candidly why the offer falls short (e.g., protecting a star, or looking for younger assets/picks).
+- If COUNTER, explain what was missing in the original offer.
+- If ACCEPT, express satisfaction with closing the deal.
+Start with the appropriate icon (❌ for decline, 🔄 for counter, ✅ for accept) and reference #${tradeId}.`;
+
+      userPrompt = `${promptContext}\n\nWrite the direct message entirely in ENGLISH according to the instructions:`;
+    } else {
+      promptContext = `
 ODOSIELATEĽ (AI GM): ${aiName}
 ADRESÁT (Manažér): ${humanName}
 AKCIA: ${action.toUpperCase()}
@@ -72,31 +102,24 @@ CHÁNENÁ HVIEZDA: ${dt?.franchise || dt?.star || "Nie"}
 POZNÁMKA K PROTIPONUKE: ${dt?.counterNote || "N/A"}
 `;
 
-    let systemInstruction = "";
-    if (lang === "cs") {
       systemInstruction = `Si generálny manažér tímu ${aiName} v hokejovej lige UNHL.
+DÔLEŽITÁ JAZYKOVÁ POŽIADAVKA: Celá správa MUSÍ byť napísaná v SLOVENČINE (resp. češtine).
 Tvojou úlohou je napísať krátku (2-3 vety), autentickú a realistickú správu generálnemu manažérovi tímu ${humanName} do internej ligovej pošty ohľadom výmeny #${tradeId}.
 Tón:
 - Profesionálny, priamy, manažérsky hokejový štýl.
 - Ak odmietaš (DECLINE), vysvetli diplomaticky ale rázne, prečo ponuka nestačí (či chrániš svoju hviezdu, alebo to neladí s prestavbou/plánom klubu).
 - Ak posielaš protiponuku (COUNTER), vysvetli, čo ti v pôvodnej ponuke chýbalo a prečo je protiponuka férová.
 - Ak prijímaš (ACCEPT), poďakuj za férové rokovanie.
-Začni príslušnou ikonou (❌ pri odmietnutí, 🔄 pri protiponuke, ✅ pri prijatí) a uveď číslo ponuky #${tradeId}.
-Píš v slovenčine bez zbytočnej omáčky.`;
-    } else {
-      systemInstruction = `You are the General Manager of ${aiName} in the UNHL hockey league.
-Write a concise (2-3 sentences), authentic direct message to the GM of ${humanName} regarding trade proposal #${tradeId}.
-Tone: direct, professional, hockey GM style. Start with ❌, 🔄, or ✅ and reference #${tradeId}.`;
+Začni príslušnou ikonou (❌ pri odmietnutí, 🔄 pri protiponuke, ✅ pri prijatí) a uveď číslo ponuky #${tradeId}.`;
+
+      userPrompt = `${promptContext}\n\nNapíš správu do pošty pre manažéra v slovenčine:`;
     }
 
-    const aiRes = await generateWithGemini(
-      promptContext + "\n\nNapíš správu do pošty pre manažéra:",
-      {
-        systemInstruction,
-        temperature: 0.7,
-        maxTokens: 300,
-      }
-    );
+    const aiRes = await generateWithGemini(userPrompt, {
+      systemInstruction,
+      temperature: 0.7,
+      maxTokens: 300,
+    });
 
     return aiRes.text.trim() || fallback();
   } catch (err) {
