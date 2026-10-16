@@ -3,7 +3,7 @@
 // OT/SO, leads after 2, comebacks, EN goals, home win) are MEASURED from all 2,624 regular-season games of 2023-24 +
 // 2024-25 (api-web.nhle.com/v1/score/<date>), as are SOG, sv% and the PP/SH goal shares; PP chances and pull timing are approximate.
 // Every ordered pair of the 32 NHL clubs × bases. Run: npx tsx scripts/nhl-reality-check.ts [bases=2] [seedBase=91000000]
-import { simulateGame, CORE_TUNING, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING, COMPRESS_TUNING } from "../lib/sim/engine";
+import { simulateGame, CORE_TUNING, GOALIE_TUNING, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING, COMPRESS_TUNING } from "../lib/sim/engine";
 import { loadSettings } from "../lib/sim/settings";
 import { loadSimTeam } from "../lib/sim/index";
 import { ENGINE_V3 } from "../lib/sim/version";
@@ -15,6 +15,7 @@ if (process.argv[5]) Object.assign(SCORE_TUNING, JSON.parse(process.argv[5]));
 if (process.argv[6]) Object.assign(SIX_TUNING, JSON.parse(process.argv[6]));
 if (process.argv[7]) Object.assign(BOUNCE_TUNING, JSON.parse(process.argv[7]));
 if (process.argv[8]) Object.assign(COMPRESS_TUNING, JSON.parse(process.argv[8]));
+if (process.env.GOALIE_TUNING) Object.assign(GOALIE_TUNING, JSON.parse(process.env.GOALIE_TUNING));
 if (process.env.CORE_TUNING) Object.assign(CORE_TUNING, JSON.parse(process.env.CORE_TUNING));
 const EXP = process.env.EXP ? JSON.parse(process.env.EXP) : undefined; // e.g. EXP='{"core":true}'
 
@@ -29,6 +30,7 @@ type A = Record<string, number>;
 const a: A = { games: 0 };
 const add = (k: string, v: number) => { a[k] = (a[k] ?? 0) + v; };
 const pulls: number[] = [];
+const teamSv = new Map<number, { sa: number; ga: number }>(); // per club, for the save % spread
 
 (async () => {
   const settings = await loadSettings();
@@ -46,6 +48,9 @@ const pulls: number[] = [];
     add("sv", r.home.shots + r.away.shots - goals.filter((g) => !g.meta?.emptyNet).length);
     add("sog", r.home.shots + r.away.shots);
     add("ppOpp", r.home.ppOpp + r.away.ppOpp); add("ppG", goals.filter((g) => g.strength === "PP").length);
+    for (const [side, opp] of [[r.home, r.away], [r.away, r.home]] as const) {
+      const t = teamSv.get(side.teamId) ?? { sa: 0, ga: 0 }; t.sa += opp.shots; t.ga += goals.filter((g) => g.teamId === opp.teamId && !g.meta?.emptyNet).length; teamSv.set(side.teamId, t);
+    }
     add("icing", (r.home.icings ?? 0) + (r.away.icings ?? 0));
     add("shG", goals.filter((g) => g.strength === "SH").length); add("psG", goals.filter((g) => g.meta?.penaltyShot).length); add("allG", goals.length);
     add("ot", r.endedIn !== "REG" ? 1 : 0); add("so", r.endedIn === "SO" ? 1 : 0);
@@ -94,6 +99,8 @@ const pulls: number[] = [];
     ["Save % (no EN)", pct("sv", a.sog), NHL.svp],
     ["Power plays / team", per("ppOpp") / 2, NHL.ppOpp],
     ["Power-play %", pct("ppG", a.ppOpp), NHL.ppPct],
+    // team save % talent spread: observed SD minus binomial luck (sqrt(p(1-p)/shots)); NHL 2023-25: 8.2 observed over 82 GP → ≈5.8 talent
+    ["Team save % talent spread (SD ×1000, luck removed)", (() => { const v = [...teamSv.values()]; const sv = v.map((t) => 1 - t.ga / t.sa); const m = sv.reduce((a, b) => a + b, 0) / sv.length; const sd2 = sv.reduce((a, b) => a + (b - m) ** 2, 0) / sv.length; const luck = m * (1 - m) / (v.reduce((a, t) => a + t.sa, 0) / v.length); return 1000 * Math.sqrt(Math.max(0, sd2 - luck)); })(), 5.8, `${Math.round(g / 16)} GP per club`],
     ["Icings / game (keep level)", per("icing"), NaN],
     ["PP goals, share of all goals %", pct("ppG", a.allG), 20.0],
     ["SH goals, share of all goals %", pct("shG", a.allG), 2.8],

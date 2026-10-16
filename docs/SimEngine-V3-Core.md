@@ -151,5 +151,14 @@ from hemmed-in, tired units and teams sitting on a lead rather than from tiredne
 zone entries and icings carry it as `meta.why`; the play-by-play and the live feed append e.g. "— tired
 legs, the change is coming". Narrated once per team, period and reason. Text only, no RNG.
 
+### Step 14 — Core goalie contest, measured (kept off)
+
+`coreGoalieQualityAdj(attrs)` folds Core's reflexes (RT) and rebound-control (RB) weights into V3's
+effective goalie quality, centred on the starter pool (mean 0, range −3.8…+2.4 quality points). Flag
+`experimentalV3.coreGoalie` exists but defaults **off**: it widened the team save % spread (10.3 → 10.6),
+which was already wider than the NHL's. The same measurement showed V3 itself spread goalies/defences too
+much (talent SD 8.4 vs NHL ≈5.8), so V3 got `GOALIE_TUNING` (goalie-quality exponent 1.7 → 1.2, defending-pair
+DF influence × 0.3) → 6.5, everything else unchanged.
+
 ### Next hybrid steps
-4. Only then consider Core's goalie contest against V3's shot model.
+- Revisit `coreGoalie` only if Core's goalie model is re-based on the narrower spread.

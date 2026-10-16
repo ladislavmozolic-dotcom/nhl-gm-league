@@ -3,7 +3,7 @@
 // shots/goals, power plays tied to real penalty times, and rich per-player
 // stats (hits, blocks, faceoffs, TOI). Tuned to NHL-realistic output.
 
-import { coreClearShare, coreDumpShare, coreShootShare, coreWhy, type CoreEngineContext } from "./v3-core/engine-bridge";
+import { coreClearShare, coreDumpShare, coreGoalieQualityAdj, coreShootShare, coreWhy, type CoreEngineContext } from "./v3-core/engine-bridge";
 import { coreTacticsFromSimTeam } from "./v3-core/adapter";
 import { RNG, fixtureSeed } from "./rng";
 import { cleanName } from "../playerName";
@@ -177,6 +177,7 @@ type SimState = {
   v3LateTieCaution: boolean;         // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
   v3OtPace: boolean;                 // V3: 3-on-3 overtime has ~2x the attempts (each a real entry + shot); OT_TUNING.conv → ~2/3 of OT games end before the shootout (NHL-like)
+  v3CoreGoalie: boolean;             // V3 Core goalie contest: reflexes + rebound control shift the keeper's effective quality (default off until it measures better)
   v3Core: boolean;                   // V3 Core hybrid: the O-zone shoot-or-pass intent comes from lib/sim/v3-core (game state, fatigue, score/time, rebound, player type, team risk); V3 still resolves it
   v3Bounces: boolean;                // V3: where the puck goes after a block or a miss — off the end boards back out front, rimmed around to the defence, or the blocker's team takes it (BOUNCE_TUNING)
   v3BackToBack: boolean;             // V3: a club on the 2nd night of a back-to-back tires faster and fades late (B2B_TUNING)
@@ -349,7 +350,7 @@ function initTeamBox(team: SimTeam): TeamBox {
 
 function conversion(
   shooterFinishing: number, goalieQuality: number, isHome: boolean,
-  strength: "EV" | "PP" | "SH", finishExponent = CFG.finishExponent ?? 1.7,
+  strength: "EV" | "PP" | "SH", finishExponent = CFG.finishExponent ?? 1.7, goalieExponent = 1.7,
 ): number {
   // finishing amplified around the league mean so an elite finisher clearly out-scores
   // a similar-looking one — the compressed ratings still separate the snipers.
@@ -357,7 +358,7 @@ function conversion(
   // goalie spread (^1.7): tightens the top so an elite keeper tops out ~92.5% SV over a
   // season (real ceiling) instead of running to ~94%, and slightly narrows the band.
   // (2.2 → elite too good; 1.9 still let mid-season elites reach 94%; now 1.7.)
-  const goalieMod = Math.pow(LEAGUE.avgGoalie / goalieQuality, 1.7);
+  const goalieMod = Math.pow(LEAGUE.avgGoalie / goalieQuality, goalieExponent);
   let p = LEAGUE.baseConversion * shooterMod * goalieMod * (CFG.goalsPct / 100) * (AHL_GAME ? AHL_GOALS_MULT : 1);
   if (isHome) p *= 1 + (LEAGUE.homeConvBonus - 1) * (CFG.homeAdvPct / 100);
   if (strength === "PP") p *= 1 + (LEAGUE.ppConvBoost - 1) * (CFG.powerPlayPct / 100);
@@ -2720,7 +2721,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       // reflects the blue line, not just the keeper. Centred on an average pair (~74 DF).
       const dPair = onIceD(def);
       const avgDefDf = dPair.length ? dPair.reduce((s, d) => s + (d.attrs.df ?? 50), 0) / dPair.length : (dman.attrs.df ?? 50);
-      const defTalent = Math.max(0.72, Math.min(1.3, 1 - (CFG.defenseTalentPct / 100) * (avgDefDf - 74) / 20));
+      const defTalent = Math.max(0.72, Math.min(1.3, 1 - (CFG.defenseTalentPct / 100) * (st.isExperimentalV3 ? GOALIE_TUNING.defTalent : 1) * (avgDefDf - 74) / 20));
       // a true 5-on-3 is far more dangerous than a plain 5-on-4 — the extra open
       // ice on top of the formation/chemistry edge, not a replacement for it.
       const manAdvMult = manAdv3 ? 1.35 : 1;
@@ -2735,7 +2736,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       const pk = 1 - PARITY_CONV * parityAmt();
       const finishExponent = (st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7)
         + (st.v3OvertimeStars && shotSituation === "3V3" ? V3_OT_STAR_EXPONENT : 0);
-      const pTalent = conversion(shOff, effGoalieQuality(gSim), isHome, strength, finishExponent);
+      const pTalent = conversion(shOff, effGoalieQuality(gSim) + (st.v3CoreGoalie ? coreGoalieQualityAdj(gSim.attrs) : 0), isHome, strength, finishExponent, st.isExperimentalV3 ? GOALIE_TUNING.exp : 1.7);
       // PARITY compresses only the GOALIE mismatch toward a league-average keeper —
       // a team-level edge — while the SHOOTER's finishing is left FULL, so elite
       // snipers still pile up goals (top scorers reach ~110-120) even as weak teams
@@ -3286,6 +3287,7 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
+export const GOALIE_TUNING = { exp: 1.2, defTalent: 0.3 }; // defTalent: × how much the defending pair's DF moves shot conversion // V3: how strongly goalie quality moves the save chance (V2: 1.7) — tuned to the NHL's team save % spread
 export const CORE_TUNING = { scale: 0.765, dump: 1.3, clear: 2.8 }; // clear: × Core's D-zone clear share → the icing multiplier (replaces the flat tired ×1.7; ≈7 icings/game kept) // dump: × Core's neutral-zone dump share (keeps ~24 dump-ins per team-game) // V3 Core hybrid: × Core's shoot share (keeps the league shot volume where V3 is calibrated)
 export const COMPRESS_TUNING = { catchUp: 0.6, early: 0.1, garbageLead: 1 }; // early: catch-up scale in periods 1-2 // V3: × the per-goal catch-up and × how much a team up 3+ eases off (1 = as before, 0 = none)
 export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.0, conv: 1.03 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
@@ -3392,7 +3394,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { core?: boolean; bounces?: boolean; backToBack?: boolean; roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
+  experimentalV3?: { coreGoalie?: boolean; core?: boolean; bounces?: boolean; backToBack?: boolean; roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3477,6 +3479,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3BackToBack: isV3 && (opts.experimentalV3?.backToBack ?? true),
     v3Bounces: isV3 && (opts.experimentalV3?.bounces ?? true),
     v3Core: isV3 && (opts.experimentalV3?.core ?? true),
+    v3CoreGoalie: isV3 && (opts.experimentalV3?.coreGoalie ?? false),
     v3Dump: isV3 && (opts.experimentalV3?.dump ?? true),
     v3Pin: isV3 && (opts.experimentalV3?.pin ?? true),
     v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),

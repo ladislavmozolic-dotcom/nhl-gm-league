@@ -68,3 +68,11 @@ export function coreWhy(ctx: CoreEngineContext, kind: "dump" | "clear"): CoreWhy
   if (kind === "dump" && (ctx.oppForecheck ?? 0) >= 0.75) return "forecheck";
   return undefined;
 }
+
+/** Core's goalie contest weighs reflexes (RT) and rebound control (RB) on top of overall quality. Expressed in
+ *  quality points around the NHL starter-pool means Core was calibrated on, so V3 can fold it into its own
+ *  effective goalie quality without moving the league save %. */
+export function coreGoalieQualityAdj(attrs: { rt?: number; rb?: number }): number {
+  const edge = ((attrs.rt ?? 88.88) - 88.88) * 0.0008 + ((attrs.rb ?? 89.66) - 89.66) * 0.0005; // goalie-resolver.ts weights
+  return edge / 0.0035; // goalie-resolver: 0.0035 goal chance per quality point
+}
