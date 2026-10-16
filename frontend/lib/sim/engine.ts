@@ -3,7 +3,8 @@
 // shots/goals, power plays tied to real penalty times, and rich per-player
 // stats (hits, blocks, faceoffs, TOI). Tuned to NHL-realistic output.
 
-import { coreShootShare } from "./v3-core/engine-bridge";
+import { coreDumpShare, coreShootShare } from "./v3-core/engine-bridge";
+import { coreTacticsFromSimTeam } from "./v3-core/adapter";
 import { RNG, fixtureSeed } from "./rng";
 import { cleanName } from "../playerName";
 import { generatePlayByPlay } from "./playbyplay";
@@ -2494,7 +2495,11 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           }
           zone = zone === "DEF" ? "NEU" : "OFF"; setup = "carry";
         }
-        else if (st.v3Dump && zone === "NEU" && rng.chance(DUMP_TUNING.share)) {
+        else if (st.v3Dump && zone === "NEU" && rng.chance(st.v3Core ? Math.min(0.9, CORE_TUNING.dump * coreDumpShare({
+          carrier, team: carrierTeam, zone, shiftSeconds: carrier.isDefense ? shifts[carrierTeam.id].dElapsed : shifts[carrierTeam.id].fElapsed,
+          pressureSeconds: tick - zoneSince, scoreMargin: margin, secondsRemaining: period <= 3 ? (3 - period) * PERIOD_SECONDS + PERIOD_SECONDS - tick : 0, rebound: false,
+          oppForecheck: coreTacticsFromSimTeam(def).forecheck,
+        })) : DUMP_TUNING.share)) { // V3 Core: whether a stopped carry becomes a dump-in depends on the moment (tired unit, forecheck, score/time, team style)
           // dump and chase: the puck goes in deep and it's a race — the attackers' forecheck against the defenders' retrieval, with the goalie sometimes playing it behind the net
           const dumper = carrier;
           st.sink.emit({ period, seconds: tick, type: "ZONE_ENTRY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: dumper.id, playerName: dumper.name, zone: "OFF", importance: "NOTABLE", meta: { entryType: "dump" } });
@@ -3279,7 +3284,7 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
-export const CORE_TUNING = { scale: 0.765 }; // V3 Core hybrid: × Core's shoot share (keeps the league shot volume where V3 is calibrated)
+export const CORE_TUNING = { scale: 0.765, dump: 1.3 }; // dump: × Core's neutral-zone dump share (keeps ~24 dump-ins per team-game) // V3 Core hybrid: × Core's shoot share (keeps the league shot volume where V3 is calibrated)
 export const COMPRESS_TUNING = { catchUp: 0.6, early: 0.1, garbageLead: 1 }; // early: catch-up scale in periods 1-2 // V3: × the per-goal catch-up and × how much a team up 3+ eases off (1 = as before, 0 = none)
 export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.0, conv: 1.03 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
 export const B2B_TUNING = { drain: 1.3, early: 0.92, late: 0.87 }; // V3 back-to-back: shift-fatigue speed, team edge in periods 1-2 / 3+

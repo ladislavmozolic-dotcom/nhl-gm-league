@@ -130,8 +130,15 @@ special teams, faceoffs, OT/SO, events, live stoppages and stats.
 - Measured with `scripts/nhl-reality-check.ts` (EXP='{"core":true}'), 2,976 games: goals 6.02 (NHL 6.09),
   SOG 29.1 (29.3), sv .904 (.902), every game-state row within ~3 points of the 2023-25 NHL data.
 
+### Step 11 — Neutral-zone dump-in intent
+
+`coreDumpShare(ctx)` returns Core's DUMP_IN share among CARRY / PASS / DUMP_IN for the carrier right now
+(opponent forecheck → pressure, shift length → fatigue, team puck style → risk, score/time). When V3's
+carry attempt is stopped in the neutral zone, `CORE_TUNING.dump (1.3) × that share` replaces the fixed
+`DUMP_TUNING.share` (0.35) as the chance it becomes a dump-in. Same RNG draws; dump-ins stay ≈25 per
+team-game; reality check unchanged within noise.
+
 ### Next hybrid steps
-1. Neutral zone: Core's CARRY / PASS / DUMP_IN intent instead of V3's fixed dump share.
 2. Defensive zone: CLEAR vs breakout PASS / CARRY under pressure.
 3. Explain decisions in the live feed / coach panel with Core's `reason`.
 4. Only then consider Core's goalie contest against V3's shot model.

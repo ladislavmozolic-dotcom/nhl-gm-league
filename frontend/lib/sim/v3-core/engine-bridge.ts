@@ -14,6 +14,7 @@ export type CoreEngineContext = {
   scoreMargin: number;             // carrier's team − opponent
   secondsRemaining: number;        // regulation seconds left (≥ 0)
   rebound: boolean;                // the look comes off a rebound / loose puck
+  oppForecheck?: number;           // 0..1 how hard the opponent forechecks (pressure on a neutral-zone carrier)
 };
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
@@ -25,7 +26,7 @@ export function coreCandidates(ctx: CoreEngineContext): Array<{ action: CoreActi
     hasPossession: true,
     zone: ZONE[ctx.zone],
     // pressure APPLIED TO the carrier's team: in his own end a long stay means he is the one hemmed in
-    pressure: ctx.zone === "DEF" ? clamp01(ctx.pressureSeconds / 40) : 0,
+    pressure: ctx.zone === "DEF" ? clamp01(ctx.pressureSeconds / 40) : ctx.zone === "NEU" ? clamp01((ctx.oppForecheck ?? 0.5) * 0.7) : 0,
     fatigue: clamp01((ctx.shiftSeconds - 30) / 70),
     scoreMargin: ctx.scoreMargin,
     secondsRemaining: Math.max(0, ctx.secondsRemaining),
@@ -40,4 +41,11 @@ export function coreShootShare(ctx: CoreEngineContext): number {
   const c = coreCandidates({ ...ctx, zone: "OFF" });
   const shoot = c.find((x) => x.action === "SHOOT")?.score ?? 0, pass = c.find((x) => x.action === "PASS")?.score ?? 0;
   return shoot + pass > 0 ? shoot / (shoot + pass) : 0.5;
+}
+
+/** In the neutral zone: Core's share of DUMP_IN among carry / pass / dump (how much this unit, right now, wants to chip it in). */
+export function coreDumpShare(ctx: CoreEngineContext): number {
+  const c = coreCandidates({ ...ctx, zone: "NEU", rebound: false });
+  const total = c.reduce((n, x) => n + x.score, 0);
+  return total > 0 ? (c.find((x) => x.action === "DUMP_IN")?.score ?? 0) / total : 0.2;
 }

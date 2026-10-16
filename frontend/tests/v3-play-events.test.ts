@@ -258,7 +258,8 @@ test("V3 overtime has more attempts and every one starts with the puck coming in
     const off = simulateGame(makeTeam(1, 60 + (seed % 9)), makeTeam(2, 62 + ((seed * 3) % 9)), { seed, engineVersion: ENGINE_V3, experimentalV3: { otPace: false } });
     if (off.endedIn !== "REG") assert.ok(off.playByPlay.filter((l) => l.period === 4 && l.kind === "entry").length === 0, "the sparse OT model adds no entries");
   }
-  assert.ok(otGames >= 15 && shots / otGames > 2.5, `OT games ${otGames}, shots per OT game ${(shots / Math.max(1, otGames)).toFixed(1)}`);
+  assert.ok(otGames >= 15 && shots / otGames > 2.0, // OT_TUNING.conv ends OT sooner (≈2/3 before the shootout), so fewer shots per OT game
+    `OT games ${otGames}, shots per OT game ${(shots / Math.max(1, otGames)).toFixed(1)}`);
 });
 
 test("V3 long shift: a unit stuck on the ice for 75+ s gets a note; V2 has none", () => {
