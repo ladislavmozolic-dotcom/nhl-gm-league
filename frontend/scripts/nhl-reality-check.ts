@@ -6,7 +6,7 @@
 import { simulateGame, CORE_TUNING, GOALIE_TUNING, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING, COMPRESS_TUNING } from "../lib/sim/engine";
 import { loadSettings } from "../lib/sim/settings";
 import { loadSimTeam } from "../lib/sim/index";
-import { ENGINE_V3 } from "../lib/sim/version";
+import { ENGINE_V2, ENGINE_V3 } from "../lib/sim/version";
 import { prisma } from "../lib/prisma";
 
 const bases = Number(process.argv[2] ?? 2), seedBase = Number(process.argv[3] ?? 91_000_000);
@@ -40,7 +40,7 @@ const teamSv = new Map<number, { sa: number; ga: number }>(); // per club, for t
   if (process.env.PULL) for (const t of teams as any[]) if (t.strategy?.goaliePull) t.strategy.goaliePull.pullSec = Number(process.env.PULL);
   for (let b = 0; b < bases; b++) for (let i = 0; i < teams.length; i++) for (let j = 0; j < teams.length; j++) {
     if (i === j) continue;
-    const r: any = simulateGame(structuredClone(teams[i]), structuredClone(teams[j]), { settings, seed: seedBase + b * 100_000 + i * 100 + j, engineVersion: ENGINE_V3, ...(EXP ? { experimentalV3: EXP } : {}) });
+    const r: any = simulateGame(structuredClone(teams[i]), structuredClone(teams[j]), { settings, seed: seedBase + b * 100_000 + i * 100 + j, engineVersion: process.env.ENGINE === "v2" ? ENGINE_V2 : ENGINE_V3, ...(EXP ? { experimentalV3: EXP } : {}) });
     const H = r.home.teamId, ev: any[] = r.events ?? [];
     a.games++;
     const goals = ev.filter((e) => e.type === "GOAL" && !e.meta?.so);

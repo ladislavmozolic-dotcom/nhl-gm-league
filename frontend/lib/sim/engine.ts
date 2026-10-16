@@ -1097,7 +1097,7 @@ function maybeStartFight(st: SimState, home: SimTeam, away: SimTeam, period: num
   };
   // base fight chance scales with the lower of the two teams' willingness; a
   // rivalry game runs hot (far more likely to drop the gloves).
-  let pGame = (0.06 + 0.5 * Math.max(0, Math.min(topFG(home), topFG(away)) - 55) / 45) * (CFG.fightsPct / 100) * v3EmotionalPimMult(st);
+  let pGame = (0.06 + 0.5 * Math.max(0, Math.min(topFG(home), topFG(away)) - 55) / 45) * (CFG.fightsPct / 100) * v3EmotionalPimMult(st) * (st.isExperimentalV3 ? FIGHT_TUNING.rate : 1);
   if (st.rivalry) pGame *= CFG.rivalryFightMult;
   pGame = Math.min(0.85, pGame);
   const perStoppage = 1 - Math.pow(1 - pGame, 1 / STOPPAGES_PER_GAME);
@@ -3287,6 +3287,7 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
+export const FIGHT_TUNING = { rate: 0.45 }; // V3: × the per-game fight chance (NHL 2023-24: 311 fights / 1,312 games ≈ 0.24 per game)
 export const GOALIE_TUNING = { exp: 1.2, defTalent: 0.3 }; // defTalent: × how much the defending pair's DF moves shot conversion // V3: how strongly goalie quality moves the save chance (V2: 1.7) — tuned to the NHL's team save % spread
 export const CORE_TUNING = { scale: 0.765, dump: 1.3, clear: 2.8 }; // clear: × Core's D-zone clear share → the icing multiplier (replaces the flat tired ×1.7; ≈7 icings/game kept) // dump: × Core's neutral-zone dump share (keeps ~24 dump-ins per team-game) // V3 Core hybrid: × Core's shoot share (keeps the league shot volume where V3 is calibrated)
 export const COMPRESS_TUNING = { catchUp: 0.6, early: 0.1, garbageLead: 1 }; // early: catch-up scale in periods 1-2 // V3: × the per-goal catch-up and × how much a team up 3+ eases off (1 = as before, 0 = none)
