@@ -3,7 +3,7 @@
 // shots/goals, power plays tied to real penalty times, and rich per-player
 // stats (hits, blocks, faceoffs, TOI). Tuned to NHL-realistic output.
 
-import { coreClearShare, coreDumpShare, coreShootShare } from "./v3-core/engine-bridge";
+import { coreClearShare, coreDumpShare, coreShootShare, coreWhy, type CoreEngineContext } from "./v3-core/engine-bridge";
 import { coreTacticsFromSimTeam } from "./v3-core/adapter";
 import { RNG, fixtureSeed } from "./rng";
 import { cleanName } from "../playerName";
@@ -2393,6 +2393,14 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     }
     const isHome = carrierTeam === home;
     const margin = st.box[carrierTeam.id].goals - st.box[def.id].goals;
+    // V3 Core hybrid: the live state as Core's decision layer sees it (carrier, shift, time in zone, score/time, opponent forecheck)
+    // …and its reason is narrated once per team, period and reason (a note, not a refrain)
+    const onceWhy = (why: string | undefined) => { if (!why) return undefined; const k = `why:${carrierTeam.id}:${period}:${why}`; if (coachNoted.has(k)) return undefined; coachNoted.add(k); return why; };
+    const coreCtx = (withForecheck: boolean): CoreEngineContext => ({
+      carrier, team: carrierTeam, zone, shiftSeconds: carrier.isDefense ? shifts[carrierTeam.id].dElapsed : shifts[carrierTeam.id].fElapsed,
+      pressureSeconds: tick - zoneSince, scoreMargin: margin, secondsRemaining: period <= 3 ? (3 - period) * PERIOD_SECONDS + PERIOD_SECONDS - tick : 0, rebound: false,
+      oppForecheck: withForecheck ? coreTacticsFromSimTeam(def).forecheck : undefined,
+    });
     const tOff = tacticsMult(carrierTeam, margin), tDef = tacticsMult(def, -margin);
     // per-line tactic: the attacking forward line's OF push and the defending pair's
     // DF commitment tilt the battle (a top offensive line presses; a shut-down pair
@@ -2467,14 +2475,11 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // 2a) ICING: a clearance from the defensive zone that goes the length of the ice
     // (a tired unit under forecheck pressure does it most). Legal when shorthanded.
     if (zone === "DEF" && CFG.icingEnabled && curStr[carrierTeam.id] !== "SH") {
-      const tiredMult = st.v3Core ? CORE_TUNING.clear * coreClearShare({ // V3 Core: who just fires it out — hemmed in, tired, protecting a late lead, a stay-at-home D
-          carrier, team: carrierTeam, zone, shiftSeconds: carrier.isDefense ? shifts[carrierTeam.id].dElapsed : shifts[carrierTeam.id].fElapsed,
-          pressureSeconds: tick - zoneSince, scoreMargin: margin, secondsRemaining: period <= 3 ? (3 - period) * PERIOD_SECONDS + PERIOD_SECONDS - tick : 0, rebound: false,
-        })
+      const tiredMult = st.v3Core ? CORE_TUNING.clear * coreClearShare(coreCtx(false)) // V3 Core: who just fires it out — hemmed in, tired, protecting a late lead, a stay-at-home D
         : fat(carrierTeam, carrier) < 0.93 ? 1.7 : 1;
       if (rng.chance(ICING_RATE * (CFG.icingRatePct / 100) * tiredMult * (defFx.takeaway ?? 1))) {
         st.box[carrierTeam.id].icings++;
-        st.sink.emit({ period, seconds: tick, type: "ICING", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "NOTABLE" });
+        st.sink.emit({ period, seconds: tick, type: "ICING", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: carrier.id, playerName: carrier.name, importance: "NOTABLE", meta: st.v3Core ? { why: onceWhy(coreWhy(coreCtx(false), "clear")) } : undefined });
         stopWhy = "icing"; state = "FACEOFF"; setup = "carry"; press = 0;
         foZone = CFG.zoneFaceoffsEnabled ? carrierTeam.id : null;
         noChange[carrierTeam.id] = true; // no change for the icing team
@@ -2499,14 +2504,10 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           }
           zone = zone === "DEF" ? "NEU" : "OFF"; setup = "carry";
         }
-        else if (st.v3Dump && zone === "NEU" && rng.chance(st.v3Core ? Math.min(0.9, CORE_TUNING.dump * coreDumpShare({
-          carrier, team: carrierTeam, zone, shiftSeconds: carrier.isDefense ? shifts[carrierTeam.id].dElapsed : shifts[carrierTeam.id].fElapsed,
-          pressureSeconds: tick - zoneSince, scoreMargin: margin, secondsRemaining: period <= 3 ? (3 - period) * PERIOD_SECONDS + PERIOD_SECONDS - tick : 0, rebound: false,
-          oppForecheck: coreTacticsFromSimTeam(def).forecheck,
-        })) : DUMP_TUNING.share)) { // V3 Core: whether a stopped carry becomes a dump-in depends on the moment (tired unit, forecheck, score/time, team style)
+        else if (st.v3Dump && zone === "NEU" && rng.chance(st.v3Core ? Math.min(0.9, CORE_TUNING.dump * coreDumpShare(coreCtx(true))) : DUMP_TUNING.share)) { // V3 Core: whether a stopped carry becomes a dump-in depends on the moment (tired unit, forecheck, score/time, team style)
           // dump and chase: the puck goes in deep and it's a race — the attackers' forecheck against the defenders' retrieval, with the goalie sometimes playing it behind the net
           const dumper = carrier;
-          st.sink.emit({ period, seconds: tick, type: "ZONE_ENTRY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: dumper.id, playerName: dumper.name, zone: "OFF", importance: "NOTABLE", meta: { entryType: "dump" } });
+          st.sink.emit({ period, seconds: tick, type: "ZONE_ENTRY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: dumper.id, playerName: dumper.name, zone: "OFF", importance: "NOTABLE", meta: { entryType: "dump", why: st.v3Core ? onceWhy(coreWhy(coreCtx(true), "dump")) : undefined } });
           const chase = onIceF(carrierTeam).filter((x) => x.id !== dumper.id); // somebody else chases the puck he put in
           const chaseD = onIceD(carrierTeam).filter((x) => x.id !== dumper.id);
           const runner = pickByAttr(rng, chase.length ? chase : chaseD.length ? chaseD : [carrier], (s) => (s.attrs.sk ?? 50) + (s.attrs.ck ?? 50)) ?? carrier;
@@ -2551,10 +2552,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // their goals. But a forward who would PASS keeps the puck (→ his linemate's
     // one-timer and the passer's assist survive), so the point shot only ever
     // cannibalises a forward's own shot, never a scoring-chance pass play.
-    const coreShoot = st.v3Core && !R ? Math.min(0.95, CORE_TUNING.scale * coreShootShare({
-      carrier, team: carrierTeam, zone, shiftSeconds: carrier.isDefense ? shifts[carrierTeam.id].dElapsed : shifts[carrierTeam.id].fElapsed,
-      pressureSeconds: tick - zoneSince, scoreMargin: margin, secondsRemaining: period <= 3 ? (3 - period) * PERIOD_SECONDS + PERIOD_SECONDS - tick : 0, rebound: setup === "rebound",
-    })) : null;
+    const coreShoot = st.v3Core && !R ? Math.min(0.95, CORE_TUNING.scale * coreShootShare({ ...coreCtx(false), rebound: setup === "rebound" })) : null;
     const wantsShot = R ? true : rng.chance(coreShoot ?? ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), st.v3Roles ? ROLE_TUNING.exp : 0.7));
     // A SNIPER shoots it himself; a lower-skill forward is the one who defers to the
     // QB at the point. So the deferral rate falls with the carrier's shot (SC) — an

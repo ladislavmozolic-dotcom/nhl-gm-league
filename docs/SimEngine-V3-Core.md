@@ -145,6 +145,11 @@ time hemmed in, fatigue, a late lead to protect, the carrier's passing/skating).
 that share` replaces V3's flat tired ×1.7 as the icing multiplier — icings stay ≈7 per game, but now come
 from hemmed-in, tired units and teams sitting on a lead rather than from tiredness alone.
 
+### Step 13 — Core reasons in the feed
+
+`coreWhy(ctx, kind)` names the main driver of a safe play (tired / forecheck / lead / hemmed). Dump-in
+zone entries and icings carry it as `meta.why`; the play-by-play and the live feed append e.g. "— tired
+legs, the change is coming". Narrated once per team, period and reason. Text only, no RNG.
+
 ### Next hybrid steps
-3. Explain decisions in the live feed / coach panel with Core's `reason`.
 4. Only then consider Core's goalie contest against V3's shot model.

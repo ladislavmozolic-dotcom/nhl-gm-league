@@ -350,3 +350,16 @@ test("V3 bounces: missed and blocked pucks go somewhere (out front, rimmed to th
   }
   assert.deepEqual([...kinds].sort(), ["block", "boards", "rim"]);
 });
+
+test("V3 Core reasons: some dump-ins / icings say why (tired, forecheck, lead, hemmed in), once per team/period/reason; V2 never", () => {
+  const re = /tired legs, the change is coming|no room against that forecheck|protecting the lead, nothing fancy|hemmed in, just get it out/;
+  let n = 0;
+  for (let seed = 1; seed <= 30; seed++) {
+    const lines = run(seed, ENGINE_V3).playByPlay.filter((l) => re.test(l.text));
+    n += lines.length;
+    const keys = lines.map((l) => `${l.teamId}:${l.period}:${l.text.match(re)![0]}`);
+    assert.equal(new Set(keys).size, keys.length, "each reason once per team and period");
+    assert.equal(run(seed, ENGINE_V2).playByPlay.filter((l) => re.test(l.text)).length, 0);
+  }
+  assert.ok(n >= 10, `reasons over 30 games: ${n}`);
+});

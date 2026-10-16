@@ -10,7 +10,7 @@ import { fightText, type FightMeta } from "./fight-text";
 import { RNG } from "./rng";
 import type { GameResult, SimTeam, SimSkater, PbpEvent, PbpKind, InjuryEvent } from "./types";
 import type { SimEvent } from "./events";
-import { RUSH_LABEL, overGlassText, pressureText, longShiftText, matchupText, bounceText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
+import { RUSH_LABEL, overGlassText, pressureText, longShiftText, coreWhyText, matchupText, bounceText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 const PERIOD_SECONDS = 1200;
 const OT_SECONDS = 300; // 5:00 for regular season OT
@@ -311,7 +311,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
         const m = e.meta as { severity?: string } | undefined;
         add(p, e.seconds, tId, "penalty", `${e.playerName ?? "?"} is ejected from the game${m?.severity === "Match" ? " (match penalty)" : ""} — he's done for the night.`, true);
       } else if (e.type === "ICING") {
-        add(p, e.seconds, tId, "icing", `Icing by ${e.playerName ?? e.teamCode ?? "?"} — ${e.teamCode ?? "they"} can't change; the draw is in their end.`);
+        add(p, e.seconds, tId, "icing", `Icing by ${e.playerName ?? e.teamCode ?? "?"}${coreWhyText((e.meta as { why?: string } | undefined)?.why)} — ${e.teamCode ?? "they"} can't change; the draw is in their end.`);
       } else if (e.type === "DELAYED_PENALTY") {
         add(p, e.seconds, tId, "change", `Delayed penalty — ${e.teamCode ?? sideOf(e.teamId ?? home.id).name} pulls the goalie for the extra attacker.`);
       } else if (e.type === "COINCIDENTAL") {
@@ -353,7 +353,7 @@ function playByPlayFromEvents(result: GameResult, home: SimTeam, away: SimTeam, 
       } else if (e.type === "ZONE_ENTRY") {
         const entryType = (e.meta as { entryType?: string } | undefined)?.entryType;
         const verb = entryType === "dump" ? "dumps the puck into the zone" : entryType === "pass" ? "feeds a pass into the zone" : "carries the puck into the zone";
-        add(p, e.seconds, tId, "entry", `${e.playerName ?? "?"} ${verb}.`);
+        add(p, e.seconds, tId, "entry", `${e.playerName ?? "?"} ${verb}${entryType === "dump" ? coreWhyText((e.meta as { why?: string } | undefined)?.why) : ""}.`);
       } else if (e.type === "GOALIE_PULL") {
         const pulled = (e.meta as { pulled?: boolean } | undefined)?.pulled;
         add(p, e.seconds, tId, "change",

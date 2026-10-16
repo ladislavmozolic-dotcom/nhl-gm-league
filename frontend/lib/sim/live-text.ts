@@ -4,7 +4,7 @@
 import type { SimEvent } from "./events";
 import { goalHow, goalPlay, saveWhere, shotHow } from "./shot-text";
 import { fightText, type FightMeta } from "./fight-text";
-import { RUSH_LABEL, overGlassText, pressureText, longShiftText, matchupText, bounceText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
+import { RUSH_LABEL, overGlassText, pressureText, longShiftText, coreWhyText, matchupText, bounceText, periodEndText, ppEndText, puckRaceText, rushEndText, rushStartText, whistleText, type RushMeta, type WhistleMeta } from "./rush-text";
 
 export type LiveLine = { seq: number; period: number; seconds: number; teamId?: number; /** set when this line means a skater has left the game */ outPlayerId?: number; /** replaces the period/clock label (e.g. "SO") */ tag?: string; kind: "goal" | "penalty" | "save" | "note" | "period"; major: boolean; text: string };
 
@@ -62,7 +62,7 @@ export function describeLiveEvent(e: SimEvent): LiveLine | null {
     case "HIT": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} (${who}) hits ${e.targetName ?? "the puck carrier"}.` };
     case "BLOCK": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} (${who}) blocks the shot${e.targetName ? ` by ${e.targetName}` : ""}.` };
     case "TAKEAWAY": return { ...base, kind: "note", major: false, text: `${e.playerName ?? "?"} (${who}) takes the puck away${e.targetName ? ` from ${e.targetName}` : ""}.` };
-    case "ICING": return { ...base, kind: "note", major: false, text: `Icing — ${who} can't change; the draw is in their end.` };
+    case "ICING": return { ...base, kind: "note", major: false, text: `Icing${coreWhyText(m<{ why?: string }>(e)?.why)} — ${who} can't change; the draw is in their end.` };
     case "DELAYED_PENALTY": return { ...base, kind: "note", major: false, text: `Delayed penalty — ${who} pulls the goalie for the extra attacker.` };
     case "COINCIDENTAL": {
       const mm = m<{ fourOnFour?: boolean; names?: string[] }>(e);

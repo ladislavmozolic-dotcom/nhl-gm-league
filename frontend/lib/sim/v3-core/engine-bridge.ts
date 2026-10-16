@@ -57,3 +57,14 @@ export function coreClearShare(ctx: CoreEngineContext): number {
   const total = c.reduce((n, x) => n + x.score, 0);
   return total > 0 ? (c.find((x) => x.action === "CLEAR")?.score ?? 0) / total : 0.33;
 }
+
+export type CoreWhy = "tired" | "forecheck" | "lead" | "hemmed" | "chasing";
+/** The main driver of a safe play (dump-in / clear), for the play-by-play — deterministic thresholds, no RNG. */
+export function coreWhy(ctx: CoreEngineContext, kind: "dump" | "clear"): CoreWhy | undefined {
+  const late = ctx.secondsRemaining > 0 && ctx.secondsRemaining < 300;
+  if (late && ctx.scoreMargin > 0) return "lead";
+  if (kind === "clear" && ctx.pressureSeconds >= 20) return "hemmed";
+  if (ctx.shiftSeconds >= 55) return "tired";
+  if (kind === "dump" && (ctx.oppForecheck ?? 0) >= 0.75) return "forecheck";
+  return undefined;
+}

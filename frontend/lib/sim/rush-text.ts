@@ -109,3 +109,8 @@ export function bounceText(m: { kind?: string }, name: string, other?: string | 
   if (m.kind === "rim") return `${other ? `${other}'s miss` : "The miss"} rims around the boards — ${name} picks it up.`;
   return `${name} gets to the loose puck after ${other ?? "the"} block and clears it.`;
 }
+
+/** " — tired legs, the change is coming" etc. for a dump-in or a clear chosen by the V3 Core intent. */
+export function coreWhyText(why?: string | null): string {
+  return why === "tired" ? " — tired legs, the change is coming" : why === "forecheck" ? " — no room against that forecheck" : why === "lead" ? " — protecting the lead, nothing fancy" : why === "hemmed" ? " — they've been hemmed in, just get it out" : "";
+}
