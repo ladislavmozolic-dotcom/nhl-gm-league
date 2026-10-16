@@ -45,6 +45,13 @@ export async function POST(req: NextRequest) {
     let systemInstruction = "";
     let userPrompt = "";
 
+    const extInfoEn = (player.extYears ?? 0) > 0
+      ? ` (NOTE: Already signed a ${player.extYears}-year extension at $${(((player.extCapHit ?? 0)) / 1_000_000).toFixed(2)}M/yr starting next season!)`
+      : "";
+    const extInfoCs = (player.extYears ?? 0) > 0
+      ? ` (POZNÁMKA: Hráč už má podpísané predĺženie na ${player.extYears} ${player.extYears === 1 ? "rok" : (player.extYears ?? 0) < 5 ? "roky" : "rokov"} s platom $${(((player.extCapHit ?? 0)) / 1_000_000).toFixed(2)}M/rok platné od budúcej sezóny!)`
+      : "";
+
     if (isEnglish) {
       promptContext = `
 PLAYER: ${cleanName(player.name)}
@@ -52,7 +59,7 @@ POSITION: ${player.position ?? "N/A"}
 CURRENT TEAM: ${player.team?.name ?? "Free Agent"}
 AGE: ${player.age ?? "N/A"} years old
 OVERALL RATING (OV): ${player.overall ?? "N/A"}
-CONTRACT: ${player.capHit ? `$${(player.capHit / 1_000_000).toFixed(2)}M` : "No contract"}, term: ${player.contractYears ?? 0} years remaining, status: ${player.rosterType ?? "N/A"}
+CONTRACT: ${player.capHit ? `$${(player.capHit / 1_000_000).toFixed(2)}M` : "No contract"}, term: ${player.contractYears ?? 0} years remaining${extInfoEn}, status: ${player.rosterType ?? "N/A"}
 
 RATINGS:
 ${
@@ -71,6 +78,7 @@ LEAGUE BENCHMARK & ROLE:
 
       systemInstruction = `You are a Director of Pro Scouting for an NHL franchise.
 CRITICAL LANGUAGE REQUIREMENT: You MUST write the ENTIRE scouting report in ENGLISH. Never use Slovak or Czech.
+IMPORTANT CONTRACT NOTE: If the player has already signed an extension for next season, do NOT recommend extending them or saying their deal is expiring; praise their secured future.
 STRUCTURE:
 1. **Player Profile & Style of Play** (1 paragraph) - player archetype and on-ice identity (sniper, playmaker, shutdown defenseman, two-way center, etc.).
 2. **Key Strengths & Weaknesses** (bullet points).
@@ -87,7 +95,7 @@ POZÍCIA: ${player.position ?? "N/A"}
 TÍM: ${player.team?.name ?? "Voľný hráč (Free Agent)"}
 VEK: ${player.age ?? "N/A"} rokov
 CELKOVÉ HODNOTENIE (OV): ${player.overall ?? "N/A"}
-ZMLUVA: ${player.capHit ? `$${(player.capHit / 1_000_000).toFixed(2)}M` : "Bez zmluvy"}, dĺžka ${player.contractYears ?? 0} rokov, status: ${player.rosterType ?? "N/A"}
+ZMLUVA: ${player.capHit ? `$${(player.capHit / 1_000_000).toFixed(2)}M` : "Bez zmluvy"}, dĺžka ${player.contractYears ?? 0} rokov${extInfoCs}, status: ${player.rosterType ?? "N/A"}
 
 HERNÉ ATRIBÚTY:
 ${

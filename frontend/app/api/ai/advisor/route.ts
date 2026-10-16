@@ -56,6 +56,8 @@ export async function POST(req: Request) {
         overall: true,
         capHit: true,
         contractYears: true,
+        extYears: true,
+        extCapHit: true,
         age: true,
         isGoalie: true,
       },
@@ -105,20 +107,31 @@ Kľúčoví hráči súpera: ${oppPlayers.map((p) => `${cleanName(p.name)} (${p.
     const criticalSlots = rosterAnalysis?.findings.filter((f) => f.severity === "critical").map((f) => f.label) || [];
     const strongSlots = rosterAnalysis?.findings.filter((f) => f.severity === "ok").map((f) => f.label) || [];
 
-    // Pending Free Agents
-    const pendingFreeAgents = players
-      .filter((p) => p.contractYears === 1)
-      .map((p) => `${cleanName(p.name)} (${p.position}, $${((p.capHit ?? 0) / 1_000_000).toFixed(2)}M)`);
+    // Pending Free Agents - ONLY unextended players in their final contract year!
+    const pendingUnextended = players
+      .filter((p) => p.contractYears === 1 && (!p.extYears || p.extYears === 0))
+      .map((p) => `${cleanName(p.name)} (${p.position}, OV: ${p.overall}, plat: $${((p.capHit ?? 0) / 1_000_000).toFixed(2)}M - zatiaľ nepredĺžený, po sezóne UFA/RFA)`);
 
-    // Top players summary
+    // Secured Players who ALREADY signed a contract extension activating next season
+    const signedExtensions = players
+      .filter((p) => (p.extYears ?? 0) > 0)
+      .map((p) => `${cleanName(p.name)} (${p.position}, OV: ${p.overall}, aktuálna zmluva končí, ALE UŽ MÁ OFICIÁLNE PODPÍSANÉ PREDĹŽENIE (EXTENSION) na ${p.extYears} ${p.extYears === 1 ? "rok" : (p.extYears ?? 0) < 5 ? "roky" : "rokov"} s platom $${(((p.extCapHit ?? 0)) / 1_000_000).toFixed(2)}M/rok od budúcej sezóny 2027-28!)`);
+
+    // Top players summary with extension awareness
     const topSkaters = players
       .filter((p) => !p.isGoalie)
-      .slice(0, 6)
-      .map((p) => `${cleanName(p.name)} (${p.position}, OV: ${p.overall}, Plat: $${((p.capHit ?? 0) / 1_000_000).toFixed(2)}M, Zmluva: ${p.contractYears}r)`);
+      .slice(0, 7)
+      .map((p) => {
+        const ext = (p.extYears ?? 0) > 0 ? ` [PREDĹŽENÝ na ${p.extYears}r za $${(((p.extCapHit ?? 0)) / 1_000_000).toFixed(2)}M od 2027-28]` : "";
+        return `${cleanName(p.name)} (${p.position}, OV: ${p.overall}, Plat: $${((p.capHit ?? 0) / 1_000_000).toFixed(2)}M, zostáva ${p.contractYears}r)${ext}`;
+      });
 
     const goalies = players
       .filter((p) => p.isGoalie)
-      .map((p) => `${cleanName(p.name)} (OV: ${p.overall}, Plat: $${((p.capHit ?? 0) / 1_000_000).toFixed(2)}M)`);
+      .map((p) => {
+        const ext = (p.extYears ?? 0) > 0 ? ` [PREDĹŽENÝ na ${p.extYears}r za $${(((p.extCapHit ?? 0)) / 1_000_000).toFixed(2)}M od 2027-28]` : "";
+        return `${cleanName(p.name)} (OV: ${p.overall}, Plat: $${((p.capHit ?? 0) / 1_000_000).toFixed(2)}M, zostáva ${p.contractYears}r)${ext}`;
+      });
 
     const userQuestion = body.question?.trim() || "";
     const focus = body.focus || "general";
@@ -142,9 +155,18 @@ DÁTA KLUBU ${team.name} (${team.code || "NHL"}):
 ${topSkaters.map((s) => `  • ${s}`).join("\n")}
 - Brankári:
 ${goalies.map((g) => `  • ${g}`).join("\n")}
-- Hráči s končiacou zmluvou po tejto sezóne (pending FA):
-${pendingFreeAgents.length ? pendingFreeAgents.map((f) => `  • ${f}`).join("\n") : "  • Žiadne urgentné končiace zmluvy"}
+
+STAV ZMLÚV A PREDĹŽENÍ (EXTENSIONS):
+- UŽ PODPÍSANÉ PREDĹŽENIA ZMLÚV (títo hráči UŽ MAJÚ novú zmluvu na ďalšie roky, neodídu zadarmo!):
+${signedExtensions.length ? signedExtensions.map((e) => `  • ${e}`).join("\n") : "  • Zatiaľ žiadne podpísané predĺženia na ďalšiu sezónu"}
+
+- ZATIAĽ NEPREDĹŽENÍ HRÁČI S KONČIACOU ZMLUVOU (toto sú jediní hráči, ktorých treba riešiť - predĺžiť alebo vymeniť):
+${pendingUnextended.length ? pendingUnextended.map((f) => `  • ${f}`).join("\n") : "  • Žiadne urgentné končiace zmluvy bez krytia"}
 ${opponentBrief}
+
+STRIKTNÉ PRAVIDLÁ PRE ROZBOR ZMLÚV:
+1. Hráči uvedení v sekcii "UŽ PODPÍSANÉ PREDĹŽENIA ZMLÚV" (napr. tí, čo majú EXTENSION) už novú zmluvu majú! NIKDY nenavrhuj ich predĺženie a netvrď, že po sezóne odídu zadarmo, pretože sú už bezpečne zazmluvnení. Ak ich spomenieš, vyzdvihni ich zazmluvnenie ako stabilitu klubu.
+2. Ako reálne končiace zmluvy na riešenie (predĺžiť vs vymeniť pred uzávierkou) analyzuj VÝHRADNE hráčov zo zoznamu "ZATIAĽ NEPREDĹŽENÍ HRÁČI".
 
 OTÁZKA / POŽIADAVKA MANAŽÉRA:
 ${userQuestion ? `"${userQuestion}"` : "Urob celkový strategický audit kádra, pomenuj kľúčové diery a odporuč 3 konkrétne manažérske kroky pred ďalšou fázou sezóny."}
@@ -154,7 +176,7 @@ Zameranie: ${focus}
 Priprav pre mňa detailný rozbor s týmito bodmi:
 1. 📊 Diagnóza a stav tímu (kde sa klub nachádza)
 2. 🚨 Kritické slabiny a kde nás tlačí topánka
-3. 💼 Odporúčané prestupové ťahy (Trade & Cap stratégia)
+3. 💼 Odporúčané prestupové ťahy a zmluvná stratégia (Trade & Cap stratégia)
 4. 🏒 Taktické a personálne odporúčanie pre trénera (vrátane prípravy na najbližšieho súpera, ak je známy)
 `;
     } else {
@@ -172,9 +194,18 @@ CLUB DATA FOR ${team.name} (${team.code || "NHL"}):
 ${topSkaters.map((s) => `  • ${s}`).join("\n")}
 - Goaltenders:
 ${goalies.map((g) => `  • ${g}`).join("\n")}
-- Expiring contracts after this season:
-${pendingFreeAgents.length ? pendingFreeAgents.map((f) => `  • ${f}`).join("\n") : "  • None"}
+
+CONTRACT & EXTENSION STATUS:
+- ALREADY SECURED EXTENSIONS (These players have ALREADY signed valid future contract extensions activating next season! They are NOT leaving):
+${signedExtensions.length ? signedExtensions.map((e) => `  • ${e}`).join("\n") : "  • None currently secured"}
+
+- PENDING UNEXTENDED EXPIRING DEALS (Only these players are pending free agents who need extension or trade):
+${pendingUnextended.length ? pendingUnextended.map((f) => `  • ${f}`).join("\n") : "  • None"}
 ${opponentBrief}
+
+STRICT CONTRACT INTEGRITY RULES:
+1. Players listed under "ALREADY SECURED EXTENSIONS" already signed their new deals! NEVER propose extending them or state they will walk as free agents. Praise the extension or factor their future cap hit into planning.
+2. Only address players in "PENDING UNEXTENDED EXPIRING DEALS" as contract priorities to extend or trade before the deadline.
 
 GM REQUEST / QUESTION:
 ${userQuestion ? `"${userQuestion}"` : "Provide a comprehensive roster audit, highlight key vulnerabilities, and suggest 3 actionable GM moves."}
@@ -184,7 +215,7 @@ Focus: ${focus}
 STRUCTURE:
 1. 📊 Team Diagnosis & Trajectory
 2. 🚨 Critical Vulnerabilities & Role Score Gaps
-3. 💼 Trade & Salary Cap Strategy
+3. 💼 Trade & Salary Cap Strategy (Respecting signed extensions)
 4. 🏒 Coaching & Tactical Adjustments (including next opponent game plan)
 `;
     }

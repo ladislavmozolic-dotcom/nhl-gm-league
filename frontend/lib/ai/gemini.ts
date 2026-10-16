@@ -19,10 +19,12 @@ export interface GeminiResponse {
 
 const CANDIDATE_MODELS = [
   process.env.GEMINI_MODEL || "gemini-4-argon",
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
   "gemini-3.5-flash",
   "gemini-3.5-flash-lite",
-  "gemini-3.8-flash",
-  "gemini-3.7-flash",
+  "gemini-flash-latest",
+  "gemini-pro-latest",
 ];
 
 export async function generateWithGemini(
@@ -78,12 +80,12 @@ export async function generateWithGemini(
 
       if (!res.ok) {
         const errText = await res.text();
-        if (res.status === 404 || res.status === 400 || res.status === 429) {
-          console.warn(`[Gemini] Model ${model} returned ${res.status}. Falling back...`);
-          lastError = new Error(`Gemini ${model} failed (${res.status}): ${errText}`);
-          continue;
+        if (res.status === 401 || (res.status === 403 && errText.includes("API_KEY_INVALID"))) {
+          throw new Error(`Gemini API key error (${res.status}): ${errText}`);
         }
-        throw new Error(`Gemini API error (${res.status}): ${errText}`);
+        console.warn(`[Gemini] Model ${model} returned ${res.status}. Falling back to next candidate...`);
+        lastError = new Error(`Gemini ${model} failed (${res.status}): ${errText}`);
+        continue;
       }
 
       const data = await res.json();
