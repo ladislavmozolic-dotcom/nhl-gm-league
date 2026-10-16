@@ -187,9 +187,9 @@ export default function CoachPanel({ gameId, teamId, teamName, over, timeoutUsed
               <div className="flex items-center gap-3">
                 <input type="range" min={30} max={300} step={15} value={pullSec} disabled={!lines}
                   onChange={(e) => { setPullSec(Number(e.target.value)); setDirty(true); setMsg(null); }} className="flex-1 accent-blue-500" />
-                <span className="w-20 text-right text-sm tabular-nums text-slate-200">{Math.floor(pullSec / 60)}:{String(pullSec % 60).padStart(2, "0")}</span>
+                <span className="w-20 text-right text-sm tabular-nums text-slate-200">{pullSec === 90 ? "auto 2:30" : `${Math.floor(pullSec / 60)}:${String(pullSec % 60).padStart(2, "0")}`}</span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">Down one goal you pull at this mark; down two about 70% of it, down three about a third.</p>
+              <p className="text-[11px] text-slate-500 mt-1">Down one goal you pull at this mark; down two about 70% of it, down three about a third. Left at the default (1:30) the bench pulls like a modern NHL coach, at about 2:30.</p>
             </div>
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <button onClick={callTimeout} disabled={busy || timeoutUsed || timeoutQueued}

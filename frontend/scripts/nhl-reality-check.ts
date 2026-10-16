@@ -2,7 +2,7 @@
 // Read-only: the current V3 default against real-NHL reference values (approximate league averages of the
 // 2023-24 and 2024-25 regular seasons — orientation, not exact targets). Distributions, score effects, goalie pulls.
 // Every ordered pair of the 32 NHL clubs × bases. Run: npx tsx scripts/nhl-reality-check.ts [bases=2] [seedBase=91000000]
-import { simulateGame, PERIOD_TUNING, SCORE_TUNING } from "../lib/sim/engine";
+import { simulateGame, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING } from "../lib/sim/engine";
 import { loadSettings } from "../lib/sim/settings";
 import { loadSimTeam } from "../lib/sim/index";
 import { ENGINE_V3 } from "../lib/sim/version";
@@ -11,6 +11,7 @@ import { prisma } from "../lib/prisma";
 const bases = Number(process.argv[2] ?? 2), seedBase = Number(process.argv[3] ?? 91_000_000);
 if (process.argv[4]) Object.assign(PERIOD_TUNING, JSON.parse(process.argv[4]));
 if (process.argv[5]) Object.assign(SCORE_TUNING, JSON.parse(process.argv[5]));
+if (process.argv[6]) Object.assign(SIX_TUNING, JSON.parse(process.argv[6]));
 
 // ≈ NHL reference (rounded; per game = both teams)
 const NHL: Record<string, number> = {
@@ -64,7 +65,17 @@ const pulls: number[] = [];
       if (e.period === 3 && Math.abs(lead) === 1 && e.type === "GOAL") add(lead < 0 ? "t3g" : "l3g", 1);
       if (e.type === "GOAL") diff += e.teamId === H ? 1 : -1;
     }
-    for (const e of ev.filter((x) => x.type === "GOALIE_PULL" && x.meta?.pulled && x.period === 3)) pulls.push(1200 - e.seconds);
+    // goalie pulls when down exactly 1 in the 3rd: how often the 6-on-5 ties it vs an empty-net goal against
+    for (const e of ev.filter((x) => x.type === "GOALIE_PULL" && x.meta?.pulled && x.period === 3)) {
+      const before = goals.filter((g) => g.period < 3 || (g.period === 3 && g.seconds <= e.seconds));
+      const lead = before.reduce((s, g) => s + (g.teamId === e.teamId ? 1 : -1), 0);
+      if (lead !== -1) continue;
+      pulls.push(1200 - e.seconds); add("pull1", 1);
+      const after = goals.filter((g) => g.period === 3 && g.seconds > e.seconds);
+      const first = after[0];
+      if (first && first.teamId === e.teamId) add("pullTie", 1);
+      if (after.some((g) => g.teamId !== e.teamId && g.meta?.emptyNet)) add("pullEng", 1);
+    }
   }
   const g = a.games, pct = (k: string, d = g) => 100 * (a[k] ?? 0) / d, per = (k: string) => (a[k] ?? 0) / g;
   const pg = a.p1 + a.p2 + a.p3 + (a.p4 ?? 0);
@@ -95,7 +106,9 @@ const pulls: number[] = [];
     ["Trailing team's share of shots %", 100 * a.shotTrail / (a.shotTrail + a.shotLead), NHL.trailShotShare],
     ["3rd, down 1: share of shots %", 100 * a.t3 / (a.t3 + a.l3), 58],
     ["3rd, 1-goal game: trailing team scores next %", 100 * a.t3g / (a.t3g + a.l3g), 47],
-    ["Goalie pulled — median s left", pulls.length ? pulls[pulls.length >> 1] : NaN, NHL.pullSec, `${pulls.length} pulls`],
+    ["Down 1, goalie pulled → tied %", pct("pullTie", a.pull1), 18],
+    ["Down 1, goalie pulled → EN goal against %", pct("pullEng", a.pull1), 30],
+    ["Goalie pulled (down 1) — median s left", pulls.length ? pulls[pulls.length >> 1] : NaN, NHL.pullSec, `${pulls.length} pulls`],
   ];
   console.log(`\n${g} games (V3 default, every ordered pair of the 32 NHL clubs × ${bases})\n`);
   console.log("| Metric | V3 | NHL ≈ | Δ |\n|---|---:|---:|---:|");
