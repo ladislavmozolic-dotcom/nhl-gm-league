@@ -288,3 +288,16 @@ test("V3 goals tell how they went in (rebound / wraparound / deflection) in both
   }
   assert.ok(seen.has("rebound") && seen.has("deflect"), [...seen].join(","));
 });
+
+test("live game flow: xG timeline from the stream — one mark per goal, totals = sum of shot xG", async () => {
+  const { liveFlow } = await import("../lib/sim/live-flow");
+  for (let seed = 1; seed <= 10; seed++) {
+    const r = run(seed, ENGINE_V3);
+    const ev = r.events ?? [];
+    const f = liveFlow(ev, { id: 1, code: "T1" }, { id: 2, code: "T2" }, 3600);
+    assert.equal(f.goals.length, ev.filter((e) => e.type === "GOAL" && !(e.meta as { so?: boolean } | undefined)?.so).length);
+    assert.ok(f.points.length >= 2 && f.bins.length >= 12);
+    const last = f.points[f.points.length - 1].diff;
+    assert.ok(Math.abs(last - (f.homeXg - f.awayXg)) < 0.01, `${last} vs ${f.homeXg - f.awayXg}`);
+  }
+});

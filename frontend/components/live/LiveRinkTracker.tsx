@@ -34,6 +34,8 @@ export interface LiveRinkTrackerProps {
   isLive?: boolean;
   standaloneControls?: boolean;
   events?: SimEvent[];
+  homeXg?: number;          // real xG so far (from the engine's shots) — the rink falls back to a SOG estimate in the standalone demo
+  awayXg?: number;
   liveLines?: LiveLine[];
   showBoxscore?: boolean;
   onToggleBoxscore?: () => void;
@@ -206,6 +208,8 @@ export default function LiveRinkTracker({
   isLive = false,
   standaloneControls = true,
   events = [],
+  homeXg,
+  awayXg,
   liveLines = [],
   showBoxscore = false,
   onToggleBoxscore,
@@ -1850,8 +1854,10 @@ export default function LiveRinkTracker({
   const displaySogHome = standaloneControls ? sogHomeState : homeSog;
   const displayClockStr = (clockStr === "SO" || clockStr === "Final") ? clockStr : displayClock;
   const displayPeriodStr = standaloneControls ? periodStr : (periodStr || "1. Tretina");
-  const displayXgAway = Math.max(0.05, displaySogAway * 0.075).toFixed(2);
-  const displayXgHome = Math.max(0.05, displaySogHome * 0.075).toFixed(2);
+  const displayXgAway = (!standaloneControls && awayXg != null ? awayXg : Math.max(0.05, displaySogAway * 0.075)).toFixed(2);
+  const displayXgHome = (!standaloneControls && homeXg != null ? homeXg : Math.max(0.05, displaySogHome * 0.075)).toFixed(2);
+  // the latest real shot's xG for the danger badge (the demo keeps its sample value)
+  const lastShotXg = useMemo(() => { for (let i = events.length - 1; i >= 0; i--) { const e = events[i]; if ((e.type === "SHOT" || e.type === "GOAL") && e.xg != null) return e.xg; } return null; }, [events]);
 
   const awaySkaters = useMemo(() => {
     return playersRef.current.filter((p) => p.team === "away" && !p.isGoalie);
@@ -2168,7 +2174,7 @@ export default function LiveRinkTracker({
               {/* Shot Alert */}
               {shotAlertVisible && (
                 <div className="absolute top-2.5 right-2.5 px-3 py-1 rounded-xl bg-red-950/95 border border-red-500 text-[11px] font-bold text-red-200 shadow-xl">
-                  ⚡ NEBEZPEČNÁ STRELA (xG: 0.38)
+                  {!standaloneControls && lastShotXg != null ? `${lastShotXg >= 0.15 ? "⚡ NEBEZPEČNÁ STRELA" : "STRELA"} (xG: ${lastShotXg.toFixed(2)})` : "⚡ NEBEZPEČNÁ STRELA (xG: 0.38)"}
                 </div>
               )}
             </div>

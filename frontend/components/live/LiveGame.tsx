@@ -6,6 +6,8 @@ import { usePoll, useServerNow } from "./useLive";
 import LiveBoard from "./LiveBoard";
 import CoachPanel from "./CoachPanel";
 import LiveRinkTracker from "./LiveRinkTracker";
+import GameFlowChart from "@/components/GameFlowChart";
+import { liveFlow } from "@/lib/sim/live-flow";
 import LiveBoxscore, { type LiveGoalItem, type LivePenaltyItem } from "./LiveBoxscore";
 import { describeLiveEvents, fmtClock, fmtRemainingClock, periodLabel, type LiveLine } from "@/lib/sim/live-text";
 import type { SimEvent } from "@/lib/sim/events";
@@ -138,6 +140,9 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       });
   }, [eventsList]);
 
+  // xG game flow, drawn as it happens (same chart as the finished-game page)
+  const flow = useMemo(() => (eventsList.length ? liveFlow(eventsList, home, away, view?.absSeconds ?? 0) : null), [eventsList, home, away, view?.absSeconds]);
+
   // three stars from the finished game: skaters by goals/assists, goalies by saves (+ a shutout bonus)
   const stars = useMemo(() => {
     if (view?.status !== "final") return [];
@@ -262,6 +267,8 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
             isLive={view?.status === "live"}
             standaloneControls={false}
             events={view?.events ?? []}
+            homeXg={flow?.homeXg}
+            awayXg={flow?.awayXg}
             liveLines={lines}
             showBoxscore={showBoxscore}
             onToggleBoxscore={toggleBoxscore}
@@ -283,6 +290,8 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
           logos={logos}
         />
       )}
+
+      {flow && flow.points.length > 2 && <div className="mb-4"><GameFlowChart flow={flow} /></div>}
 
       {stars.length > 0 && (
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 mb-4">
