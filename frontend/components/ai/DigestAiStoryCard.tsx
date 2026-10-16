@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLang } from "@/components/LangProvider";
+import AiArticleView from "@/components/ai/AiArticleView";
 
 export default function DigestAiStoryCard({
   season,
@@ -19,7 +20,6 @@ export default function DigestAiStoryCard({
   const [story, setStory] = useState<string | null>(null);
   const [modelUsed, setModelUsed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   if (!hasGames) return null;
 
@@ -41,13 +41,6 @@ export default function DigestAiStoryCard({
     } finally {
       setLoading(false);
     }
-  };
-
-  const copyStory = () => {
-    if (!story) return;
-    navigator.clipboard.writeText(story);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -101,18 +94,13 @@ export default function DigestAiStoryCard({
       )}
 
       {story && (
-        <div className="mt-4 pt-4 border-t border-slate-800/80">
-          <div className="flex items-center justify-end mb-2">
-            <button
-              onClick={copyStory}
-              className="text-xs text-slate-400 hover:text-slate-200 transition"
-            >
-              {copied ? (cs ? "✓ Skopírované" : "✓ Copied") : (cs ? "Kopírovať článok" : "Copy story")}
-            </button>
-          </div>
-          <div className="prose prose-invert prose-sm max-w-none text-slate-200 leading-relaxed space-y-3 bg-slate-950/70 p-5 rounded-xl border border-slate-800/90 whitespace-pre-line text-xs sm:text-sm shadow-inner">
-            {story}
-          </div>
+        <div className="mt-5">
+          <AiArticleView
+            content={story}
+            category={cs ? "UNHL DENNÝ DIGEST" : "UNHL DAILY DIGEST"}
+            model={modelUsed}
+            lang={lang}
+          />
         </div>
       )}
     </div>

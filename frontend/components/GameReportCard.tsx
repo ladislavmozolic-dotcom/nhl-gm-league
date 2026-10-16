@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { GameReport, ReportBit } from "@/lib/game-report-server";
 import { useLang } from "@/components/LangProvider";
+import AiArticleView from "@/components/ai/AiArticleView";
 
 function Bit({ title, icon, bit }: { title: string; icon: string; bit: ReportBit }) {
   if (!bit) return null;
@@ -25,7 +26,6 @@ export default function GameReportCard({ report, gameId }: { report: GameReport;
   const [aiStory, setAiStory] = useState<string | null>(null);
   const [modelUsed, setModelUsed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const generateStory = async () => {
     if (!gameId) return;
@@ -46,13 +46,6 @@ export default function GameReportCard({ report, gameId }: { report: GameReport;
     } finally {
       setLoading(false);
     }
-  };
-
-  const copyStory = () => {
-    if (!aiStory) return;
-    navigator.clipboard.writeText(aiStory);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -103,31 +96,13 @@ export default function GameReportCard({ report, gameId }: { report: GameReport;
       )}
 
       {aiStory && (
-        <div className="mt-5 pt-5 border-t border-slate-800/80">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-base">📰</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
-                {cs ? "Oficiálna reportáž akreditovaného redaktora" : "Official Beat Writer Game Story"}
-              </span>
-              {modelUsed && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-950/60 text-blue-300 border border-blue-800/40">
-                  {modelUsed}
-                </span>
-              )}
-            </div>
-            <button
-              onClick={copyStory}
-              className="text-xs text-slate-400 hover:text-slate-200 transition"
-              title={cs ? "Kopírovať reportáž" : "Copy story"}
-            >
-              {copied ? (cs ? "✓ Skopírované" : "✓ Copied") : (cs ? "Kopírovať" : "Copy")}
-            </button>
-          </div>
-
-          <div className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed space-y-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80 whitespace-pre-line">
-            {aiStory}
-          </div>
+        <div className="mt-5">
+          <AiArticleView
+            content={aiStory}
+            category={cs ? "OFICIÁLNA REPORTÁŽ ZÁPASU" : "BEAT WRITER RECAP"}
+            model={modelUsed}
+            lang={lang}
+          />
         </div>
       )}
     </div>

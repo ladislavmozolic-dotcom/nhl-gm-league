@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useLang } from "@/components/LangProvider";
+import AiArticleView from "@/components/ai/AiArticleView";
 
 interface GeminiAdvisorCardProps {
   teamId: number;
@@ -177,22 +178,13 @@ export default function GeminiAdvisorCard({ teamId, teamName }: GeminiAdvisorCar
 
       {/* Result Display */}
       {analysis && !loading && (
-        <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-5 shadow-inner">
-          <div className="flex items-center justify-between mb-3 border-b border-slate-800/60 pb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-              <span>📋</span> {cs ? "Strategické zhodnotenie riaditeľa operácií" : "Director of Hockey Ops Briefing"}
-            </span>
-            <button
-              onClick={() => navigator.clipboard.writeText(analysis)}
-              className="text-[11px] text-slate-400 hover:text-white transition"
-              title={cs ? "Kopírovať rozbor" : "Copy briefing"}
-            >
-              {cs ? "Kopírovať text" : "Copy text"}
-            </button>
-          </div>
-          <div className="prose prose-invert prose-sm max-w-none text-slate-200 leading-relaxed space-y-3 whitespace-pre-line text-xs sm:text-sm">
-            {analysis}
-          </div>
+        <div className="mt-4">
+          <AiArticleView
+            content={analysis}
+            category={cs ? "STRATEGICKÝ ROZBOR KÁDRA" : "DIRECTOR OF HOCKEY OPS BRIEFING"}
+            model={modelUsed}
+            lang={lang}
+          />
         </div>
       )}
     </div>

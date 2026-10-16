@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useLang } from "@/components/LangProvider";
 import { Card } from "@/components/ui";
+import AiArticleView from "@/components/ai/AiArticleView";
 
 export default function PlayerScoutCard({ playerId, playerName }: { playerId: number; playerName: string }) {
   const lang = useLang();
@@ -12,7 +13,6 @@ export default function PlayerScoutCard({ playerId, playerName }: { playerId: nu
   const [report, setReport] = useState<string | null>(null);
   const [modelUsed, setModelUsed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const fetchScoutReport = async () => {
     setLoading(true);
@@ -32,13 +32,6 @@ export default function PlayerScoutCard({ playerId, playerName }: { playerId: nu
     } finally {
       setLoading(false);
     }
-  };
-
-  const copyReport = () => {
-    if (!report) return;
-    navigator.clipboard.writeText(report);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -89,18 +82,13 @@ export default function PlayerScoutCard({ playerId, playerName }: { playerId: nu
       )}
 
       {report && (
-        <div className="mt-1">
-          <div className="flex items-center justify-end mb-2">
-            <button
-              onClick={copyReport}
-              className="text-xs text-slate-400 hover:text-slate-200 transition"
-            >
-              {copied ? (cs ? "✓ Skopírované" : "✓ Copied") : (cs ? "Kopírovať text" : "Copy text")}
-            </button>
-          </div>
-          <div className="prose prose-invert prose-sm max-w-none text-slate-200 leading-relaxed space-y-2 bg-slate-950/70 p-4 rounded-xl border border-slate-800/90 whitespace-pre-line text-xs sm:text-sm">
-            {report}
-          </div>
+        <div className="mt-2">
+          <AiArticleView
+            content={report}
+            category={cs ? `SKAUTSKÝ REPORT: ${playerName}` : `PRO SCOUTING REPORT: ${playerName}`}
+            model={modelUsed}
+            lang={lang}
+          />
         </div>
       )}
     </Card>
