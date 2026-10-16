@@ -22,6 +22,7 @@ import { autoImportUpcomingClass } from "@/lib/draft-class-import";
 import { computeContractExpiry } from "@/lib/finance";
 
 import { advanceLeagueDayCore } from "@/lib/season-day";
+import { reviewGames, serveSuspensions } from "@/lib/discipline-server";
 import { liveMatchesActive, liveRunGames, tryStartLiveTask } from "@/lib/live-server";
 
 const SEASON = "2026-27";
@@ -110,8 +111,14 @@ export async function simNextDayAction() {
   await aiGmDaily();            // AI GM sets tactics + cap-compliance for GM-less clubs
   await autoFillRosters("NHL"); // ensure every club owns a legal roster (durable, counts to cap)
   await fillAhlFromScratched(); // farms activate healthy scratches so their games sim
+  const simStart = new Date(); // suspensions issued before these games get these games counted
   const r = await playScheduledGames({ season: SEASON, round: next.round, actor: await commissionerName() });
   await processFinances(SEASON, "NHL");
+  // Player Safety, same as the nightly day: count these games toward active suspensions, then review tonight's incidents
+  // (this manual fallback used to skip it, so ejections/majors were never reviewed).
+  const playedIds = (await prisma.game.findMany({ where: { season: SEASON, league: "NHL", status: "FINAL", seriesId: null, round: next.round }, select: { id: true } })).map((g) => g.id);
+  await serveSuspensions(playedIds, simStart).catch((e) => console.error("[discipline:serve]", e));
+  await reviewGames(playedIds).catch((e) => console.error("[discipline:review]", e));
   // resolve any in-season UFA deliberation window that's come due — so signings progress
   // even when the season is moved via game-sim (not just the calendar's Advance Day).
   const inSeasonFa = await resolveInSeasonWindows(await getLeagueDate());
