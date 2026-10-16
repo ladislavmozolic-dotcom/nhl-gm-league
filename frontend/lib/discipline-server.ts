@@ -222,6 +222,13 @@ export async function appealSuspension(id: number, teamId: number, text: string)
   if (body.length < 10) throw new Error("Tell the commissioner why (a sentence or two).");
   await prisma.suspension.update({ where: { id }, data: { appealStatus: "PENDING", appealText: body, appealAt: new Date() } });
   await prisma.transaction.create({ data: { type: "DISCIPLINE", message: `⚖️ ${s.playerName}'s club has appealed his ${s.kind === "FINE" ? `$${s.fine.toLocaleString("en-US")} fine` : `${s.games}-game suspension`} to the commissioner.` } }).catch(() => {});
+  // tell the commissioner(s) in their own League Notifications thread — the public Transactions line is easy to miss
+  const club = await prisma.team.findUnique({ where: { id: teamId }, select: { code: true } }).catch(() => null);
+  const commish = await prisma.team.findMany({ where: { isAdmin: true }, select: { id: true } }); // only the commissioner can rule on an appeal
+  const what = s.kind === "FINE" ? `$${s.fine.toLocaleString("en-US")} fine` : `${s.games}-game suspension`;
+  for (const c of commish) {
+    await prisma.dmMessage.create({ data: { fromTeamId: c.id, toTeamId: c.id, body: `⚖️ Appeal to rule on: ${club?.code ?? "a club"} appeals ${cleanName(s.playerName)}'s ${what} — "${body.slice(0, 300)}"`, tradeUrl: "/league/player-safety" } }).catch(() => {});
+  }
 }
 
 /** Commissioner: uphold / reduce (to `games`) / overturn a suspension — on appeal or on his own. */
