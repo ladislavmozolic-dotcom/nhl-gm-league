@@ -138,17 +138,24 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       });
   }, [eventsList]);
 
-  // three stars from the goals/assists of the finished game (skaters only — saves aren't in the live feed)
+  // three stars from the finished game: skaters by goals/assists, goalies by saves (+ a shutout bonus)
   const stars = useMemo(() => {
     if (view?.status !== "final") return [];
-    const t = new Map<string, { name: string; team: string; g: number; a: number }>();
-    const row = (name: string, team: string) => { const k = `${team}|${name}`; if (!t.has(k)) t.set(k, { name, team, g: 0, a: 0 }); return t.get(k)!; };
+    type R = { name: string; team: string; g: number; a: number; sv: number; ga: number; goalie: boolean };
+    const t = new Map<string, R>();
+    const row = (name: string, team: string, goalie = false) => { const k = `${team}|${name}|${goalie}`; if (!t.has(k)) t.set(k, { name, team, g: 0, a: 0, sv: 0, ga: 0, goalie }); return t.get(k)!; };
     for (const g of liveGoals) {
       row(g.scorerName, g.teamCode ?? "").g++;
       for (const a of g.assists) row(a, g.teamCode ?? "").a++;
     }
-    return [...t.values()].sort((x, y) => (y.g + y.a) - (x.g + x.a) || y.g - x.g).slice(0, 3);
-  }, [view?.status, liveGoals]);
+    for (const e of eventsList) {
+      if (e.type === "SAVE" && e.playerName && !(e.meta as { so?: boolean } | undefined)?.so) row(e.playerName, e.teamCode ?? "", true).sv++;
+    }
+    const goalies = [...t.values()].filter((r) => r.goalie);
+    for (const gl of goalies) gl.ga = liveGoals.filter((g) => g.teamCode && g.teamCode !== gl.team).length;
+    const score = (r: R) => r.goalie ? r.sv * 0.06 + (r.ga === 0 && r.sv >= 15 ? 1.5 : 0) - r.ga * 0.35 : r.g + r.a * 0.6;
+    return [...t.values()].sort((x, y) => score(y) - score(x)).slice(0, 3);
+  }, [view?.status, liveGoals, eventsList]);
 
   const livePeriods = useMemo(() => {
     const pSet = new Set<number>([1]);
@@ -282,7 +289,7 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
           <h3 className="text-sm font-semibold text-slate-200 mb-2">⭐ Three stars</h3>
           <ol className="space-y-1 text-sm text-slate-300">
             {stars.map((s, i) => (
-              <li key={`${s.team}-${s.name}`}>{"⭐".repeat(3 - i)} <span className="font-medium text-slate-100">{s.name}</span> <span className="text-slate-500">{s.team}</span> — {s.g}G {s.a}A</li>
+              <li key={`${s.team}-${s.name}`}>{"⭐".repeat(3 - i)} <span className="font-medium text-slate-100">{s.name}</span> <span className="text-slate-500">{s.team}</span> — {s.goalie ? `${s.sv} saves, ${s.ga} GA` : `${s.g}G ${s.a}A`}</li>
             ))}
           </ol>
         </div>
