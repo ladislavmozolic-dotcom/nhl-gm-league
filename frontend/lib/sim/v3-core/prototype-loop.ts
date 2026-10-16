@@ -3,13 +3,14 @@
 import { RNG } from "../rng";
 import { decideCoreAction, type CoreAction, type CorePlayerProfile } from "./decision-engine";
 import { resolveCoreAction } from "./action-resolver";
-import { resolveCoreShot, type CoreGoalieProfile } from "./goalie-resolver";
+import type { CoreGoalieProfile } from "./goalie-resolver";
+import { resolveCoreShotResult, type CoreShotOutcome } from "./shot-result";
 import { createMatchState, opponentId, viewForTeam, withPossession, withScore, type CoreOnIce, type CoreZone, type RelativeZone, type V3CoreMatchState } from "./match-state";
 import { applyCoreTickState, withCoreLineChange } from "./state-transition";
 
 export type CorePrototypeLines = { forwards: number[][]; defense: number[][] };
 export type CorePrototypeTeam = { id: number; players: CorePlayerProfile[]; goalie?: CoreGoalieProfile; lines?: CorePrototypeLines; tactics?: { risk?: number; forecheck?: number } };
-export type CorePrototypeEvent = { tick: number; teamId: number; action: CoreAction | "GOAL" | "SAVE" | "TURNOVER"; outcome: "SUCCESS" | "FAILURE" | "GOAL" | "SAVE"; reason: string };
+export type CorePrototypeEvent = { tick: number; teamId: number; action: CoreAction | CoreShotOutcome | "TURNOVER"; outcome: "SUCCESS" | "FAILURE" | "GOAL" | "SAVE" | "MISS" | "BLOCK" | "REBOUND"; reason: string };
 export type CorePrototypeResult = { state: V3CoreMatchState; events: CorePrototypeEvent[] };
 
 const zoneFor = (state: V3CoreMatchState, teamId: number, relative: RelativeZone): CoreZone => {
@@ -70,15 +71,26 @@ export function runCorePrototype(input: { home: CorePrototypeTeam; away: CorePro
       continue;
     }
     if (action === "SHOOT") {
-      const shot = resolveCoreShot({ shooter: actor, goalie: opponent.goalie ?? averageGoalie, shotQuality: resolution.shotQuality ?? "LOW" });
-      if (rng.chance(shot.goalChance)) {
+      const shot = resolveCoreShotResult({
+        shooter: actor,
+        defender: { defense: defender.defense, physical: defender.physical },
+        goalie: opponent.goalie ?? averageGoalie,
+        shotQuality: resolution.shotQuality ?? "LOW",
+        pressure: view.pressure,
+      });
+      const outcome = rng.weighted((["MISS", "BLOCK", "GOAL", "SAVE", "REBOUND"] as const).map((kind) => shot.chances[kind]));
+      const kind = (["MISS", "BLOCK", "GOAL", "SAVE", "REBOUND"] as const)[outcome];
+      if (kind === "GOAL") {
         state = withScore(state, teamId, state.score[teamId] + 1);
         events.push({ tick, teamId, action: "GOAL", outcome: "GOAL", reason: shot.reason });
+      } else if (kind === "REBOUND") {
+        events.push({ tick, teamId, action: "REBOUND", outcome: "REBOUND", reason: shot.reason });
+        state = withPossession(state, teamId, zoneFor(state, teamId, "OFFENSIVE"));
       } else {
-        events.push({ tick, teamId, action: "SAVE", outcome: "SAVE", reason: shot.reason });
+        events.push({ tick, teamId: kind === "BLOCK" ? opponent.id : teamId, action: kind, outcome: kind, reason: shot.reason });
+        const other = opponentId(state, teamId);
+        state = withPossession(state, other, zoneFor(state, other, "DEFENSIVE"));
       }
-      const other = opponentId(state, teamId);
-      state = withPossession(state, other, zoneFor(state, other, "DEFENSIVE"));
     } else {
       state = withPossession(state, teamId, zoneFor(state, teamId, resolution.nextZone));
     }
