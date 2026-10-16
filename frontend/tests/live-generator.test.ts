@@ -158,8 +158,8 @@ test("moving the goalie-pull mark mid-game makes a trailing team pull earlier", 
     for (let seed = 301; seed < 361; seed++) {
       const opts = { seed, engineVersion: ENGINE_V3, liveFeed: true };
       const { result } = drain(simulateGameLive(makeTeam(1, 55), makeTeam(2, 70), opts), (s) => (change && s.period === 1 ? { home: makeTeam(1, 55, undefined, 300) } : undefined));
-      // pulls inside the last 5 minutes but earlier than the 90s default mark (1110s elapsed)
-      early += result.events!.filter((e) => e.type === "GOALIE_PULL" && e.teamId === 1 && (e.meta as { pulled?: boolean }).pulled && e.period === 3 && e.seconds < 1050).length;
+      // pulls inside the last 5 minutes but earlier than the default mark (V3 reads the 90 s default as 2:30; down 2 ×1.3 ≈ 3:15 → 1005 s elapsed)
+      early += result.events!.filter((e) => e.type === "GOALIE_PULL" && e.teamId === 1 && (e.meta as { pulled?: boolean }).pulled && e.period === 3 && e.seconds < 1000).length;
     }
     return early;
   };

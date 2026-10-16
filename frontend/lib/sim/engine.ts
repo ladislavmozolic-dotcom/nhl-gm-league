@@ -1575,7 +1575,7 @@ export function v3ShooterFormMult(secondsSinceOwnGoal: number, shotsSinceGoal: n
 // blowout keeps its full tempo. From the 2nd period a team up 3+ eases off (x0.94, x0.90 in the
 // 3rd); a team down 3+ pushes a little in the 3rd (x1.05). Bounded, deterministic, no RNG.
 export function v3GarbageTimeShotMult(period: number, marginForTeam: number): number {
-  if (marginForTeam >= 3 && period >= 2) return period >= 3 ? 0.76 : 0.86;
+  if (marginForTeam >= 3 && period >= 2) return 1 - (1 - (period >= 3 ? 0.76 : 0.86)) * COMPRESS_TUNING.garbageLead;
   if (marginForTeam <= -3 && period >= 3) return 1.1;
   return 1;
 }
@@ -2196,7 +2196,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       // gamble. Taper the window instead of treating all 3 deficits alike: a
       // wide-open down-3 pull for the full 2 minutes was creating a lot of the
       // engine's excess blowout rate (a real, but too-generous, empty-net dagger).
-      const trailWindow = trailBy === 1 ? pullWindow : trailBy === 2 ? pullWindow * 0.7 : pullWindow * 0.35;
+      const trailWindow = trailBy === 1 ? pullWindow : trailBy === 2 ? pullWindow * (st.v3SixOnFive ? SIX_TUNING.down2 : 0.7) : pullWindow * 0.35; // V3: modern benches pull down 2 about as early as down 1
       const eligible = period === 3 && (curStr[team.id] === "EV" || curStr[team.id] === "PP") && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= trailWindow;
       if (eligible !== !!st.emptyNet[team.id]) {
         if (eligible) useTimeout(team, tick, "before pulling the goalie");
@@ -2417,7 +2417,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       }
     }
     // score-effect: the team in front eases off, the trailing team presses (catch-up → fewer blowouts)
-    const catchUp = 1 - CFG.catchUpStrength * Math.max(-3, Math.min(3, margin));
+    const catchUp = 1 - CFG.catchUpStrength * (st.isExperimentalV3 ? COMPRESS_TUNING.catchUp : 1) * Math.max(-3, Math.min(3, margin));
     // team edge: the higher-overall club wins more battles and controls play, so
     // quality reliably tells over a season. Uses roster overall (the metric fans
     // compare) and amplifies the (narrow) OV gap; scaled by possessionSkillPct —
@@ -2497,7 +2497,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           const dumper = carrier;
           st.sink.emit({ period, seconds: tick, type: "ZONE_ENTRY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: dumper.id, playerName: dumper.name, zone: "OFF", importance: "NOTABLE", meta: { entryType: "dump" } });
           const chase = onIceF(carrierTeam).filter((x) => x.id !== dumper.id); // somebody else chases the puck he put in
-          const runner = pickByAttr(rng, chase.length ? chase : onIceD(carrierTeam).filter((x) => x.id !== dumper.id).concat(carrier), (s) => (s.attrs.sk ?? 50) + (s.attrs.ck ?? 50)) ?? carrier;
+          const chaseD = onIceD(carrierTeam).filter((x) => x.id !== dumper.id);
+          const runner = pickByAttr(rng, chase.length ? chase : chaseD.length ? chaseD : [carrier], (s) => (s.attrs.sk ?? 50) + (s.attrs.ck ?? 50)) ?? carrier;
           const pWin = Math.max(0.15, Math.min(0.7, DUMP_TUNING.race * ratio(atkSkill(runner.attrs.sk ?? 50), defSkill(dman.attrs.sk ?? 50))));
           if (rng.chance(pWin)) {
             carrier = runner; zone = "OFF"; setup = "carry"; press = 0;
@@ -3272,10 +3273,11 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
-export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.1, conv: 1.015 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
+export const COMPRESS_TUNING = { catchUp: 0.6, garbageLead: 1 }; // V3: × the per-goal catch-up and × how much a team up 3+ eases off (1 = as before, 0 = none)
+export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.1, conv: 0.99 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
 export const B2B_TUNING = { drain: 1.3, early: 0.92, late: 0.87 }; // V3 back-to-back: shift-fatigue speed, team edge in periods 1-2 / 3+
 export const ROLE_TUNING = { exp: 1.6, creator: 75 }; // V3 roles: SC-vs-PA exponent of the shoot-or-pass choice (V2: 0.7); % of goals whose primary assist is the real passer
-export const SIX_TUNING = { rate: 2.3, conv: 1.8, enShots: 0.3, pullSec: 150 }; // V3 6-on-5: attack shot rate / finishing (×, replaces 1.22), the leader's shot rate at the empty net, default pull window
+export const SIX_TUNING = { rate: 2.3, conv: 1.8, enShots: 0.4, pullSec: 150, down2: 1.3 }; // V3 6-on-5: attack shot rate / finishing (×, replaces 1.22), the leader's shot rate at the empty net, default pull window
 export const SCORE_TUNING = { push: 0.15, sit: 0.10 }; // V3 3rd-period score effects on the shot rate (down 1-2: ×(1+push), up 1-2: ×(1−sit))
 export const PERIOD_TUNING = { p1: 0.98, p2: 1.12, p3: 0.94 }; // V3 long change: goal conversion by regulation period (NHL ≈ 31 / 35 / 33 % of goals)
 export const OT_TUNING = { rate: 0.15, conv: 1.9 }; // conv: V3 3-on-3 finishing (open ice → more OT games end before the shootout)

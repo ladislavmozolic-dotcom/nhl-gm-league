@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Read-only: the current V3 default against real-NHL reference values (approximate league averages of the
-// 2023-24 and 2024-25 regular seasons — orientation, not exact targets). Distributions, score effects, goalie pulls.
+// Read-only: the current V3 default against real-NHL reference values. Game-state numbers (goals, periods, margins,
+// OT/SO, leads after 2, comebacks, EN goals, home win) are MEASURED from all 2,624 regular-season games of 2023-24 +
+// 2024-25 (api-web.nhle.com/v1/score/<date>); shots / sv% / PP / pull timing are approximate league averages.
 // Every ordered pair of the 32 NHL clubs × bases. Run: npx tsx scripts/nhl-reality-check.ts [bases=2] [seedBase=91000000]
-import { simulateGame, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING } from "../lib/sim/engine";
+import { simulateGame, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING, COMPRESS_TUNING } from "../lib/sim/engine";
 import { loadSettings } from "../lib/sim/settings";
 import { loadSimTeam } from "../lib/sim/index";
 import { ENGINE_V3 } from "../lib/sim/version";
@@ -13,12 +14,13 @@ if (process.argv[4]) Object.assign(PERIOD_TUNING, JSON.parse(process.argv[4]));
 if (process.argv[5]) Object.assign(SCORE_TUNING, JSON.parse(process.argv[5]));
 if (process.argv[6]) Object.assign(SIX_TUNING, JSON.parse(process.argv[6]));
 if (process.argv[7]) Object.assign(BOUNCE_TUNING, JSON.parse(process.argv[7]));
+if (process.argv[8]) Object.assign(COMPRESS_TUNING, JSON.parse(process.argv[8]));
 
 // ≈ NHL reference (rounded; per game = both teams)
 const NHL: Record<string, number> = {
-  goals: 6.1, shots: 29.5, svp: 90.2, ppOpp: 2.9, ppPct: 21, ot: 23, so: 7, home: 54,
-  shutout: 0.11, eng: 0.3, p1: 31, p2: 35, p3: 33,
-  m1: 41, m2: 22, m3: 18, m4: 19, lead2win: 78, trailShotShare: 53, pullSec: 165,
+  goals: 6.09, shots: 29.5, svp: 90.2, ppOpp: 2.9, ppPct: 21, ot: 20.7, so: 6.1, home: 55.2,
+  shutout: 0.11, eng: 0.37, p1: 28.9, p2: 33.6, p3: 35.1,
+  m1: 38.2, m2: 21.0, m3: 23.9, m4: 16.9, lead2win: 84.7, trailShotShare: 53, pullSec: 165,
 };
 
 type A = Record<string, number>;
@@ -102,13 +104,13 @@ const pulls: number[] = [];
     ["Final margin 3 goals %", pct("m3"), NHL.m3],
     ["Final margin 4+ goals %", pct("m4"), NHL.m4],
     ["Leading after 2 → wins %", pct("lead2win", a.lead2), NHL.lead2win],
-    ["…lead of 1 → wins %", pct("lead2win_1", a.lead2_1), 70, `${(pct("lead2_1", a.lead2)).toFixed(0)}% of leads`],
-    ["…lead of 2 → wins %", pct("lead2win_2", a.lead2_2), 89, `${(pct("lead2_2", a.lead2)).toFixed(0)}% of leads`],
-    ["…lead of 3+ → wins %", pct("lead2win_3", a.lead2_3), 97, `${(pct("lead2_3", a.lead2)).toFixed(0)}% of leads`],
-    ["Tied after 2 periods %", 100 - pct("lead2"), 27],
+    ["…lead of 1 → wins %", pct("lead2win_1", a.lead2_1), 73.8, `${(pct("lead2_1", a.lead2)).toFixed(0)}% of leads`],
+    ["…lead of 2 → wins %", pct("lead2win_2", a.lead2_2), 90.7, `${(pct("lead2_2", a.lead2)).toFixed(0)}% of leads`],
+    ["…lead of 3+ → wins %", pct("lead2win_3", a.lead2_3), 97.8, `${(pct("lead2_3", a.lead2)).toFixed(0)}% of leads`],
+    ["Tied after 2 periods %", 100 - pct("lead2"), 19.8],
     ["Trailing team's share of shots %", 100 * a.shotTrail / (a.shotTrail + a.shotLead), NHL.trailShotShare],
     ["3rd, down 1: share of shots %", 100 * a.t3 / (a.t3 + a.l3), 58],
-    ["3rd, 1-goal game: trailing team scores next %", 100 * a.t3g / (a.t3g + a.l3g), 47],
+    ["3rd, 1-goal game: trailing team scores next %", 100 * a.t3g / (a.t3g + a.l3g), 56.3],
     ["Down 1, goalie pulled → tied %", pct("pullTie", a.pull1), 18],
     ["Down 1, goalie pulled → EN goal against %", pct("pullEng", a.pull1), 30],
     ["Goalie pulled (down 1) — median s left", pulls.length ? pulls[pulls.length >> 1] : NaN, NHL.pullSec, `${pulls.length} pulls`],
