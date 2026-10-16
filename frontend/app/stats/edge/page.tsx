@@ -31,6 +31,8 @@ const SKATER_COLS: Col[] = [
   { key: "miles", label: "Distance", title: "Skating distance, miles (modelled from ice time)", num: true, format: "dec1" },
   { key: "topShot", label: "Top Shot", title: "Fastest shot on goal, mph (tracked)", num: true, format: "dec1" },
   { key: "hits", label: "Hits", title: "Hits", num: true },
+  { key: "rushes", label: "Rushes", title: "Odd-man rushes led — breakaways, 2-on-1s, 3-on-2s (V3 games)", num: true },
+  { key: "rushGoals", label: "Rush G", title: "Goals scored off an odd-man rush (V3 games)", num: true },
 ];
 
 const GOALIE_COLS: Col[] = [
@@ -54,6 +56,11 @@ const TEAM_COLS: Col[] = [
   { key: "topShot", label: "Top Shot", title: "Fastest shot, mph", num: true, format: "dec1" },
   { key: "hitsPg", label: "Hits/G", title: "Hits per game", num: true, format: "dec1" },
   { key: "skate", label: "Avg Speed", title: "Roster average top skating speed, mph (modelled)", num: true, format: "dec1" },
+  { key: "entriesPg", label: "Entries/G", title: "Offensive-zone entries per game", num: true, format: "dec1" },
+  { key: "dumpPct", label: "Dump %", title: "Share of zone entries that were dump-ins (V3 games)", num: true, format: "dec1" },
+  { key: "rushForPg", label: "Rush/G", title: "Odd-man rushes per game (V3 games)", num: true, format: "dec1" },
+  { key: "rushAgPg", label: "Rush Ag/G", title: "Odd-man rushes allowed per game (V3 games)", num: true, format: "dec1" },
+  { key: "rushGoals", label: "Rush G", title: "Goals off odd-man rushes (V3 games)", num: true },
 ];
 
 export default async function EdgeStatsPage({ searchParams }: { searchParams: Promise<{ league?: string; view?: string; phase?: string }> }) {
@@ -86,9 +93,9 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
     const filtered = sk.filter((s) => s.gp >= skMin);
     rows = filtered.map((s) => ({
       _pid: s.playerId, _slug: s.slug, name: s.name, teamCode: s.teamCode ?? "—", _teamSlug: s.teamSlug ?? "", _teamLogo: s.teamLogo ?? "", pos: s.position, gp: s.gp,
-      topSkate: s.topSkateSpeed, bursts: s.bursts, miles: s.miles, topShot: s.topShot, hits: s.hits,
+      topSkate: s.topSkateSpeed, bursts: s.bursts, miles: s.miles, topShot: s.topShot, hits: s.hits, rushes: s.rushes, rushGoals: s.rushGoals,
     }));
-    cols = SKATER_COLS; initialSort = "topShot";
+    cols = filtered.some((p) => p.rushes > 0) ? SKATER_COLS : SKATER_COLS.filter((c) => c.key !== "rushes" && c.key !== "rushGoals"); initialSort = "topShot";
     minNote = `Minimum ${skMin} GP (scales up to 10). Top Shot is tracked; Top Speed / bursts / distance are modelled.`;
 
     if (filtered.length > 0) {
@@ -234,8 +241,11 @@ export default async function EdgeStatsPage({ searchParams }: { searchParams: Pr
     rows = te.map((t) => ({
       name: t.name, _teamSlug: t.slug ?? "", _teamLogo: t.logoUrl ?? "", gp: t.gp, ozPct: t.ozPct, nzPct: t.nzPct, dzPct: t.dzPct,
       avgShot: t.avgShot, topShot: t.topShot, hitsPg: t.hitsPerGame, skate: t.avgSkateSpeed,
+      entriesPg: t.entriesPg, dumpPct: t.dumpPct, rushForPg: t.rushForPg, rushAgPg: t.rushAgPg, rushGoals: t.rushGoals,
     }));
-    cols = TEAM_COLS; initialSort = "ozPct";
+    // V3 transition columns only when this season has V3 games (V2 has no dump-ins / rushes)
+    cols = te.some((t) => t.dumpPct > 0 || t.rushForPg > 0) ? TEAM_COLS : TEAM_COLS.filter((c) => !["dumpPct", "rushForPg", "rushAgPg", "rushGoals"].includes(c.key));
+    initialSort = "ozPct";
 
     if (te.length > 0) {
       const ozLeader = [...te].sort((a, b) => b.ozPct - a.ozPct)[0];

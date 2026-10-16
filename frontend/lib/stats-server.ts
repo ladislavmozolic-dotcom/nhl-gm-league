@@ -257,11 +257,43 @@ const skateTopSpeed = (sk: number, id: number) => 18.4 + ((sk - 50) / 49) * 5.6 
 const burstsPerGame = (sk: number) => Math.max(0, (sk - 72) / 3.5); // 22+ mph bursts / game
 const milesPerGame = (toiSecPerGame: number) => (toiSecPerGame / 60) * 0.155;
 
+
+/** V3 transition play from the stored event stream: zone entries (dump-ins), odd-man rushes and the goals off them.
+ *  V2 games simply have no dump-in / rush events, so they add nothing. */
+async function transitionAgg(season: string, league: string) {
+  const game = gameWhere({ season, league, playoffs: false });
+  const [entries, dumps, rushes, goals] = await Promise.all([
+    prisma.gameEvent.groupBy({ by: ["teamId"], where: { type: "ZONE_ENTRY", game }, _count: { _all: true } }),
+    prisma.gameEvent.groupBy({ by: ["teamId"], where: { type: "ZONE_ENTRY", game, meta: { path: ["entryType"], equals: "dump" } }, _count: { _all: true } }),
+    prisma.gameEvent.findMany({ where: { type: "RUSH", game }, select: { teamId: true, playerId: true, game: { select: { homeTeamId: true, awayTeamId: true } } } }),
+    prisma.gameEvent.findMany({ where: { type: "GOAL", game }, select: { teamId: true, playerId: true, meta: true } }),
+  ]);
+  const team = new Map<number, { entries: number; dumps: number; rushFor: number; rushAg: number; rushGoals: number }>();
+  const player = new Map<number, { rushes: number; rushGoals: number }>();
+  const T = (id: number) => { let r = team.get(id); if (!r) { r = { entries: 0, dumps: 0, rushFor: 0, rushAg: 0, rushGoals: 0 }; team.set(id, r); } return r; };
+  const P = (id: number) => { let r = player.get(id); if (!r) { r = { rushes: 0, rushGoals: 0 }; player.set(id, r); } return r; };
+  for (const e of entries) if (e.teamId != null) T(e.teamId).entries += e._count._all;
+  for (const e of dumps) if (e.teamId != null) T(e.teamId).dumps += e._count._all;
+  for (const r of rushes) {
+    if (r.teamId == null) continue;
+    T(r.teamId).rushFor++;
+    T(r.teamId === r.game.homeTeamId ? r.game.awayTeamId : r.game.homeTeamId).rushAg++;
+    if (r.playerId != null) P(r.playerId).rushes++;
+  }
+  for (const g of goals) {
+    if (!(g.meta as { rush?: string } | null)?.rush) continue;
+    if (g.teamId != null) T(g.teamId).rushGoals++;
+    if (g.playerId != null) P(g.playerId).rushGoals++;
+  }
+  return { team, player };
+}
+
 export type SkaterEdge = {
   playerId: number; name: string; position: string; teamId?: number | null; teamCode: string | null; teamSlug: string | null; teamLogo: string | null;
   photoUrl?: string | null; slug?: string | null;
   gp: number; toi: number; topShot: number; hits: number;
   topSkateSpeed: number; bursts: number; miles: number; sk: number;
+  rushes: number; rushGoals: number; // V3: odd-man rushes he led / goals scored off a rush
 };
 
 export async function skaterEdge(season: string, league = "NHL"): Promise<SkaterEdge[]> {
@@ -280,6 +312,7 @@ export async function skaterEdge(season: string, league = "NHL"): Promise<Skater
   ]);
   const pById = new Map(players.map((p) => [p.id, p]));
   const skById = new Map(ratings.map((r) => [r.playerId, r.sk ?? 50]));
+  const trans = await transitionAgg(season, league);
   return grouped.map((g) => {
     const p = pById.get(g.playerId);
     const t = g.teamId ? teams.get(g.teamId) : null;
@@ -293,6 +326,7 @@ export async function skaterEdge(season: string, league = "NHL"): Promise<Skater
       gp, toi, topShot: g._max.topShot ?? 0, hits: g._sum.hits ?? 0,
       topSkateSpeed: skateTopSpeed(sk, g.playerId), bursts: Math.round(burstsPerGame(sk) * gp),
       miles: gp ? milesPerGame(toi / gp) * gp : 0, sk,
+      rushes: trans.player.get(g.playerId)?.rushes ?? 0, rushGoals: trans.player.get(g.playerId)?.rushGoals ?? 0,
     };
   });
 }
@@ -343,6 +377,7 @@ export type TeamEdge = {
   teamId: number; name: string; code: string | null; slug: string | null; logoUrl: string | null;
   gp: number; ozPct: number; nzPct: number; dzPct: number;
   avgShot: number; topShot: number; hitsPerGame: number; avgSkateSpeed: number;
+  entriesPg: number; dumpPct: number; rushForPg: number; rushAgPg: number; rushGoals: number; // V3 transition (0 when only V2 games)
 };
 
 export async function teamEdge(season: string, league = "NHL"): Promise<TeamEdge[]> {
@@ -375,8 +410,10 @@ export async function teamEdge(season: string, league = "NHL"): Promise<TeamEdge
     if (p.teamId == null || !p.skaterRating?.sk) continue;
     const e = skByTeam.get(p.teamId) ?? { sum: 0, n: 0 }; e.sum += p.skaterRating.sk; e.n++; skByTeam.set(p.teamId, e);
   }
+  const trans = await transitionAgg(season, league);
   return [...acc.values()].map((a) => {
     const t = teamRows.get(a.teamId);
+    const tr = trans.team.get(a.teamId);
     const sk = skByTeam.get(a.teamId);
     return {
       teamId: a.teamId, name: t?.name ?? "—", code: t?.code ?? null, slug: t?.slug ?? null, logoUrl: t?.logoUrl ?? null,
@@ -384,6 +421,8 @@ export async function teamEdge(season: string, league = "NHL"): Promise<TeamEdge
       avgShot: a.gp ? a.avgShot / a.gp : 0, topShot: a.topShot,
       hitsPerGame: a.gp ? (hitByTeam.get(a.teamId) ?? 0) / a.gp : 0,
       avgSkateSpeed: sk && sk.n ? skateTopSpeed(sk.sum / sk.n, a.teamId) : 0,
+      entriesPg: a.gp && tr ? tr.entries / a.gp : 0, dumpPct: tr && tr.entries ? (100 * tr.dumps) / tr.entries : 0,
+      rushForPg: a.gp && tr ? tr.rushFor / a.gp : 0, rushAgPg: a.gp && tr ? tr.rushAg / a.gp : 0, rushGoals: tr?.rushGoals ?? 0,
     };
   });
 }
