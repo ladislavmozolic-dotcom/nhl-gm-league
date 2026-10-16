@@ -174,7 +174,9 @@ type SimState = {
   v3ShooterForm: boolean;            // V3 diagnostic feature flag
   v3LateTieCaution: boolean;         // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
-  v3OtPace: boolean;                 // V3: 3-on-3 overtime has ~2x the attempts (each a real entry + shot) at a proportionally lower conversion — same scoring, a livelier feed
+  v3OtPace: boolean;                 // V3: 3-on-3 overtime has ~2x the attempts (each a real entry + shot); OT_TUNING.conv → ~2/3 of OT games end before the shootout (NHL-like)
+  v3ScoreEffects: boolean;           // V3: in the 3rd a team down 1-2 pushes and the team in front sits back (NHL: the trailing side gets ~56% of the shots)
+  v3LongChange: boolean;             // V3: the 2nd period's long change — more goals in the 2nd, slightly fewer in the 1st/3rd (goal-neutral, PERIOD_TUNING)
   v3Dump: boolean;                   // V3: a failed carry-in becomes a dump-in — a race for the puck, the goalie may play it
   v3Pin: boolean;                    // V3: a team pinned in its own end can't change, tires, and gets scored on more
   v3Pace: boolean;                   // V3: the puck needs real time to cross a zone — no 2-second counter-attacks, no 'takeaway' right after a shot
@@ -2462,8 +2464,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           // dump and chase: the puck goes in deep and it's a race — the attackers' forecheck against the defenders' retrieval, with the goalie sometimes playing it behind the net
           const dumper = carrier;
           st.sink.emit({ period, seconds: tick, type: "ZONE_ENTRY", teamId: carrierTeam.id, teamCode: carrierTeam.code ?? undefined, playerId: dumper.id, playerName: dumper.name, zone: "OFF", importance: "NOTABLE", meta: { entryType: "dump" } });
-          const chase = onIceF(carrierTeam).filter((x) => x !== dumper); // somebody else chases the puck he put in
-          const runner = pickByAttr(rng, chase.length ? chase : onIceD(carrierTeam).filter((x) => x !== dumper).concat(carrier), (s) => (s.attrs.sk ?? 50) + (s.attrs.ck ?? 50)) ?? carrier;
+          const chase = onIceF(carrierTeam).filter((x) => x.id !== dumper.id); // somebody else chases the puck he put in
+          const runner = pickByAttr(rng, chase.length ? chase : onIceD(carrierTeam).filter((x) => x.id !== dumper.id).concat(carrier), (s) => (s.attrs.sk ?? 50) + (s.attrs.ck ?? 50)) ?? carrier;
           const pWin = Math.max(0.15, Math.min(0.7, DUMP_TUNING.race * ratio(atkSkill(runner.attrs.sk ?? 50), defSkill(dman.attrs.sk ?? 50))));
           if (rng.chance(pWin)) {
             carrier = runner; zone = "OFF"; setup = "carry"; press = 0;
@@ -2487,7 +2489,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // on-goal (SOG) rate the calibration is tuned against unchanged.
     const lateShell = lateShellShotMult(period, tick, margin)
       * (st.v3GarbageTime ? v3GarbageTimeShotMult(period, margin) : 1)
-      * (st.v3LateTieCaution && curStr[home.id] === "EV" && curStr[away.id] === "EV" ? v3LateTieShotMult(period, tick, margin) : 1);
+      * (st.v3LateTieCaution && curStr[home.id] === "EV" && curStr[away.id] === "EV" ? v3LateTieShotMult(period, tick, margin) : 1)
+      * (st.v3ScoreEffects && period === 3 && Math.abs(margin) >= 1 && Math.abs(margin) <= 2 ? (margin < 0 ? 1 + SCORE_TUNING.push : 1 - SCORE_TUNING.sit) : 1);
     const faceoffSetPlay = faceoffPressure?.teamId === carrierTeam.id && tick < faceoffPressure.until ? 1.06 : 1;
     const adaptAtk = adapt(carrierTeam, margin).shots, adaptDef = adapt(def, -margin).allow;
     const openIce = curSkaters[home.id] === 4 && curSkaters[away.id] === 4 && curStr[carrierTeam.id] === "EV" ? FOUR_ON_FOUR_SHOTS : 1;
@@ -2698,6 +2701,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
         p *= v3GoalieComposureMult(absT - (st.lastGoalAgainst[def.id] ?? -1e9), st.goalieStreak[def.id] ?? 0);
       }
       // V3: a defence that has been pinned out there far too long is gassed — the later it gets, the likelier the goal
+      // V3: the long change in the 2nd — tired players can't get off, the bench is far, more odd looks
+      if (st.v3LongChange && !defEmptyNet && period <= 3) p *= period === 1 ? PERIOD_TUNING.p1 : period === 2 ? PERIOD_TUNING.p2 : PERIOD_TUNING.p3;
       if (st.v3Pin && !defEmptyNet) p *= 1 + PIN_TUNING.conv * Math.max(0, Math.min(1, (Math.max(shifts[def.id].fElapsed, shifts[def.id].dElapsed) - 40) / 60));
       // Empty net (both engines — a real missing mechanic, not a v2 presentation
       // choice; see st.emptyNet below). carrierTeam pulled: 6-on-5 pressure. def
@@ -3124,7 +3129,7 @@ function simulateOvertime(st: SimState, cfg: { period?: number; seconds?: number
       hasOtShot = true;
       const finishExponent = (st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7)
         + (st.v3OvertimeStars ? V3_OT_STAR_EXPONENT : 0); // the separate 3-on-3 OT model (the possession loop never plays OT)
-      const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV", finishExponent) * 2.2 * (cfg.finishMult ?? 1) * (st.v3OtPace ? 0.07 / OT_TUNING.rate : 1);
+      const p = conversion(shooter.offense, effGoalieQuality(liveGoalie(st, def)), isHome, "EV", finishExponent) * 2.2 * (cfg.finishMult ?? 1) * (st.v3OtPace ? 0.07 / OT_TUNING.rate * OT_TUNING.conv : 1);
       if (rng.chance(p)) {
         tracked.goalie!.goalsAgainst++;
         // st.currentOnIce already holds the real deployed trio for both teams
@@ -3211,7 +3216,9 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
-export const OT_TUNING = { rate: 0.15 };
+export const SCORE_TUNING = { push: 0.15, sit: 0.10 }; // V3 3rd-period score effects on the shot rate (down 1-2: ×(1+push), up 1-2: ×(1−sit))
+export const PERIOD_TUNING = { p1: 0.98, p2: 1.12, p3: 0.94 }; // V3 long change: goal conversion by regulation period (NHL ≈ 31 / 35 / 33 % of goals)
+export const OT_TUNING = { rate: 0.15, conv: 1.9 }; // conv: V3 3-on-3 finishing (open ice → more OT games end before the shootout)
 export const PIN_TUNING = { hold: 6, maxShift: 100, conv: 0.35, shots: 0.25, base: 0.80, keep: 0.25, tire: 0.8, dur: 0.6 };
 export const PACE_TUNING = { dwell: 2, advance: 0.6, shotDwell: 2, shotGap: 3, shotBoost: 1.78 };
 
@@ -3309,7 +3316,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
+  experimentalV3?: { scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3386,6 +3393,8 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3LateTieCaution: isV3 && (opts.experimentalV3?.lateTieCaution ?? true),
     v3Stoppages: isV3 && (opts.experimentalV3?.stoppageRealism ?? CFG.v3StoppageRealism ?? false),
     v3OtPace: isV3 && (opts.experimentalV3?.otPace ?? true),
+    v3LongChange: isV3 && (opts.experimentalV3?.longChange ?? true),
+    v3ScoreEffects: isV3 && (opts.experimentalV3?.scoreEffects ?? true),
     v3Dump: isV3 && (opts.experimentalV3?.dump ?? true),
     v3Pin: isV3 && (opts.experimentalV3?.pin ?? true),
     v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),

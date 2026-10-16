@@ -1,0 +1,104 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Read-only: the current V3 default against real-NHL reference values (approximate league averages of the
+// 2023-24 and 2024-25 regular seasons — orientation, not exact targets). Distributions, score effects, goalie pulls.
+// Every ordered pair of the 32 NHL clubs × bases. Run: npx tsx scripts/nhl-reality-check.ts [bases=2] [seedBase=91000000]
+import { simulateGame, PERIOD_TUNING, SCORE_TUNING } from "../lib/sim/engine";
+import { loadSettings } from "../lib/sim/settings";
+import { loadSimTeam } from "../lib/sim/index";
+import { ENGINE_V3 } from "../lib/sim/version";
+import { prisma } from "../lib/prisma";
+
+const bases = Number(process.argv[2] ?? 2), seedBase = Number(process.argv[3] ?? 91_000_000);
+if (process.argv[4]) Object.assign(PERIOD_TUNING, JSON.parse(process.argv[4]));
+if (process.argv[5]) Object.assign(SCORE_TUNING, JSON.parse(process.argv[5]));
+
+// ≈ NHL reference (rounded; per game = both teams)
+const NHL: Record<string, number> = {
+  goals: 6.1, shots: 29.5, svp: 90.2, ppOpp: 2.9, ppPct: 21, ot: 23, so: 7, home: 54,
+  shutout: 0.11, eng: 0.3, p1: 31, p2: 35, p3: 33,
+  m1: 41, m2: 22, m3: 18, m4: 19, lead2win: 78, trailShotShare: 53, pullSec: 165,
+};
+
+type A = Record<string, number>;
+const a: A = { games: 0 };
+const add = (k: string, v: number) => { a[k] = (a[k] ?? 0) + v; };
+const pulls: number[] = [];
+
+(async () => {
+  const settings = await loadSettings();
+  const ids = (await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true }, orderBy: { id: "asc" } })).map((t) => t.id);
+  const teams: Awaited<ReturnType<typeof loadSimTeam>>[] = [];
+  for (const id of ids) teams.push(await loadSimTeam(id));
+  if (process.env.PULL) for (const t of teams as any[]) if (t.strategy?.goaliePull) t.strategy.goaliePull.pullSec = Number(process.env.PULL);
+  for (let b = 0; b < bases; b++) for (let i = 0; i < teams.length; i++) for (let j = 0; j < teams.length; j++) {
+    if (i === j) continue;
+    const r: any = simulateGame(structuredClone(teams[i]), structuredClone(teams[j]), { settings, seed: seedBase + b * 100_000 + i * 100 + j, engineVersion: ENGINE_V3 });
+    const H = r.home.teamId, ev: any[] = r.events ?? [];
+    a.games++;
+    const goals = ev.filter((e) => e.type === "GOAL" && !e.meta?.so);
+    add("goals", r.home.goals + r.away.goals); add("shots", r.home.shots + r.away.shots);
+    add("sv", r.home.shots + r.away.shots - goals.filter((g) => !g.meta?.emptyNet).length);
+    add("sog", r.home.shots + r.away.shots);
+    add("ppOpp", r.home.ppOpp + r.away.ppOpp); add("ppG", goals.filter((g) => g.strength === "PP").length);
+    add("ot", r.endedIn !== "REG" ? 1 : 0); add("so", r.endedIn === "SO" ? 1 : 0);
+    add("home", r.winner === H ? 1 : 0);
+    add("shutout", (r.home.goals === 0 ? 1 : 0) + (r.away.goals === 0 ? 1 : 0));
+    add("eng", goals.filter((g) => g.meta?.emptyNet).length);
+    for (const g of goals) add(`p${Math.min(g.period, 4)}`, 1);
+    const m = Math.abs(r.home.goals - r.away.goals);
+    add(m >= 4 ? "m4" : `m${m}`, 1);
+    // score after 2 periods → who wins
+    const s2 = goals.filter((g) => g.period <= 2).reduce((s, g) => s + (g.teamId === H ? 1 : -1), 0);
+    if (s2 !== 0) {
+      add("lead2", 1); const k = Math.min(3, Math.abs(s2)); add(`lead2_${k}`, 1);
+      if ((s2 > 0) === (r.winner === H)) { add("lead2win", 1); add(`lead2win_${k}`, 1); }
+    }
+    // score effects: shots on goal (SAVE + GOAL, regulation) taken while trailing vs leading
+    let diff = 0; // home − away, walked in time order
+    const timeline = ev.filter((e) => (e.type === "SAVE" || e.type === "GOAL") && e.period <= 3 && !e.meta?.so && !e.meta?.emptyNet).sort((x, y) => x.period - y.period || x.seconds - y.seconds || x.seq - y.seq);
+    for (const e of timeline) {
+      const shooterHome = e.type === "GOAL" ? e.teamId === H : e.teamId !== H;
+      const lead = shooterHome ? diff : -diff;
+      if (lead < 0) add("shotTrail", 1); else if (lead > 0) add("shotLead", 1);
+      if (e.period === 3 && lead === -1) add("t3", 1); else if (e.period === 3 && lead === 1) add("l3", 1);
+      if (e.period === 3 && Math.abs(lead) === 1 && e.type === "GOAL") add(lead < 0 ? "t3g" : "l3g", 1);
+      if (e.type === "GOAL") diff += e.teamId === H ? 1 : -1;
+    }
+    for (const e of ev.filter((x) => x.type === "GOALIE_PULL" && x.meta?.pulled && x.period === 3)) pulls.push(1200 - e.seconds);
+  }
+  const g = a.games, pct = (k: string, d = g) => 100 * (a[k] ?? 0) / d, per = (k: string) => (a[k] ?? 0) / g;
+  const pg = a.p1 + a.p2 + a.p3 + (a.p4 ?? 0);
+  pulls.sort((x, y) => x - y);
+  const rows: [string, number, number, string?][] = [
+    ["Goals / game", per("goals"), NHL.goals],
+    ["Shots on goal / team", per("shots") / 2, NHL.shots],
+    ["Save % (no EN)", pct("sv", a.sog), NHL.svp],
+    ["Power plays / team", per("ppOpp") / 2, NHL.ppOpp],
+    ["Power-play %", pct("ppG", a.ppOpp), NHL.ppPct],
+    ["Games past regulation %", pct("ot"), NHL.ot],
+    ["Shootouts % of games", pct("so"), NHL.so],
+    ["Home team wins %", pct("home"), NHL.home],
+    ["Shutouts / game", per("shutout"), NHL.shutout],
+    ["Empty-net goals / game", per("eng"), NHL.eng],
+    ["Goals in 1st period %", pct("p1", pg), NHL.p1],
+    ["Goals in 2nd period %", pct("p2", pg), NHL.p2],
+    ["Goals in 3rd period %", pct("p3", pg), NHL.p3],
+    ["Final margin 1 goal %", pct("m1"), NHL.m1],
+    ["Final margin 2 goals %", pct("m2"), NHL.m2],
+    ["Final margin 3 goals %", pct("m3"), NHL.m3],
+    ["Final margin 4+ goals %", pct("m4"), NHL.m4],
+    ["Leading after 2 → wins %", pct("lead2win", a.lead2), NHL.lead2win],
+    ["…lead of 1 → wins %", pct("lead2win_1", a.lead2_1), 70, `${(pct("lead2_1", a.lead2)).toFixed(0)}% of leads`],
+    ["…lead of 2 → wins %", pct("lead2win_2", a.lead2_2), 89, `${(pct("lead2_2", a.lead2)).toFixed(0)}% of leads`],
+    ["…lead of 3+ → wins %", pct("lead2win_3", a.lead2_3), 97, `${(pct("lead2_3", a.lead2)).toFixed(0)}% of leads`],
+    ["Tied after 2 periods %", 100 - pct("lead2"), 27],
+    ["Trailing team's share of shots %", 100 * a.shotTrail / (a.shotTrail + a.shotLead), NHL.trailShotShare],
+    ["3rd, down 1: share of shots %", 100 * a.t3 / (a.t3 + a.l3), 58],
+    ["3rd, 1-goal game: trailing team scores next %", 100 * a.t3g / (a.t3g + a.l3g), 47],
+    ["Goalie pulled — median s left", pulls.length ? pulls[pulls.length >> 1] : NaN, NHL.pullSec, `${pulls.length} pulls`],
+  ];
+  console.log(`\n${g} games (V3 default, every ordered pair of the 32 NHL clubs × ${bases})\n`);
+  console.log("| Metric | V3 | NHL ≈ | Δ |\n|---|---:|---:|---:|");
+  for (const [l, v, n, note] of rows) console.log(`| ${l} | ${v.toFixed(2)} | ${n} | ${(v - n >= 0 ? "+" : "") + (v - n).toFixed(2)}${note ? ` (${note})` : ""} |`);
+  await prisma.$disconnect();
+})();
