@@ -337,7 +337,7 @@ function createSleeveTexture(kit: Kit, a: Actor, isLeft: boolean): THREE.CanvasT
 }
 
 function createHelmetTexture(kit: Kit, logoImg?: HTMLImageElement | null): THREE.CanvasTexture {
-  const W = 256,
+  const W = 512,
     H = 256;
   const cv = document.createElement("canvas");
   cv.width = W;
@@ -347,19 +347,153 @@ function createHelmetTexture(kit: Kit, logoImg?: HTMLImageElement | null): THREE
   c.fillStyle = kit.helmet;
   c.fillRect(0, 0, W, H);
 
-  // Air ventilation slots
+  // Aerodynamic vents on crown
   c.fillStyle = "#111111";
   for (let i = 0; i < 4; i++) {
     c.beginPath();
-    c.roundRect(40 + i * 48, 30, 24, 70, 10);
+    c.roundRect(140 + i * 36, 25, 20, 60, 8);
     c.fill();
   }
 
-  // Team logo decals on sides
+  // Side logo decals (on left side u ~ 0.25 and right side u ~ 0.75)
   if (logoImg && logoImg.complete && logoImg.naturalWidth) {
-    c.drawImage(logoImg, 35, 140, 70, 70);
-    c.drawImage(logoImg, 150, 140, 70, 70);
+    const s = 64;
+    c.drawImage(logoImg, 64, 110, s, s);
+    c.drawImage(logoImg, W - 64 - s, 110, s, s);
   }
+
+  // Manufacturer logo (CCM / Bauer white badge at forehead)
+  c.fillStyle = "#ffffff";
+  c.font = "bold 16px Arial, sans-serif";
+  c.textAlign = "center";
+  c.fillText("UNHL", W / 2, 85);
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createFaceTexture(skinTone = "#d9a584"): THREE.CanvasTexture {
+  const W = 256,
+    H = 256;
+  const cv = document.createElement("canvas");
+  cv.width = W;
+  cv.height = H;
+  const c = cv.getContext("2d")!;
+
+  // 1. Base skin tone
+  c.fillStyle = skinTone;
+  c.fillRect(0, 0, W, H);
+
+  // 2. Athletic hair / back & sides of head
+  c.fillStyle = "#1e1713";
+  c.beginPath();
+  c.moveTo(0, 0);
+  c.lineTo(W, 0);
+  c.lineTo(W, 85);
+  c.quadraticCurveTo(W * 0.75, 80, W * 0.58, 65);
+  c.quadraticCurveTo(W * 0.5, 75, W * 0.42, 65);
+  c.quadraticCurveTo(W * 0.25, 80, 0, 85);
+  c.closePath();
+  c.fill();
+
+  // Sideburns
+  c.fillRect(60, 80, 22, 45);
+  c.fillRect(W - 82, 80, 22, 45);
+
+  // 3. Eye sockets / subtle shadow
+  c.fillStyle = "rgba(0,0,0,0.08)";
+  c.beginPath();
+  c.ellipse(108, 108, 16, 12, 0, 0, Math.PI * 2);
+  c.ellipse(148, 108, 16, 12, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // 4. White sclera of eyes
+  c.fillStyle = "#f8fafc";
+  c.beginPath();
+  c.ellipse(108, 108, 9, 5, 0, 0, Math.PI * 2);
+  c.ellipse(148, 108, 9, 5, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // 5. Irises & Pupils (Focused athletic forward gaze)
+  for (const ex of [108, 148]) {
+    c.fillStyle = "#2d3748";
+    c.beginPath();
+    c.arc(ex, 108, 4.2, 0, Math.PI * 2);
+    c.fill();
+
+    c.fillStyle = "#090d14";
+    c.beginPath();
+    c.arc(ex, 108, 2.2, 0, Math.PI * 2);
+    c.fill();
+
+    c.fillStyle = "#ffffff";
+    c.beginPath();
+    c.arc(ex + 1.2, 106.8, 1.2, 0, Math.PI * 2);
+    c.fill();
+  }
+
+  // 6. Eyelids / lash line
+  c.strokeStyle = "#1a1614";
+  c.lineWidth = 1.8;
+  c.beginPath();
+  c.moveTo(98, 106);
+  c.quadraticCurveTo(108, 103, 118, 107);
+  c.moveTo(138, 107);
+  c.quadraticCurveTo(148, 103, 158, 106);
+  c.stroke();
+
+  // 7. Strong athletic eyebrows
+  c.strokeStyle = "#231a14";
+  c.lineWidth = 3.5;
+  c.lineCap = "round";
+  c.beginPath();
+  c.moveTo(96, 99);
+  c.quadraticCurveTo(108, 95, 120, 98);
+  c.moveTo(136, 98);
+  c.quadraticCurveTo(148, 95, 160, 99);
+  c.stroke();
+
+  // 8. Nose bridge & shading
+  c.fillStyle = "rgba(0,0,0,0.12)";
+  c.beginPath();
+  c.moveTo(126, 106);
+  c.lineTo(130, 106);
+  c.lineTo(133, 128);
+  c.lineTo(123, 128);
+  c.closePath();
+  c.fill();
+
+  // Nostrils
+  c.fillStyle = "rgba(40,20,15,0.4)";
+  c.beginPath();
+  c.ellipse(123, 129, 2.5, 1.8, -0.2, 0, Math.PI * 2);
+  c.ellipse(133, 129, 2.5, 1.8, 0.2, 0, Math.PI * 2);
+  c.fill();
+
+  // 9. Mouth line & lips
+  c.strokeStyle = "#8a4f42";
+  c.lineWidth = 2.4;
+  c.beginPath();
+  c.moveTo(116, 144);
+  c.quadraticCurveTo(128, 145, 140, 144);
+  c.stroke();
+
+  // Subtle lower lip highlight & shadow
+  c.fillStyle = "rgba(0,0,0,0.1)";
+  c.beginPath();
+  c.ellipse(128, 150, 8, 3, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // 10. Athletic stubble on jaw & chin
+  c.fillStyle = "rgba(30,22,18,0.09)";
+  c.beginPath();
+  c.moveTo(85, 130);
+  c.quadraticCurveTo(128, 172, 171, 130);
+  c.lineTo(171, 155);
+  c.quadraticCurveTo(128, 185, 85, 155);
+  c.closePath();
+  c.fill();
 
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -458,8 +592,9 @@ export function makeRig(
     roughness: 0.04,
     metalness: 0.05,
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.65,
     reflectivity: 0.95,
+    side: THREE.DoubleSide,
   });
   const matSkin = new THREE.MeshStandardMaterial({ color: "#d5a582", roughness: 0.8 });
   const matGlovePalm = new THREE.MeshStandardMaterial({ color: "#473b32", roughness: 0.85 });
@@ -488,6 +623,17 @@ export function makeRig(
   pelvis.position.y = 0;
   root.add(pelvis);
 
+  const chest = G ? 1.05 : 0.84;
+
+  // Contoured hockey pant pelvic girdle (connects hips seamlessly to thighs without gaps)
+  add(pelvis, new THREE.CylinderGeometry(chest * 0.85, chest * 0.78, 0.82, 20), matPants, 0, 2.65, 0, 0.84, 1.0, 1.16);
+  // Padded pant belt & lace tie
+  add(pelvis, new THREE.TorusGeometry(chest * 0.84, 0.06, 8, 24), matDark, 0, 2.95, 0, 0.84, 1.16, 1.0).rotation.x = Math.PI / 2;
+  // White front pant laces
+  add(pelvis, new THREE.BoxGeometry(0.12, 0.16, 0.14), matTuuk, 0.72, 2.85, 0);
+  // Groin / inseam stretch gusset
+  add(pelvis, new THREE.BoxGeometry(0.38, 0.55, 0.32), matDark, 0, 2.45, 0);
+
   // --- LEGS (Hierarchical Articulation: Thigh -> Shin -> Skate) ---
   const mkLeg = (z: number, isLeft: boolean) => {
     // 1. Thigh (Hip Joint)
@@ -498,6 +644,8 @@ export function makeRig(
     add(thigh, new THREE.CylinderGeometry(G ? 0.52 : 0.46, G ? 0.44 : 0.36, 1.15, 14), matPants, 0, -0.55, 0);
     // Vertical side stripe on pants
     add(thigh, new THREE.BoxGeometry(0.12, 1.05, 0.08), matTrim, 0, -0.55, isLeft ? -0.42 : 0.42);
+    // Small NHL shield patch on front of right thigh / team logo on left thigh
+    add(thigh, new THREE.BoxGeometry(0.06, 0.14, 0.12), matTuuk, 0.42, -0.7, 0);
 
     // 2. Shin (Knee Joint) - attached under thigh
     const shin = new THREE.Group();
@@ -509,21 +657,23 @@ export function makeRig(
       add(shin, new THREE.BoxGeometry(0.72, 2.3, 0.88), matGoaliePad, 0.18, -0.75, 0);
       add(shin, new THREE.CylinderGeometry(0.12, 0.12, 2.2, 8), matTrim, -0.15, -0.75, isLeft ? -0.44 : 0.44); // outer roll
     } else {
-      // Knee cap shell
-      add(shin, new THREE.SphereGeometry(0.3, 10, 8), matDark, 0.06, 0.02, 0);
+      // Knee cap shell (Bauer Supreme anatomical shin guard)
+      add(shin, new THREE.SphereGeometry(0.32, 12, 10), matDark, 0.08, 0.02, 0);
       // Hockey sock / Shin guard with authentic 3-stripe pattern
-      add(shin, new THREE.CapsuleGeometry(0.26, 1.05, 4, 12), matJerseySolid, 0, -0.65, 0);
+      add(shin, new THREE.CapsuleGeometry(0.26, 1.05, 4, 14), matJerseySolid, 0, -0.65, 0);
       // Sock stripes matching jersey
-      add(shin, new THREE.CylinderGeometry(0.272, 0.272, 0.12, 12, 1, true), matTrim, 0, -0.42, 0);
+      add(shin, new THREE.CylinderGeometry(0.272, 0.272, 0.12, 14, 1, true), matTrim, 0, -0.42, 0);
       add(
         shin,
-        new THREE.CylinderGeometry(0.274, 0.274, 0.14, 12, 1, true),
+        new THREE.CylinderGeometry(0.274, 0.274, 0.14, 14, 1, true),
         new THREE.MeshStandardMaterial({ color: kit.stripe, roughness: 0.6 }),
         0,
         -0.56,
         0
       );
-      add(shin, new THREE.CylinderGeometry(0.272, 0.272, 0.12, 12, 1, true), matTrim, 0, -0.7, 0);
+      add(shin, new THREE.CylinderGeometry(0.272, 0.272, 0.12, 14, 1, true), matTrim, 0, -0.7, 0);
+      // Clear shin tape wrapped below knee to keep pads tight
+      add(shin, new THREE.CylinderGeometry(0.276, 0.276, 0.08, 14, 1, true), matVisor, 0, -0.25, 0);
     }
 
     // 3. Skate (Ankle Joint) - attached under shin
@@ -531,19 +681,23 @@ export function makeRig(
     skate.position.set(0.06, -1.45, 0);
     shin.add(skate);
 
-    // Molded black composite hockey skate boot
-    add(skate, new THREE.BoxGeometry(1.12, 0.36, 0.34), matDark, 0.08, 0.18, 0);
-    // Curved heel cup
-    add(skate, new THREE.BoxGeometry(0.36, 0.38, 0.3), matDark, -0.32, 0.4, 0);
-    // Tendon guard sweeping up behind Achilles tendon
-    add(skate, new THREE.BoxGeometry(0.12, 0.42, 0.2), matDark, -0.44, 0.56, 0);
-    // White skate tongue with criss-crossed white laces
-    add(skate, new THREE.BoxGeometry(0.52, 0.14, 0.22), matTuuk, 0.18, 0.38, 0);
+    // Composite boot with carbon weave quarter package
+    add(skate, new THREE.BoxGeometry(1.15, 0.38, 0.34), matDark, 0.08, 0.2, 0);
+    // Molded hard toe cap (impact resistant)
+    add(skate, new THREE.BoxGeometry(0.38, 0.32, 0.35), matDark, 0.52, 0.16, 0);
+    // Curved anatomical heel cup
+    add(skate, new THREE.BoxGeometry(0.38, 0.42, 0.32), matDark, -0.32, 0.42, 0);
+    // Sweeping tendon guard
+    add(skate, new THREE.BoxGeometry(0.12, 0.46, 0.22), matDark, -0.46, 0.6, 0);
+    // Pro white felt tongue with criss-crossed white hockey laces
+    add(skate, new THREE.BoxGeometry(0.54, 0.16, 0.24), matTuuk, 0.18, 0.4, 0);
+    // Black lace eyelet facing
+    add(skate, new THREE.BoxGeometry(0.48, 0.06, 0.28), matDark, 0.18, 0.39, 0);
     // White Tuuk Lightspeed Edge blade holder with trigger dial
-    add(skate, new THREE.BoxGeometry(1.24, 0.22, 0.09), matTuuk, 0.08, -0.06, 0);
-    add(skate, new THREE.CylinderGeometry(0.04, 0.04, 0.1, 8), matDark, -0.42, -0.06, 0.05);
-    // Polished stainless steel runner blade
-    add(skate, new THREE.BoxGeometry(1.32, 0.08, 0.03), matSteel, 0.08, -0.18, 0);
+    add(skate, new THREE.BoxGeometry(1.26, 0.24, 0.1), matTuuk, 0.08, -0.06, 0);
+    add(skate, new THREE.CylinderGeometry(0.045, 0.045, 0.11, 8), matDark, -0.42, -0.06, 0.05);
+    // High-polish stainless steel runner blade with ice reflection
+    add(skate, new THREE.BoxGeometry(1.35, 0.09, 0.035), matSteel, 0.08, -0.19, 0);
 
     return { thigh, shin, skate };
   };
@@ -557,17 +711,18 @@ export function makeRig(
   upper.position.set(0, 3.05, 0);
   pelvis.add(upper);
 
-  const chest = G ? 1.05 : 0.84;
+  // Solid jersey inner body core (never see hollow gaps through collar or waist)
+  add(upper, new THREE.CapsuleGeometry(chest * 0.86, 0.95, 8, 16), matJerseySolid, 0, 0.95, 0, 0.82, 1.0, 1.15);
 
-  // Front 3D Curved Chest & Abdomen Shell (Seamless contour wrapping around ribs)
+  // Front 3D Curved Chest & Abdomen Shell (Centered on +X)
   const frontGeo = new THREE.CylinderGeometry(
     chest * 0.94,
     chest * 0.82,
     1.55,
-    24,
+    32,
     1,
-    false,
-    -Math.PI / 2,
+    true,
+    0,
     Math.PI
   );
   const frontMesh = cast(new THREE.Mesh(frontGeo, matJerseyFront));
@@ -575,15 +730,15 @@ export function makeRig(
   frontMesh.scale.set(0.82, 1.0, 1.18);
   upper.add(frontMesh);
 
-  // Back 3D Curved Spine & Rib Shell (Seamless contour wrapping around flanks)
+  // Back 3D Curved Spine & Rib Shell (Centered on -X)
   const backGeo = new THREE.CylinderGeometry(
     chest * 0.94,
     chest * 0.82,
     1.55,
-    24,
+    32,
     1,
-    false,
-    Math.PI / 2,
+    true,
+    Math.PI,
     Math.PI
   );
   const backMesh = cast(new THREE.Mesh(backGeo, matJerseyBack));
@@ -615,36 +770,85 @@ export function makeRig(
   head.position.set(0, 2.05, 0);
   upper.add(head);
 
-  add(head, new THREE.CylinderGeometry(0.22, 0.25, 0.32, 12), matDark, 0, 0, 0); // Neck guard / base
+  // Muscular neck & neck guard rim
+  add(head, new THREE.CylinderGeometry(0.24, 0.28, 0.36, 14), matSkin, 0, 0, 0);
+  add(head, new THREE.TorusGeometry(0.26, 0.04, 8, 16), matDark, 0, -0.12, 0).rotation.x = Math.PI / 2;
 
   if (G) {
     // Modern painted goalie mask with wire cat-eye cage
-    add(head, new THREE.SphereGeometry(0.52, 18, 14), matHelmet, 0, 0.46, 0, 1.04, 1.12, 0.94);
-    add(head, new THREE.BoxGeometry(0.35, 0.28, 0.32), matHelmet, 0.22, 0.2, 0);
-    const wireCageMat = new THREE.MeshStandardMaterial({ color: "#e2e8f0", roughness: 0.15, metalness: 0.95, wireframe: true });
-    add(head, new THREE.SphereGeometry(0.44, 14, 12, -Math.PI / 2, Math.PI), wireCageMat, 0.18, 0.38, 0, 0.92, 1.02, 1);
-  } else {
-    // Sleek Pro NHL molded helmet shell with brow peak, ear protectors, and wrap-around visor
-    add(head, new THREE.SphereGeometry(0.48, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.68), matHelmet, 0, 0.44, 0, 1.1, 1.02, 0.96);
-    add(head, new THREE.BoxGeometry(0.2, 0.06, 0.56), matHelmet, 0.38, 0.46, 0); // Brow peak
+    add(head, new THREE.SphereGeometry(0.53, 22, 16, 0, Math.PI * 2, 0, Math.PI * 0.65), matHelmet, 0.05, 0.45, 0, 1.05, 1.1, 0.94);
+    add(head, new THREE.BoxGeometry(0.38, 0.34, 0.36), matHelmet, 0.26, 0.2, 0);
+    add(head, new THREE.BoxGeometry(0.18, 0.2, 0.48), matVisor, 0.24, 0.02, 0); // Throat shield
+
+    // Interior head & focused goalie eyes
+    add(head, new THREE.SphereGeometry(0.44, 14, 12), matDark, 0.12, 0.34, 0, 1, 1, 0.9);
     for (const ez of [-1, 1]) {
-      add(head, new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12), matDark, 0.02, 0.28, ez * 0.48); // Ear well
-      add(head, new THREE.CylinderGeometry(0.04, 0.04, 0.06, 8), matSteel, 0.06, 0.38, ez * 0.49).rotation.x = Math.PI / 2; // Chrome bracket
+      add(head, new THREE.SphereGeometry(0.04, 8, 8), matSteel, 0.46, 0.35, ez * 0.12);
     }
-    // Curved wrap-around half-visor
-    const visorGeo = new THREE.CylinderGeometry(0.49, 0.49, 0.24, 24, 1, true, -Math.PI / 2.3, Math.PI / 1.15);
+
+    // Chrome Cat-Eye Cage Bars
+    const barTop = add(head, new THREE.CylinderGeometry(0.018, 0.018, 0.58, 8), matSteel, 0.46, 0.42, 0);
+    barTop.rotation.x = Math.PI / 2;
+    const barMid = add(head, new THREE.CylinderGeometry(0.018, 0.018, 0.54, 8), matSteel, 0.48, 0.30, 0);
+    barMid.rotation.x = Math.PI / 2;
+    const barBot = add(head, new THREE.CylinderGeometry(0.018, 0.018, 0.42, 8), matSteel, 0.44, 0.18, 0);
+    barBot.rotation.x = Math.PI / 2;
+    add(head, new THREE.CylinderGeometry(0.018, 0.018, 0.32, 8), matSteel, 0.48, 0.30, 0);
+    for (const ez of [-1, 1]) {
+      const eyeRing = add(head, new THREE.TorusGeometry(0.1, 0.014, 6, 12), matSteel, 0.45, 0.36, ez * 0.16);
+      eyeRing.rotation.y = Math.PI / 2;
+    }
+    add(head, new THREE.BoxGeometry(0.12, 0.38, 0.42), matDark, -0.42, 0.36, 0);
+  } else {
+    // Pro Skater Head with realistic textured face
+    const faceTex = createFaceTexture();
+    const matFace = new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.72 });
+    add(head, new THREE.SphereGeometry(0.42, 24, 18), matFace, 0.08, 0.30, 0, 1.08, 1.08, 0.94);
+
+    // Anatomical ears
+    for (const ez of [-1, 1]) {
+      add(head, new THREE.SphereGeometry(0.09, 8, 8), matSkin, 0.02, 0.30, ez * 0.44, 0.6, 1.2, 0.5);
+    }
+
+    // Molded Pro Helmet Shell
+    add(
+      head,
+      new THREE.SphereGeometry(0.49, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.58),
+      matHelmet,
+      0.06,
+      0.44,
+      0,
+      1.1,
+      1.02,
+      0.98
+    );
+    // Brow peak
+    add(head, new THREE.BoxGeometry(0.18, 0.07, 0.64), matHelmet, 0.46, 0.47, 0);
+    // Rear occipital adjustment block
+    add(head, new THREE.BoxGeometry(0.14, 0.12, 0.42), matHelmet, -0.42, 0.42, 0);
+    // Side ear protectors & brackets
+    for (const ez of [-1, 1]) {
+      add(head, new THREE.CylinderGeometry(0.14, 0.14, 0.08, 14), matDark, 0.04, 0.31, ez * 0.48);
+      add(head, new THREE.TorusGeometry(0.12, 0.025, 6, 14), matDark, 0.04, 0.31, ez * 0.49);
+      add(head, new THREE.CylinderGeometry(0.035, 0.035, 0.06, 8), matSteel, 0.15, 0.42, ez * 0.5).rotation.x = Math.PI / 2;
+    }
+
+    // Pro Oakley-style Wrap-Around Curved Visor (Centered directly on eyes at +X)
+    const vLen = Math.PI * 0.72;
+    const vStart = Math.PI / 2 - vLen / 2;
+    const visorGeo = new THREE.CylinderGeometry(0.51, 0.51, 0.22, 24, 1, true, vStart, vLen);
     const visorMesh = cast(new THREE.Mesh(visorGeo, matVisor));
-    visorMesh.position.set(0, 0.36, 0);
+    visorMesh.position.set(0.06, 0.35, 0);
     visorMesh.scale.set(1.08, 1, 0.98);
     head.add(visorMesh);
 
-    // Sculpted athletic face with nose bridge
-    add(head, new THREE.SphereGeometry(0.36, 16, 12), matSkin, 0.12, 0.24, 0, 1.15, 1.0, 0.92);
-    const nose = add(head, new THREE.ConeGeometry(0.05, 0.14, 6), matSkin, 0.46, 0.26, 0);
-    nose.rotation.z = -Math.PI / 2;
-
-    // Chin strap with chin cup
-    add(head, new THREE.BoxGeometry(0.14, 0.1, 0.22), matDark, 0.12, 0.04, 0);
+    // Nylon chin strap with molded chin cup
+    add(head, new THREE.BoxGeometry(0.18, 0.1, 0.22), matDark, 0.22, 0.08, 0);
+    for (const ez of [-1, 1]) {
+      const strap = add(head, new THREE.CylinderGeometry(0.02, 0.02, 0.28, 6), matDark, 0.12, 0.18, ez * 0.34);
+      strap.rotation.z = -0.55;
+      strap.rotation.x = ez * 0.35;
+    }
   }
 
   // --- ARMS (Hierarchical Articulation: Shoulder -> Elbow -> Glove) ---
@@ -654,7 +858,9 @@ export function makeRig(
     arm.position.set(0, 1.74, z);
 
     const sleeveMat = isLeft ? matSleeveL : matSleeveR;
-    add(arm, new THREE.CapsuleGeometry(G ? 0.31 : 0.25, 0.72, 4, 10), sleeveMat, 0, -0.42, 0);
+    const upperArmMesh = add(arm, new THREE.CapsuleGeometry(G ? 0.31 : 0.25, 0.72, 4, 12), sleeveMat, 0, -0.42, 0);
+    // Rotate so sleeve numbers face outward to the side!
+    upperArmMesh.rotation.y = isLeft ? Math.PI / 2 : -Math.PI / 2;
 
     // 2. Forearm & Glove (Elbow Joint) - attached under arm
     const forearm = new THREE.Group();
@@ -662,17 +868,20 @@ export function makeRig(
     arm.add(forearm);
 
     // Elbow pad
-    add(forearm, new THREE.SphereGeometry(0.22, 8, 6), matDark, -0.06, 0, 0);
+    add(forearm, new THREE.SphereGeometry(0.22, 10, 8), matDark, -0.06, 0, 0);
     // Forearm sleeve
-    add(forearm, new THREE.CapsuleGeometry(G ? 0.28 : 0.23, 0.65, 4, 10), matJerseySolid, 0, -0.38, 0);
-    add(forearm, new THREE.CylinderGeometry(G ? 0.29 : 0.24, G ? 0.29 : 0.24, 0.08, 10, 1, true), matTrim, 0, -0.52, 0);
+    add(forearm, new THREE.CapsuleGeometry(G ? 0.28 : 0.23, 0.65, 4, 12), matJerseySolid, 0, -0.38, 0);
+    add(forearm, new THREE.CylinderGeometry(G ? 0.29 : 0.24, G ? 0.29 : 0.24, 0.08, 12, 1, true), matTrim, 0, -0.52, 0);
 
     // 4-Roll Hockey Glove with anatomical rolls, team trim, and leather palm
     const glove = add(forearm, new THREE.BoxGeometry(0.44, 0.38, 0.38), G ? (matGoaliePad ?? matTrim) : matTrim, 0, -0.72, 0);
-    add(forearm, new THREE.CylinderGeometry(0.3, 0.26, 0.18, 12, 1, true), matTrim, 0, -0.58, 0); // Flared cuff
-    add(glove, new THREE.BoxGeometry(0.28, 0.14, 0.34), matDark, 0.15, -0.22, 0); // Padded finger rolls
-    add(glove, new THREE.BoxGeometry(0.24, 0.12, 0.32), matDark, 0.2, -0.32, 0);
-    add(glove, new THREE.BoxGeometry(0.26, 0.24, 0.2), matGlovePalm, 0.08, -0.05, 0); // Palm grip
+    add(forearm, new THREE.CylinderGeometry(0.31, 0.26, 0.2, 12, 1, true), matTrim, 0, -0.58, 0); // Flared cuff
+    for (let r = 0; r < 3; r++) {
+      add(glove, new THREE.BoxGeometry(0.09, 0.09, 0.34), matDark, -0.22, 0.12 - r * 0.12, 0); // 4-roll padding
+    }
+    add(glove, new THREE.BoxGeometry(0.18, 0.24, 0.14), matDark, 0.18, -0.12, isLeft ? 0.16 : -0.16); // Lock-thumb
+    add(glove, new THREE.BoxGeometry(0.24, 0.14, 0.32), matDark, 0.16, -0.26, 0); // Fingers
+    add(glove, new THREE.BoxGeometry(0.26, 0.26, 0.22), matGlovePalm, 0.08, -0.06, 0); // Palm grip
 
     return { arm, forearm };
   };
@@ -705,9 +914,14 @@ export function makeRig(
   );
   shaft.rotation.z = G ? 0.35 : 0.55;
 
+  // White taped butt-end knob at top of shaft
+  add(stick, new THREE.BoxGeometry(0.12, 0.24, 0.16), matTape, 0, G ? 0.45 : 0.48, 0).rotation.z = G ? 0.35 : 0.55;
+  // Brand color accent band on shaft
+  add(stick, new THREE.BoxGeometry(0.09, 0.35, 0.13), matTrim, 0, G ? -0.8 : -1.1, 0).rotation.z = G ? 0.35 : 0.55;
+
   // Curved blade with taped heel & toe
   add(stick, new THREE.BoxGeometry(G ? 1.45 : 1.2, G ? 0.36 : 0.29, 0.08), matStick, G ? 0.92 : 1.62, G ? -3.05 : -3.55, 0);
-  add(stick, new THREE.BoxGeometry(G ? 1.05 : 0.85, G ? 0.26 : 0.22, 0.09), matTape, G ? 0.96 : 1.66, G ? -3.05 : -3.55, 0);
+  add(stick, new THREE.BoxGeometry(G ? 1.05 : 0.88, G ? 0.28 : 0.24, 0.09), matTape, G ? 0.96 : 1.66, G ? -3.05 : -3.55, 0);
 
   if (G) {
     add(stick, new THREE.BoxGeometry(0.12, 1.35, 0.14), matStick, 0.42, -2.25, 0).rotation.z = 0.35;
@@ -767,8 +981,13 @@ export function disposeRig(r: Rig) {
   r.root.traverse((o) => {
     const m = o as THREE.Mesh;
     m.geometry?.dispose();
-    const mat = m.material as THREE.MeshStandardMaterial | undefined;
-    if (mat) {
+    const mat = m.material as THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[] | undefined;
+    if (Array.isArray(mat)) {
+      mat.forEach((x) => {
+        x.map?.dispose();
+        x.dispose();
+      });
+    } else if (mat) {
       mat.map?.dispose();
       mat.dispose();
     }
