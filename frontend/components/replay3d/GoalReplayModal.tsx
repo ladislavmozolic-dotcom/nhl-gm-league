@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import Replay3DPlayer, { type ReplayHud } from "./Replay3DPlayer";
 import { goalClip, computeGoalTelemetry, type GoalReplayData } from "@/lib/replay3d/goal-replay";
 import { teamKit } from "@/lib/replay3d/team-colors";
+import { BODY_CREDIT } from "./skinned-body";
 
 type Team = { teamId: number; name: string; code?: string | null; slug?: string | null; logoUrl: string | null };
 export type ReplayGoal = {
@@ -161,6 +162,7 @@ export default function GoalReplayModal({ gameId, home, away, goals, start, onCl
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
           <p className="leading-snug">
             3D rekonštrukcia zo zápasových dát simulácie (NHL Edge telemetria, typ a sektor strely, dorážky/tečovania, asistencie a hráči na ľade).
+            <span className="block text-slate-600">{BODY_CREDIT}</span>
           </p>
           <div className="flex items-center gap-3 text-slate-400 font-mono">
             <span>[Medzerník] Pauza/Play</span>

@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RinkScene, type CameraMode } from "./RinkScene";
+import { BODY_CREDIT } from "./skinned-body";
 import { playSfx } from "./sfx";
 import { clipAt, type ActorState, type ClipFrame } from "@/lib/replay3d/reconstruct";
 import { LiveDirector, type Banner, type LiveItem, type LivePlayer, type LiveTeam } from "@/lib/replay3d/live-director";
@@ -212,7 +213,7 @@ export default function Live3DView({ gameId, home, away, homeLogoUrl, events, sc
         <button onClick={() => setLabels((v) => !v)} className={`px-2 py-1 rounded-lg text-[11px] font-bold border ${labels ? "bg-slate-700 border-slate-600 text-white" : "bg-slate-800 border-slate-700 text-slate-500"}`}>🏷️ Mená</button>
         <button onClick={() => setSound((v) => !v)} className={`px-2 py-1 rounded-lg text-[11px] font-bold border ${sound ? "bg-slate-700 border-slate-600 text-white" : "bg-slate-800 border-slate-700 text-slate-500"}`}>{sound ? "🔊" : "🔇"}</button>
         {behind > 2 && <span className="text-[11px] text-amber-400 font-bold">⏩ dobieham živý priebeh ({behind})</span>}
-        <span className="ml-auto text-[10px] text-slate-500 hidden sm:inline">3D pohľad je rekonštrukcia z udalostí zápasu, výsledok neovplyvňuje.</span>
+        <span className="ml-auto text-[10px] text-slate-500 hidden sm:inline">3D pohľad je rekonštrukcia z udalostí zápasu, výsledok neovplyvňuje. · {BODY_CREDIT}</span>
       </div>
     </div>
   );

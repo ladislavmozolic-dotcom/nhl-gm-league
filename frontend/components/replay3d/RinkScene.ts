@@ -8,6 +8,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { Arena, roundedRect, glowTexture } from "./arena";
 import { makeRig, disposeRig, type Rig } from "./players";
+import { loadBodyTemplate, attachBody, syncBody, setBodyCrest, type Body } from "./skinned-body";
 import { RINK, POSE, type Actor, type ClipFrame } from "@/lib/replay3d/reconstruct";
 import type { Kit } from "@/lib/replay3d/team-colors";
 
@@ -124,6 +125,10 @@ export class RinkScene {
   private disposables: Array<{ dispose(): void }> = [];
   private small = false;
   private logos: Record<"home" | "away", HTMLImageElement | null> = { home: null, away: null };
+  // realistic skinned bodies (when the model is installed), driven by the primitive rigs
+  private bodyTpl: Awaited<ReturnType<typeof loadBodyTemplate>> = null;
+  private bodies = new Map<string, Body>();
+  private disposed = false;
 
   constructor(canvas: HTMLCanvasElement, opts: {
     homeKit: Kit;
@@ -147,6 +152,7 @@ export class RinkScene {
         for (const r of this.rigs.values()) {
           if (r.side === "home") r.setLogo(img);
         }
+        for (const [id, b] of this.bodies) if (this.rigs.get(id)?.side === "home") setBodyCrest(b, img);
       };
     }
     if (opts.awayLogoUrl) {
@@ -158,6 +164,7 @@ export class RinkScene {
         for (const r of this.rigs.values()) {
           if (r.side === "away") r.setLogo(img);
         }
+        for (const [id, b] of this.bodies) if (this.rigs.get(id)?.side === "away") setBodyCrest(b, img);
       };
     }
 
@@ -325,9 +332,27 @@ export class RinkScene {
       if (r && r.root.userData.sig === sig) continue;
       if (r) { this.scene.remove(r.root); disposeRig(r); }
       const nr = makeRig(this.scene, a, this.kits[a.side], this.logos[a.side]); nr.root.userData.sig = sig; this.rigs.set(a.id, nr);
+      this.bodies.delete(a.id);
     }
+    for (const id of [...this.bodies.keys()]) if (!keep.has(id)) this.bodies.delete(id);
     this.order = actors.map((a) => a.id);
     this.actorsById = new Map(actors.map((a) => [a.id, a]));
+    this.dressBodies();
+  }
+
+  /** Put a realistic body on every rig that doesn't have one yet (no-op without the model). */
+  private dressBodies() {
+    if (!this.bodyTpl) {
+      loadBodyTemplate().then((t) => { if (t && !this.disposed && !this.bodyTpl) { this.bodyTpl = t; this.dressBodies(); } });
+      return;
+    }
+    for (const [id, r] of this.rigs) {
+      if (this.bodies.has(id)) continue;
+      const a = this.actorsById.get(id);
+      if (!a) continue;
+      const b = attachBody(r, this.bodyTpl, this.kits[a.side], a, this.logos[a.side]);
+      if (b) this.bodies.set(id, b);
+    }
   }
   private actorsById = new Map<string, Actor>();
 
@@ -591,6 +616,10 @@ export class RinkScene {
         }
       }
 
+      // the realistic body (if installed) copies the pose the rig just took
+      const body = this.bodies.get(id);
+      if (body) syncBody(r, body, s.pose);
+
       // Names only around the puck (plus the player the clip is about)
       const near = Math.hypot(s.x - frame.p.x, s.z - frame.p.z) < 26;
       r.label.visible = ((this.labels && near) || id === this.focusId) && !!a.name;
@@ -677,6 +706,7 @@ export class RinkScene {
   snapCamera() { this.updateCamera(0, true); }
 
   dispose() {
+    this.disposed = true;
     this.controls.dispose();
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
