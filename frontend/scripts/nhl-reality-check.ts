@@ -3,7 +3,7 @@
 // OT/SO, leads after 2, comebacks, EN goals, home win) are MEASURED from all 2,624 regular-season games of 2023-24 +
 // 2024-25 (api-web.nhle.com/v1/score/<date>), as are SOG, sv% and the PP/SH goal shares; PP chances and pull timing are approximate.
 // Every ordered pair of the 32 NHL clubs × bases. Run: npx tsx scripts/nhl-reality-check.ts [bases=2] [seedBase=91000000]
-import { simulateGame, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING, COMPRESS_TUNING } from "../lib/sim/engine";
+import { simulateGame, CORE_TUNING, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING, COMPRESS_TUNING } from "../lib/sim/engine";
 import { loadSettings } from "../lib/sim/settings";
 import { loadSimTeam } from "../lib/sim/index";
 import { ENGINE_V3 } from "../lib/sim/version";
@@ -15,6 +15,8 @@ if (process.argv[5]) Object.assign(SCORE_TUNING, JSON.parse(process.argv[5]));
 if (process.argv[6]) Object.assign(SIX_TUNING, JSON.parse(process.argv[6]));
 if (process.argv[7]) Object.assign(BOUNCE_TUNING, JSON.parse(process.argv[7]));
 if (process.argv[8]) Object.assign(COMPRESS_TUNING, JSON.parse(process.argv[8]));
+if (process.env.CORE_TUNING) Object.assign(CORE_TUNING, JSON.parse(process.env.CORE_TUNING));
+const EXP = process.env.EXP ? JSON.parse(process.env.EXP) : undefined; // e.g. EXP='{"core":true}'
 
 // ≈ NHL reference (rounded; per game = both teams)
 const NHL: Record<string, number> = {
@@ -36,7 +38,7 @@ const pulls: number[] = [];
   if (process.env.PULL) for (const t of teams as any[]) if (t.strategy?.goaliePull) t.strategy.goaliePull.pullSec = Number(process.env.PULL);
   for (let b = 0; b < bases; b++) for (let i = 0; i < teams.length; i++) for (let j = 0; j < teams.length; j++) {
     if (i === j) continue;
-    const r: any = simulateGame(structuredClone(teams[i]), structuredClone(teams[j]), { settings, seed: seedBase + b * 100_000 + i * 100 + j, engineVersion: ENGINE_V3 });
+    const r: any = simulateGame(structuredClone(teams[i]), structuredClone(teams[j]), { settings, seed: seedBase + b * 100_000 + i * 100 + j, engineVersion: ENGINE_V3, ...(EXP ? { experimentalV3: EXP } : {}) });
     const H = r.home.teamId, ev: any[] = r.events ?? [];
     a.games++;
     const goals = ev.filter((e) => e.type === "GOAL" && !e.meta?.so);

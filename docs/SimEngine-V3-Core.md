@@ -114,3 +114,24 @@ whistle happens and at which faceoff spot play restarts, allowing the existing
 V3 named stoppages to connect to Core later. Only afterwards should Core gain
 special teams, penalties, faceoffs, injuries or any routing into a sandbox
 game.
+
+## Step 10 — Hybrid bridge into the production V3 engine (Oct 16 2026)
+
+Core is now connected to the playable V3 engine as its **decision layer**, not as a replacement:
+`frontend/lib/sim/v3-core/engine-bridge.ts` turns the live V3 state at the moment of an offensive-zone
+decision (carrier, team tactics, zone, shift length, time in zone, score margin, time left, rebound) into a
+Core decision input and returns Core's share of SHOOT versus PASS. The V3 loop samples that share with its
+own seeded RNG and keeps everything else — resolution, blocks/misses/bounces, goalie contest, penalties,
+special teams, faceoffs, OT/SO, events, live stoppages and stats.
+
+- Flag: `experimentalV3.core` (default **on** in V3, off-switch for comparison). V2 is untouched.
+- `CORE_TUNING.scale = 0.765` keeps the league shot volume at the measured NHL level; Core decides *who*
+  and *when* (skills, player type, rebound, late desperation, team risk), V3 keeps *how many*.
+- Measured with `scripts/nhl-reality-check.ts` (EXP='{"core":true}'), 2,976 games: goals 6.02 (NHL 6.09),
+  SOG 29.1 (29.3), sv .904 (.902), every game-state row within ~3 points of the 2023-25 NHL data.
+
+### Next hybrid steps
+1. Neutral zone: Core's CARRY / PASS / DUMP_IN intent instead of V3's fixed dump share.
+2. Defensive zone: CLEAR vs breakout PASS / CARRY under pressure.
+3. Explain decisions in the live feed / coach panel with Core's `reason`.
+4. Only then consider Core's goalie contest against V3's shot model.

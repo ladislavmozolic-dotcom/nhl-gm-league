@@ -3,6 +3,7 @@
 // shots/goals, power plays tied to real penalty times, and rich per-player
 // stats (hits, blocks, faceoffs, TOI). Tuned to NHL-realistic output.
 
+import { coreShootShare } from "./v3-core/engine-bridge";
 import { RNG, fixtureSeed } from "./rng";
 import { cleanName } from "../playerName";
 import { generatePlayByPlay } from "./playbyplay";
@@ -175,6 +176,7 @@ type SimState = {
   v3LateTieCaution: boolean;         // V3 diagnostic feature flag
   v3Rush: boolean;                   // V3: turnovers can become breakaways / 2-on-1 / 3-on-2 the other way
   v3OtPace: boolean;                 // V3: 3-on-3 overtime has ~2x the attempts (each a real entry + shot); OT_TUNING.conv → ~2/3 of OT games end before the shootout (NHL-like)
+  v3Core: boolean;                   // V3 Core hybrid: the O-zone shoot-or-pass intent comes from lib/sim/v3-core (game state, fatigue, score/time, rebound, player type, team risk); V3 still resolves it
   v3Bounces: boolean;                // V3: where the puck goes after a block or a miss — off the end boards back out front, rimmed around to the defence, or the blocker's team takes it (BOUNCE_TUNING)
   v3BackToBack: boolean;             // V3: a club on the 2nd night of a back-to-back tires faster and fades late (B2B_TUNING)
   v3Roles: boolean;                  // V3: shooters shoot, playmakers pass (steeper SC-vs-PA shoot/pass choice) and a pass always goes to somebody else
@@ -2540,7 +2542,11 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // their goals. But a forward who would PASS keeps the puck (→ his linemate's
     // one-timer and the passer's assist survive), so the point shot only ever
     // cannibalises a forward's own shot, never a scoring-chance pass play.
-    const wantsShot = R ? true : rng.chance(ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), st.v3Roles ? ROLE_TUNING.exp : 0.7));
+    const coreShoot = st.v3Core && !R ? Math.min(0.95, CORE_TUNING.scale * coreShootShare({
+      carrier, team: carrierTeam, zone, shiftSeconds: carrier.isDefense ? shifts[carrierTeam.id].dElapsed : shifts[carrierTeam.id].fElapsed,
+      pressureSeconds: tick - zoneSince, scoreMargin: margin, secondsRemaining: period <= 3 ? (3 - period) * PERIOD_SECONDS + PERIOD_SECONDS - tick : 0, rebound: setup === "rebound",
+    })) : null;
+    const wantsShot = R ? true : rng.chance(coreShoot ?? ratio(atkSkill(carrier.attrs.sc ?? 50), (carrier.attrs.pa ?? 50), st.v3Roles ? ROLE_TUNING.exp : 0.7));
     // A SNIPER shoots it himself; a lower-skill forward is the one who defers to the
     // QB at the point. So the deferral rate falls with the carrier's shot (SC) — an
     // 82+ sniper (McDavid) never gives it up, a grinder defers up to ~1/3 the time.
@@ -3273,6 +3279,7 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
+export const CORE_TUNING = { scale: 0.765 }; // V3 Core hybrid: × Core's shoot share (keeps the league shot volume where V3 is calibrated)
 export const COMPRESS_TUNING = { catchUp: 0.6, early: 0.1, garbageLead: 1 }; // early: catch-up scale in periods 1-2 // V3: × the per-goal catch-up and × how much a team up 3+ eases off (1 = as before, 0 = none)
 export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.0, conv: 1.03 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
 export const B2B_TUNING = { drain: 1.3, early: 0.92, late: 0.87 }; // V3 back-to-back: shift-fatigue speed, team edge in periods 1-2 / 3+
@@ -3378,7 +3385,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { bounces?: boolean; backToBack?: boolean; roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
+  experimentalV3?: { core?: boolean; bounces?: boolean; backToBack?: boolean; roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3462,6 +3469,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3Roles: isV3 && (opts.experimentalV3?.roles ?? true),
     v3BackToBack: isV3 && (opts.experimentalV3?.backToBack ?? true),
     v3Bounces: isV3 && (opts.experimentalV3?.bounces ?? true),
+    v3Core: isV3 && (opts.experimentalV3?.core ?? true),
     v3Dump: isV3 && (opts.experimentalV3?.dump ?? true),
     v3Pin: isV3 && (opts.experimentalV3?.pin ?? true),
     v3Pace: isV3 && (opts.experimentalV3?.pace ?? true),

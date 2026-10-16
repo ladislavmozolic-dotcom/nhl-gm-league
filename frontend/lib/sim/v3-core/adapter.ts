@@ -38,6 +38,11 @@ const riskValue = (team: SimTeam) => {
   return Math.max(0, Math.min(1, base + (team.teamTactics.tempo === "fast" ? 0.08 : team.teamTactics.tempo === "slow" ? -0.08 : 0)));
 };
 
+/** The team's tactical identity as Core sees it (risk appetite 0..1, forecheck 0..1). */
+export function coreTacticsFromSimTeam(team: Pick<SimTeam, "teamTactics">): { risk: number; forecheck: number } {
+  return { risk: riskValue(team as SimTeam), forecheck: forecheckValue(team.teamTactics.forecheck) };
+}
+
 /** Turns a real SimTeam into an offline Core prototype side, preserving its tactical identity. */
 export function corePrototypeTeamFromSimTeam(team: SimTeam): CorePrototypeTeam {
   return {
@@ -50,6 +55,6 @@ export function corePrototypeTeamFromSimTeam(team: SimTeam): CorePrototypeTeam {
       forwards: (team.units ?? []).filter((unit) => !unit.isDef).map((unit) => unit.members),
       defense: (team.units ?? []).filter((unit) => unit.isDef).map((unit) => unit.members),
     },
-    tactics: { risk: riskValue(team), forecheck: forecheckValue(team.teamTactics.forecheck) },
+    tactics: coreTacticsFromSimTeam(team),
   };
 }

@@ -20,7 +20,7 @@ type P = { name: string; d: boolean; sc: number; pa: number; gp: number; g: numb
   const ps = new Map<number, P>();
   for (let b = 0; b < bases; b++) for (let i = 0; i < teams.length; i++) for (let j = 0; j < teams.length; j++) {
     if (i === j) continue;
-    const r: any = simulateGame(structuredClone(teams[i]), structuredClone(teams[j]), { settings, seed: 93_000_000 + b * 100_000 + i * 100 + j, engineVersion: ENGINE_V3 });
+    const r: any = simulateGame(structuredClone(teams[i]), structuredClone(teams[j]), { settings, seed: 93_000_000 + b * 100_000 + i * 100 + j, engineVersion: ENGINE_V3, ...(process.env.EXP ? { experimentalV3: JSON.parse(process.env.EXP) } : {}) });
     for (const side of [r.home, r.away]) for (const l of side.skaters) {
       const at = attrs.get(l.id); if (!at) continue;
       const p = ps.get(l.id) ?? { name: l.name, d: at.d, sc: at.sc, pa: at.pa, gp: 0, g: 0, a: 0, s: 0 };
