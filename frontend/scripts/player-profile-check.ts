@@ -1,18 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Read-only: do player roles come through in V3? D vs F share of shots/goals/assists, the top shooters' volume,
 // shooters vs playmakers. Every ordered pair of the 32 NHL clubs × bases. Run: npx tsx scripts/player-profile-check.ts [bases=1]
-import { simulateGame, ROLE_TUNING } from "../lib/sim/engine";
-import { loadSettings } from "../lib/sim/settings";
+import { simulateGame, ROLE_TUNING, FINISH_TUNING } from "../lib/sim/engine";
+import { loadSettings, mergeSettings } from "../lib/sim/settings";
+import { readFileSync } from "fs";
 import { loadSimTeam } from "../lib/sim/index";
 import { ENGINE_V3 } from "../lib/sim/version";
 import { prisma } from "../lib/prisma";
 
 const bases = Number(process.argv[2] ?? 1);
 if (process.argv[3]) Object.assign(ROLE_TUNING, JSON.parse(process.argv[3]));
+if (process.env.FINISH) FINISH_TUNING.v3 = Number(process.env.FINISH);
 type P = { name: string; d: boolean; sc: number; pa: number; gp: number; g: number; a: number; s: number };
 
 (async () => {
-  const settings = await loadSettings();
+  // SETTINGS=<json file> runs with another league's settings (e.g. scripts/fixtures/league-settings-2026-10.json = the live league)
+  const settings = process.env.SETTINGS ? mergeSettings(JSON.parse(readFileSync(process.env.SETTINGS, "utf8"))) : await loadSettings();
   const ids = (await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true }, orderBy: { id: "asc" } })).map((t) => t.id);
   const teams: any[] = []; for (const id of ids) teams.push(await loadSimTeam(id));
   const attrs = new Map<number, { sc: number; pa: number; d: boolean }>();
@@ -41,6 +44,11 @@ type P = { name: string; d: boolean; sc: number; pa: number; gp: number; g: numb
   row("Top-10 shooters, SOG / 82", sum((p) => per82(p, "s"), top("s")) / 10, "290");
   row("Top-10 goal scorers, G / 82", sum((p) => per82(p, "g"), top("g")) / 10, "48");
   row("Top-10 playmakers, A / 82", sum((p) => per82(p, "a"), top("a")) / 10, "68");
+  // NHL 2023-24 / 2024-25 (api.nhle.com, ≥40 GP, per-82 pace): 40+ G pace 20 / 13, 30+ G pace 60 / 61, top-10 G 51 / 43, top-10 PTS 116 / 103
+  const pace = (k: "g" | "a" | "s", x: number) => all.filter((p) => !p.d && per82(p, k) >= x).length;
+  row("Players on a 40+ goal pace", pace("g", 40), "13–20");
+  row("Players on a 30+ goal pace", pace("g", 30), "≈60");
+  row("Top-10 points, PTS / 82", [...all].sort((x, y) => (y.g + y.a) / y.gp - (x.g + x.a) / x.gp).slice(0, 10).reduce((n, p) => n + ((p.g + p.a) / p.gp) * 82, 0) / 10, "103–116");
   row("Best shooting % (≥150 SOG/82)", Math.max(...all.filter((p) => per82(p, "s") >= 150).map((p) => 100 * p.g / Math.max(1, p.s))), "≈20");
   // shooters vs playmakers among forwards: SC−PA gap vs their A/G ratio
   const F = all.filter((p) => !p.d && p.g + p.a >= 20);

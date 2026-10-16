@@ -79,9 +79,10 @@ test("V3 concentrates a defence pair's assist weight without changing its averag
   assert.ok(Math.abs((weights[0] + weights[1]) / 2 - 1) < 0.000001);
 });
 
-test("V3 softly compresses only the finishing curve's elite end", () => {
+test("V3 caps the finishing curve (never steepens a league's own flatter setting)", () => {
   assert.equal(v3FinishingExponent(1.7), 1.55);
-  assert.equal(v3FinishingExponent(1.55), 1.5);
+  assert.equal(v3FinishingExponent(1.55), 1.55);
+  assert.equal(v3FinishingExponent(0.9), 0.9, "the live league's 0.9 stays 0.9 (used to be forced up to 1.5 → too many 40-goal scorers)");
 });
 
 test("V3 goalie rhythm only chills a goalie after a long idle stretch and is capped", () => {

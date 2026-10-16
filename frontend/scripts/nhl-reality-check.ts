@@ -4,7 +4,8 @@
 // 2024-25 (api-web.nhle.com/v1/score/<date>), as are SOG, sv% and the PP/SH goal shares; PP chances and pull timing are approximate.
 // Every ordered pair of the 32 NHL clubs × bases. Run: npx tsx scripts/nhl-reality-check.ts [bases=2] [seedBase=91000000]
 import { simulateGame, CORE_TUNING, GOALIE_TUNING, PERIOD_TUNING, SCORE_TUNING, SIX_TUNING, BOUNCE_TUNING, COMPRESS_TUNING } from "../lib/sim/engine";
-import { loadSettings } from "../lib/sim/settings";
+import { loadSettings, mergeSettings } from "../lib/sim/settings";
+import { readFileSync } from "fs";
 import { loadSimTeam } from "../lib/sim/index";
 import { ENGINE_V2, ENGINE_V3 } from "../lib/sim/version";
 import { prisma } from "../lib/prisma";
@@ -33,7 +34,8 @@ const pulls: number[] = [];
 const teamSv = new Map<number, { sa: number; ga: number }>(); // per club, for the save % spread
 
 (async () => {
-  const settings = await loadSettings();
+  // SETTINGS=<json file> runs with another league's settings (e.g. scripts/fixtures/league-settings-2026-10.json = the live league)
+  const settings = process.env.SETTINGS ? mergeSettings(JSON.parse(readFileSync(process.env.SETTINGS, "utf8"))) : await loadSettings();
   const ids = (await prisma.team.findMany({ where: { league: "NHL" }, select: { id: true }, orderBy: { id: "asc" } })).map((t) => t.id);
   const teams: Awaited<ReturnType<typeof loadSimTeam>>[] = [];
   for (const id of ids) teams.push(await loadSimTeam(id));
