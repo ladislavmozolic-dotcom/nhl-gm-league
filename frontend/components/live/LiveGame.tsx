@@ -8,6 +8,7 @@ import CoachPanel from "./CoachPanel";
 import LiveRinkTracker from "./LiveRinkTracker";
 import GameFlowChart from "@/components/GameFlowChart";
 import { liveFlow } from "@/lib/sim/live-flow";
+import { liveLineStats } from "@/lib/sim/live-lines";
 import LiveBoxscore, { type LiveGoalItem, type LivePenaltyItem } from "./LiveBoxscore";
 import { describeLiveEvents, fmtClock, fmtRemainingClock, periodLabel, type LiveLine } from "@/lib/sim/live-text";
 import type { SimEvent } from "@/lib/sim/events";
@@ -142,6 +143,9 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
 
   // xG game flow, drawn as it happens (same chart as the finished-game page)
   const flow = useMemo(() => (eventsList.length ? liveFlow(eventsList, home, away, view?.absSeconds ?? 0) : null), [eventsList, home, away, view?.absSeconds]);
+
+  // line-by-line: shots / xG / goals for and against while each forward line was out (does my matchup work?)
+  const lineStats = useMemo(() => (eventsList.length ? liveLineStats(eventsList, home.id, away.id, view?.absSeconds ?? 0) : null), [eventsList, home.id, away.id, view?.absSeconds]);
 
   // three stars from the finished game: skaters by goals/assists, goalies by saves (+ a shutout bonus)
   const stars = useMemo(() => {
@@ -292,6 +296,37 @@ export default function LiveGame({ gameId, logos, home, away, coachTeams, finalH
       )}
 
       {flow && flow.points.length > 2 && <div className="mb-4"><GameFlowChart flow={flow} /></div>}
+
+      {lineStats && (lineStats[home.id]?.length || lineStats[away.id]?.length) ? (
+        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 mb-4">
+          <h3 className="text-sm font-semibold text-slate-200 mb-1">Lines on the ice</h3>
+          <p className="text-[11px] text-slate-500 mb-3">5-on-5 forward lines: shots, xG and goals for–against while each line was out.</p>
+          <div className="grid md:grid-cols-2 gap-4">
+            {[away, home].map((side) => (
+              <div key={side.id} className="overflow-x-auto">
+                <div className="text-xs font-bold text-slate-300 mb-1">{side.code ?? side.name}</div>
+                <table className="w-full text-xs tabular-nums">
+                  <thead><tr className="text-slate-500"><th className="text-left font-normal">Line</th><th className="font-normal">TOI</th><th className="font-normal">SOG</th><th className="font-normal">xG</th><th className="font-normal">G</th></tr></thead>
+                  <tbody>
+                    {(lineStats[side.id] ?? []).map((r) => {
+                      const good = r.xgf - r.xga;
+                      return (
+                        <tr key={r.label} className="border-t border-slate-800">
+                          <td className="py-1 pr-2 text-left"><span className="text-slate-200">{r.label}</span><div className="text-[10px] text-slate-500 truncate max-w-[180px]">{r.names}</div></td>
+                          <td className="text-center text-slate-400">{Math.floor(r.toi / 60)}:{String(Math.floor(r.toi % 60)).padStart(2, "0")}</td>
+                          <td className="text-center">{r.sf}–{r.sa}</td>
+                          <td className={`text-center ${good > 0.15 ? "text-emerald-400" : good < -0.15 ? "text-rose-400" : "text-slate-300"}`}>{r.xgf.toFixed(2)}–{r.xga.toFixed(2)}</td>
+                          <td className="text-center">{r.gf}–{r.ga}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {stars.length > 0 && (
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 mb-4">

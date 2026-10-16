@@ -47,6 +47,8 @@ export type EventType =
   | "SHOOTOUT";         // one shootout attempt — only synthesized for the LIVE feed (the engine keeps attempts in result.shootout)
 
 // Rising importance — controls what gets persisted and how loud the PBP is.
+const LIVE_EXTRA = new Set<string>(["LINE_CHANGE", "PUCK_RACE", "LONG_SHIFT", "MATCHUP"]);
+
 export type Importance = "MINOR" | "NOTABLE" | "MAJOR" | "HIGHLIGHT";
 
 const RANK: Record<Importance, number> = { MINOR: 0, NOTABLE: 1, MAJOR: 2, HIGHLIGHT: 3 };
@@ -101,9 +103,11 @@ export class EventSink {
     return this.events.filter((e) => e.type === "SHOT" || e.type === "SAVE" || RANK[e.importance] >= RANK.NOTABLE);
   }
 
-  /** Persistable events emitted since index `cursor` (a prior `count`) — the live feed. */
+  /** Events emitted since index `cursor` (a prior `count`) for the LIVE feed: the persistable ones plus the minor
+   * narrative / line-change events the live view needs (feed notes, the rink's line tracker, line stats).
+   * Live events stay in memory — what gets stored with the game is still `persistable()`. */
   persistableSince(cursor: number): SimEvent[] {
-    return this.events.slice(cursor).filter((e) => e.type === "SHOT" || e.type === "SAVE" || RANK[e.importance] >= RANK.NOTABLE);
+    return this.events.slice(cursor).filter((e) => e.type === "SHOT" || e.type === "SAVE" || LIVE_EXTRA.has(e.type) || RANK[e.importance] >= RANK.NOTABLE);
   }
 
   get count(): number {

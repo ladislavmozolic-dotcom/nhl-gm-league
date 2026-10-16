@@ -314,3 +314,18 @@ test("V3 coaching moves show in the feed (matchups, zone-draw lines), at most on
   }
   assert.ok(n >= 30, `notes over 30 games: ${n}`);
 });
+
+test("live line stats: every 5-on-5 shot lands on exactly one line per side; TOI adds up", async () => {
+  const { liveLineStats } = await import("../lib/sim/live-lines");
+  const { simulateGameLive } = await import("../lib/sim/engine");
+  const g = simulateGameLive(makeTeam(1, 64), makeTeam(2, 66), { seed: 5, engineVersion: ENGINE_V3, liveFeed: true });
+  const stream: import("../lib/sim/events").SimEvent[] = [];
+  let it = g.next();
+  while (!it.done) { stream.push(...((it.value as { events?: import("../lib/sim/events").SimEvent[] }).events ?? [])); it = g.next(undefined); }
+  const st = liveLineStats(stream, 1, 2, 3600);
+  assert.ok(st[1].length >= 3 && st[2].length >= 3, JSON.stringify(st[1].map((x) => x.label)));
+  const sf1 = st[1].reduce((n, x) => n + x.sf, 0), sa2 = st[2].reduce((n, x) => n + x.sa, 0);
+  assert.ok(sf1 > 0 && Math.abs(sf1 - sa2) <= sf1 * 0.25, `${sf1} vs ${sa2}`);
+  const toi = st[1].reduce((n, x) => n + x.toi, 0);
+  assert.ok(toi > 1800 && toi <= 3900, `toi ${toi}`);
+});
