@@ -179,6 +179,7 @@ type SimState = {
   v3OtPace: boolean;                 // V3: 3-on-3 overtime has ~2x the attempts (each a real entry + shot); OT_TUNING.conv → ~2/3 of OT games end before the shootout (NHL-like)
   v3CoreGoalie: boolean;             // V3 Core goalie contest: reflexes + rebound control shift the keeper's effective quality (default off until it measures better)
   v3Core: boolean;                   // V3 Core hybrid: the O-zone shoot-or-pass intent comes from lib/sim/v3-core (game state, fatigue, score/time, rebound, player type, team risk); V3 still resolves it
+  v3LineRotation: boolean;           // V3: lines/pairs roll to the GM's ice-time shares (next out = furthest below its share), not a weighted coin flip per change
   v3DepthScoring: boolean;           // V3: depth lines (2-4) generate a little more at 5-on-5 and a forward who stands out on his line drives its chances (DEPTH_TUNING)
   v3Bounces: boolean;                // V3: where the puck goes after a block or a miss — off the end boards back out front, rimmed around to the defence, or the blocker's team takes it (BOUNCE_TUNING)
   v3BackToBack: boolean;             // V3: a club on the 2nd night of a back-to-back tires faster and fades late (B2B_TUNING)
@@ -1263,6 +1264,7 @@ type ShiftState = {
   tiredNoted?: boolean;
   matchNote?: { mine: number; theirs: number; kind: "check" | "top" }; // V3: last change just won the matchup the coach wanted (written to the feed by the tick loop) // V3: the 'stuck on a long shift' note was already written for this shift
   fTopIdx: number; fCheckIdx: number; // which fLines index is this team's top-scoring / most defensive trio
+  fToi?: number[]; dToi?: number[];   // V3 line rotation: 5-on-5 seconds each forward line / D pair has had this game
 };
 // Classify a team's forward lines by role from real attributes (not manager-set line
 // order, which isn't guaranteed to reflect actual skill): the line with the highest
@@ -1396,16 +1398,32 @@ const FOUR_ON_FOUR_SHOTS = 1.15;
 // `matchup` (v2/home only): lets the home coach react to whichever forward line the
 // away team currently has out — send the checking line vs their top trio, or the top
 // trio vs their checking line — mirroring real "last change" home-ice advantage.
-function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG, hold = false, matchup?: { oppSh: ShiftState; isHome: boolean }, shorten: 0 | 1 | 2 = 0) {
+function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number, rng: RNG, hold = false, matchup?: { oppSh: ShiftState; isHome: boolean }, shorten: 0 | 1 | 2 = 0, evenStrength = true) {
   sh.fElapsed += dur; sh.dElapsed += dur;
+  if (st.v3LineRotation && evenStrength) { // the line / pair actually out at 5-on-5 banks the time toward its share
+    (sh.fToi ??= sh.fLines.map(() => 0))[sh.fIdx] = (sh.fToi[sh.fIdx] ?? 0) + dur;
+    (sh.dToi ??= sh.dPairs.map(() => 0))[sh.dIdx] = (sh.dToi[sh.dIdx] ?? 0) + dur;
+  }
   // TOI is accrued in the possession tick loop against the ACTUAL on-ice unit (which
   // is the PP/PK unit during a man-advantage) — not here against the rotating line.
   // `shorten`: 1 = a close game late in the 3rd — the 4th line and 3rd pair sit more;
   // 2 = playoff overtime — a milder lean (OT can run for periods, so the depth still
   // has to play: the 4th line gets roughly half its usual shifts).
-  const pick = (lines: SimSkater[][], weights: number[], cur: number, biasIdx?: number, deepFrom = 99) => {
+  const pick = (lines: SimSkater[][], weights: number[], cur: number, biasIdx?: number, deepFrom = 99, toi?: number[]) => {
     if (lines.length <= 1) return 0;
     const deep = shorten === 2 ? (deepFrom === 3 ? 0.55 : 0.75) : shorten === 1 ? (deepFrom === 3 ? 0.35 : 0.6) : 1;
+    if (st.v3LineRotation && toi) {
+      // V3: coaches roll their lines to the set shares — the next unit over the boards is the one furthest
+      // BELOW its share of the 5-on-5 time so far (the late-game shortening lowers the deep units' targets).
+      // A home matchup call still wins when that unit isn't already well over its share. No RNG.
+      const eff = lines.map((_, i) => Math.max(0.01, weights[i] ?? 1) * (i >= deepFrom ? deep : 1));
+      const wsum = eff.reduce((a, b) => a + b, 0), tot = toi.reduce((a, b) => a + (b ?? 0), 0) + 40;
+      const deficit = (i: number) => (eff[i] / wsum) * tot - (toi[i] ?? 0);
+      if (biasIdx !== undefined && biasIdx !== cur && biasIdx < lines.length && deficit(biasIdx) > -LINE_ROTATION_SLACK) return biasIdx;
+      let best = -1;
+      for (let i = 0; i < lines.length; i++) if (i !== cur && (best < 0 || deficit(i) > deficit(best))) best = i;
+      return best;
+    }
     const w = lines.map((_, i) => (i === cur ? 0 : Math.max(0.01, weights[i] ?? 1) * (i >= deepFrom ? deep : 1)));
     if (biasIdx !== undefined && biasIdx !== cur && biasIdx < w.length) w[biasIdx] *= LAST_CHANGE_MATCHUP_BOOST;
     return rng.weighted(w);
@@ -1423,12 +1441,12 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
       if (oppFIdx === matchup.oppSh.fTopIdx && sh.fCheckIdx !== sh.fTopIdx) bias = sh.fCheckIdx;
       else if (oppFIdx === matchup.oppSh.fCheckIdx) bias = sh.fTopIdx;
     }
-    sh.fIdx = pick(sh.fLines, sh.fWeights, sh.fIdx, bias, 3);
+    sh.fIdx = pick(sh.fLines, sh.fWeights, sh.fIdx, bias, 3, sh.fToi ?? (st.v3LineRotation ? (sh.fToi = sh.fLines.map(() => 0)) : undefined));
     if (bias !== undefined && sh.fIdx === bias && matchup) sh.matchNote = { mine: bias, theirs: matchup.oppSh.fIdx, kind: bias === sh.fCheckIdx ? "check" : "top" };
     sh.fElapsed = 0;
   }
   const dShiftLimit = 42 + rng.int(20);
-  if (sh.dElapsed >= (st.v3FatigueDeployment ? v3ShiftLimit(dShiftLimit, sh.dPairs[sh.dIdx] ?? []) : dShiftLimit)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dWeights, sh.dIdx, undefined, 2); sh.dElapsed = 0; }
+  if (sh.dElapsed >= (st.v3FatigueDeployment ? v3ShiftLimit(dShiftLimit, sh.dPairs[sh.dIdx] ?? []) : dShiftLimit)) { flushShift(st, teamId, sh.dPairs[sh.dIdx] ?? []); sh.dIdx = pick(sh.dPairs, sh.dWeights, sh.dIdx, undefined, 2, sh.dToi ?? (st.v3LineRotation ? (sh.dToi = sh.dPairs.map(() => 0)) : undefined)); sh.dElapsed = 0; }
 }
 // A shift ends for these players: record it, and whether their on-ice xG differential
 // over the shift was positive (Shift Quality → Positive Shift %). Resets the accrual.
@@ -2073,8 +2091,8 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // V3 bounces: a defence that has been hemmed in for a while wins fewer loose pucks (tired, out of position)
     const pinnedLoose = () => 1 - Math.min(0.75, Math.max(0, tick - zoneSince) / 25);
     const pinned = (team: SimTeam) => st.v3Pin && state === "PLAY" && carrierTeam.id !== team.id && zone === "OFF" && tick - zoneSince >= PIN_TUNING.hold && Math.max(shifts[team.id].fElapsed, shifts[team.id].dElapsed) < PIN_TUNING.maxShift;
-    advanceShift(st, home.id, shifts[home.id], 1, rng, carrying(home) || pinned(home) || !!noChange[home.id], { oppSh: shifts[away.id], isHome: true }, shortenFor(home, tick));
-    advanceShift(st, away.id, shifts[away.id], 1, rng, carrying(away) || pinned(away) || !!noChange[away.id], { oppSh: shifts[home.id], isHome: false }, shortenFor(away, tick));
+    advanceShift(st, home.id, shifts[home.id], 1, rng, carrying(home) || pinned(home) || !!noChange[home.id], { oppSh: shifts[away.id], isHome: true }, shortenFor(home, tick), curStr[home.id] === "EV" && curStr[away.id] === "EV");
+    advanceShift(st, away.id, shifts[away.id], 1, rng, carrying(away) || pinned(away) || !!noChange[away.id], { oppSh: shifts[home.id], isHome: false }, shortenFor(away, tick), curStr[away.id] === "EV" && curStr[home.id] === "EV");
     for (const tm of [home, away]) { // V3: the home bench got the matchup it wanted on a line change
       const sh = shifts[tm.id], n = sh.matchNote;
       if (!n) continue;
@@ -2258,6 +2276,9 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
           const old = shifts[team.id], fresh = buildShifts(team);
           fresh.fIdx = old.fIdx % Math.max(1, fresh.fLines.length); fresh.dIdx = old.dIdx % Math.max(1, fresh.dPairs.length);
           fresh.fElapsed = old.fElapsed; fresh.dElapsed = old.dElapsed;
+          // the rotation's ice-time ledger carries over by slot (a line keeps its banked 5-on-5 time)
+          if (old.fToi) fresh.fToi = fresh.fLines.map((_, i) => old.fToi![i] ?? 0);
+          if (old.dToi) fresh.dToi = fresh.dPairs.map((_, i) => old.dToi![i] ?? 0);
           shifts[team.id] = fresh;
           stUnit[team.id] = resolveStUnits(team);
           lastMinOffUnit[team.id] = resolveLastMinOff(team);
@@ -3298,12 +3319,13 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
+export const LINE_ROTATION_SLACK = 25; // V3: a home matchup call overrides the rotation unless that unit is already 25 s+ over its share
 export const DEPTH_TUNING = { l2: 0.1, l3: 0.22, l4: 0.18, standout: 1.5 }; // V3 5-on-5 finishing by forward line (+share over line 1) and, on lines 2-4, (carrier OFF / his line's avg OFF)^standout
 export const FIGHT_TUNING = { rate: 1.05 }; // V3: × the per-game fight chance (NHL 2023-24: 311 fights / 1,312 games ≈ 0.24 per game)
 export const GOALIE_TUNING = { exp: 1.0, defTalent: 0.1 }; // defTalent: × how much the defending pair's DF moves shot conversion // V3: how strongly goalie quality moves the save chance (V2: 1.7) — tuned to the NHL's team save % spread
 export const CORE_TUNING = { scale: 0.765, dump: 1.3, clear: 2.8 }; // clear: × Core's D-zone clear share → the icing multiplier (replaces the flat tired ×1.7; ≈7 icings/game kept) // dump: × Core's neutral-zone dump share (keeps ~24 dump-ins per team-game) // V3 Core hybrid: × Core's shoot share (keeps the league shot volume where V3 is calibrated)
 export const COMPRESS_TUNING = { catchUp: 0.6, early: 0.1, garbageLead: 1 }; // early: catch-up scale in periods 1-2 // V3: × the per-goal catch-up and × how much a team up 3+ eases off (1 = as before, 0 = none)
-export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.0, conv: 0.965 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
+export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.0, conv: 0.982 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
 export const B2B_TUNING = { drain: 1.3, early: 0.92, late: 0.87 }; // V3 back-to-back: shift-fatigue speed, team edge in periods 1-2 / 3+
 export const ROLE_TUNING = { exp: 1.6, creator: 75 }; // V3 roles: SC-vs-PA exponent of the shoot-or-pass choice (V2: 0.7); % of goals whose primary assist is the real passer
 export const SIX_TUNING = { rate: 2.3, conv: 1.8, enShots: 0.4, pullSec: 150, down2: 1.3 }; // V3 6-on-5: attack shot rate / finishing (×, replaces 1.22), the leader's shot rate at the empty net, default pull window
@@ -3407,7 +3429,7 @@ export type SimOptions = {
   crowd?: { fill: number; neutral?: boolean };
   // Offline-only V3 diagnosis. Omitted means every approved V3 increment is on.
   liveFeed?: boolean; // live driver: attach score/shots/new events to every Stoppage
-  experimentalV3?: { depthScoring?: boolean; coreGoalie?: boolean; core?: boolean; bounces?: boolean; backToBack?: boolean; roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
+  experimentalV3?: { lineRotation?: boolean; depthScoring?: boolean; coreGoalie?: boolean; core?: boolean; bounces?: boolean; backToBack?: boolean; roles?: boolean; coachNotes?: boolean; sixOnFive?: boolean; scoreEffects?: boolean; longChange?: boolean; otPace?: boolean; dump?: boolean; pin?: boolean; pace?: boolean; fightStory?: boolean; playEvents?: boolean; stoppageRealism?: boolean; transitionRush?: boolean; shooterForm?: boolean; garbageTime?: boolean; shootoutDuel?: boolean; netFront?: boolean; speedDrawsPenalties?: boolean; ppPuckMovement?: boolean; overtimeStars?: boolean; goalieComposure?: boolean; blockSkill?: boolean; goalieRhythm?: boolean; fatigueDeployment?: boolean; coachAdaptation?: boolean; checkingMatchup?: boolean; qualityDAssists?: boolean; faceoffPressure?: boolean; reboundClearance?: boolean; momentumTimeout?: boolean; assistSpread?: boolean; emotionalDiscipline?: boolean; finishingCurve?: boolean; lateTieCaution?: boolean };
 };
 
 /**
@@ -3492,6 +3514,7 @@ function* gameGen(home: SimTeam, away: SimTeam, opts: SimOptions): Generator<Sto
     v3BackToBack: isV3 && (opts.experimentalV3?.backToBack ?? true),
     v3Bounces: isV3 && (opts.experimentalV3?.bounces ?? true),
     v3DepthScoring: isV3 && (opts.experimentalV3?.depthScoring ?? true),
+    v3LineRotation: isV3 && (opts.experimentalV3?.lineRotation ?? true),
     v3Core: isV3 && (opts.experimentalV3?.core ?? true),
     v3CoreGoalie: isV3 && (opts.experimentalV3?.coreGoalie ?? false),
     v3Dump: isV3 && (opts.experimentalV3?.dump ?? true),
