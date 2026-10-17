@@ -3288,11 +3288,11 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
-export const FIGHT_TUNING = { rate: 0.85 }; // V3: × the per-game fight chance (NHL 2023-24: 311 fights / 1,312 games ≈ 0.24 per game)
+export const FIGHT_TUNING = { rate: 1.05 }; // V3: × the per-game fight chance (NHL 2023-24: 311 fights / 1,312 games ≈ 0.24 per game)
 export const GOALIE_TUNING = { exp: 1.0, defTalent: 0.1 }; // defTalent: × how much the defending pair's DF moves shot conversion // V3: how strongly goalie quality moves the save chance (V2: 1.7) — tuned to the NHL's team save % spread
 export const CORE_TUNING = { scale: 0.765, dump: 1.3, clear: 2.8 }; // clear: × Core's D-zone clear share → the icing multiplier (replaces the flat tired ×1.7; ≈7 icings/game kept) // dump: × Core's neutral-zone dump share (keeps ~24 dump-ins per team-game) // V3 Core hybrid: × Core's shoot share (keeps the league shot volume where V3 is calibrated)
 export const COMPRESS_TUNING = { catchUp: 0.6, early: 0.1, garbageLead: 1 }; // early: catch-up scale in periods 1-2 // V3: × the per-goal catch-up and × how much a team up 3+ eases off (1 = as before, 0 = none)
-export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.0, conv: 1.065 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
+export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.0, conv: 1.01 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
 export const B2B_TUNING = { drain: 1.3, early: 0.92, late: 0.87 }; // V3 back-to-back: shift-fatigue speed, team edge in periods 1-2 / 3+
 export const ROLE_TUNING = { exp: 1.6, creator: 75 }; // V3 roles: SC-vs-PA exponent of the shoot-or-pass choice (V2: 0.7); % of goals whose primary assist is the real passer
 export const SIX_TUNING = { rate: 2.3, conv: 1.8, enShots: 0.4, pullSec: 150, down2: 1.3 }; // V3 6-on-5: attack shot rate / finishing (×, replaces 1.22), the leader's shot rate at the empty net, default pull window
