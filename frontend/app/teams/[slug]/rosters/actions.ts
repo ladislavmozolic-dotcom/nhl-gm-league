@@ -26,7 +26,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
   const ids = moves.map((m) => m.id);
   const players = await prisma.player.findMany({
     where: { id: { in: ids }, teamId: { in: [team.id, affiliate.id] } },
-    select: { id: true, name: true, isGoalie: true, suspendedGames: true, rosterType: true, capHit: true, contractYears: true, contractType: true, contractText: true, lastRecalledAt: true },
+    select: { id: true, name: true, isGoalie: true, suspendedGames: true, injuryDaysLeft: true, rosterType: true, capHit: true, contractYears: true, contractType: true, contractText: true, lastRecalledAt: true },
   });
   const byId = new Map(players.map((p) => [p.id, p]));
   const valid = moves.filter((m) => byId.has(m.id));
@@ -113,7 +113,7 @@ export async function saveRosterMoves(slug: string, moves: MoveRow[]) {
         teamId: isNhlSide(m.side) ? team.id : affiliate.id,
         rosterType: isNhlSide(m.side) ? "NHL" : "AHL",
         // NHL-scratched + farm-scratched; a suspended player is only DISPLAYED as scratched, so don't persist it
-        ...(p.suspendedGames > 0 && isNhlSide(m.side) ? {} : { scratched: isScratchSide(m.side) }),
+        ...((p.suspendedGames > 0 || p.injuryDaysLeft > 0) && isScratchSide(m.side) ? {} : { scratched: isScratchSide(m.side) }), // an injured/suspended player is only DISPLAYED as scratched
         // contractType is a contract term — the roster mover does NOT change it (no
         // flipping 1-way → 2-way to bury a player).
         ...(calledUp ? { lastRecalledAt: today } : {}),

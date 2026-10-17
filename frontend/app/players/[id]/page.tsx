@@ -725,6 +725,11 @@ export default async function PlayerPage({
                   🔒 <Link href="/login" className="text-blue-400 hover:underline">Sign in as a GM</Link> to see full player attributes.
                 </div>
               )}
+              {/* CON — live condition (fatigue / injury), not a rating: green rested, amber worn, red hurt */}
+              <div className="min-w-[56px] text-center px-2 py-2.5 border-r border-slate-800" title={p.injuryDaysLeft > 0 ? `Injured — ${p.injuryDaysLeft} days` : "Condition (CON)"}>
+                <div className="text-[10px] font-bold text-slate-500 tracking-wide">CON</div>
+                <div className={`text-lg font-semibold tabular-nums leading-tight ${p.injuryDaysLeft > 0 ? "text-red-400" : (p.condition ?? 100) >= 95 ? "text-emerald-400" : (p.condition ?? 100) >= 85 ? "text-amber-300" : "text-red-400"}`}>{Math.round(p.condition ?? 100)}</div>
+              </div>
               <div className="min-w-[64px] text-center px-2 py-2.5 bg-slate-800/60 border-l border-slate-700">
                 <div className="text-[10px] font-bold text-slate-400 tracking-wide">OV</div>
                 <div className={`text-lg font-black tabular-nums leading-tight ${ovColor(grp, overall)}`}>{overall ?? "—"}</div>

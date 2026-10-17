@@ -23,9 +23,13 @@ type Player = {
   recallDaysLeft?: number;
   recallGamesLeft?: number;
   suspendedGames?: number;
+  injuryDays?: number;     // > 0 = injured: shown as scratched, can't be dressed
+  injuryDesc?: string | null;
 };
 
 const isAhlOnly = (p: Player) => p.capHit === 100_000;
+/** suspended or injured — he can't dress, so he sits in Scratched until he is available */
+const isOut = (p: Player) => (p.suspendedGames ?? 0) > 0 || (p.injuryDays ?? 0) > 0;
 
 const ovColor = (ov: number) =>
   ov >= 80
@@ -138,7 +142,7 @@ export default function RosterMover({
   };
 
   const canMove = (p: Player, to: RosterSide) => {
-    if ((p.suspendedGames ?? 0) > 0) return false; // serves his suspension where he is
+    if (isOut(p)) return false; // serves his suspension / heals where he is
     if (isNhlSide(to)) return !isAhlOnly(p);
     if (!isNhlSide(p.side)) return true;
     return p.contractType !== "ONE_WAY" || isAhlOnly(p) || !!p.recallExempt;
@@ -187,8 +191,8 @@ export default function RosterMover({
 
   const autoRoster = () => {
     const byOV = (a: Player, b: Player) => b.overall - a.overall;
-    const sk = rows.filter((r) => !r.isGoalie && !(r.suspendedGames ?? 0));
-    const gk = rows.filter((r) => r.isGoalie && !(r.suspendedGames ?? 0));
+    const sk = rows.filter((r) => !r.isGoalie && !isOut(r));
+    const gk = rows.filter((r) => r.isGoalie && !isOut(r));
     const forcedUp = (p: Player) => p.contractType === "ONE_WAY" && !isAhlOnly(p);
     const proPool = (pool: Player[], n: number) => {
       const forced = pool.filter(forcedUp);
@@ -200,7 +204,7 @@ export default function RosterMover({
     const remGk = gk.filter((p) => !proIds.has(p.id)).sort(byOV);
     const farmIds = new Set([...remSk.slice(0, 18), ...remGk.slice(0, 2)].map((p) => p.id));
     setRows((prev) =>
-      prev.map((p) => (p.suspendedGames ?? 0) > 0 ? p : ({ ...p, side: proIds.has(p.id) ? "pro" : farmIds.has(p.id) ? "farm" : "farm-scratched" }))
+      prev.map((p) => isOut(p) ? p : ({ ...p, side: proIds.has(p.id) ? "pro" : farmIds.has(p.id) ? "farm" : "farm-scratched" }))
     );
     setSaved(false);
     setErr(null);
@@ -267,7 +271,8 @@ export default function RosterMover({
   const Row = ({ p }: { p: Player }) => {
     const oneWay = p.contractType === "ONE_WAY";
     const ahlOnly = isAhlOnly(p);
-    const susp = (p.suspendedGames ?? 0) > 0;
+    const susp = isOut(p); // suspended or injured: no move buttons
+    const hurt = (p.injuryDays ?? 0) > 0;
     const tooExpensive = p.capHit > WAIVER_CAP_HIT_LIMIT;
 
     return (
@@ -303,9 +308,14 @@ export default function RosterMover({
               </span>
             )}
 
-            {susp && (
+            {(p.suspendedGames ?? 0) > 0 && (
               <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded border border-rose-500/50 text-rose-300 bg-rose-500/10 whitespace-nowrap">
                 {isCs ? `🚫 Suspendovaný · ${p.suspendedGames}` : `🚫 Suspension · ${p.suspendedGames} left`}
+              </span>
+            )}
+            {hurt && (
+              <span title={p.injuryDesc ?? undefined} className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded border border-red-500/50 text-red-300 bg-red-500/10 whitespace-nowrap">
+                {isCs ? `🩹 Zranený · ${p.injuryDays} ${p.injuryDays === 1 ? "deň" : p.injuryDays! < 5 ? "dni" : "dní"}` : `🩹 Injured · ${p.injuryDays} day${p.injuryDays === 1 ? "" : "s"}`}{p.injuryDesc ? ` · ${p.injuryDesc}` : ""} · {isCs ? "nemôže nastúpiť" : "can't play"}
               </span>
             )}
 

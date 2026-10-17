@@ -298,10 +298,21 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       // recover too — the NOT IN above only covers clubs that are idle tonight, so a goalie on a
       // team playing most days never got a rest-day bump. Anyone who started on the last played
       // game day (a back-to-back) gets nothing, like before.
+      // Each goalie gets exactly one credit per day he didn't play:
+      //  - a goalie who dressed on the last game day (starter or backup) is already settled for that day
+      //    by the game itself (starter: shot-load drop; backup who sat: +1/+2 on his game line);
+      //  - a goalie whose club was idle that day got it from the bulk update above at that day's sim;
+      //  - so only the ones left out of a lineup while their club played (3rd goalie, scratched) get
+      //    that day here — plus, for everyone on tonight's clubs, any league-wide break days in between.
       const lastDay = lastPlayed._max.round;
       if (lastDay != null) {
+        const sea = season.replace(/'/g, "");
+        const breakDays = Math.max(0, restDays - 1);
+        const perDay = `CASE WHEN COALESCE((SELECT r.du FROM "GoalieRating" r WHERE r."playerId" = "Player".id), 0) >= ${DU_HIGH} THEN 2 ELSE 1 END`;
+        const clubPlayedLast = `"teamId" IN (SELECT g."homeTeamId" FROM "Game" g WHERE g.season = '${sea}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL AND g.status = 'FINAL' UNION SELECT g."awayTeamId" FROM "Game" g WHERE g.season = '${sea}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL AND g.status = 'FINAL')`;
+        const dressedLast = `id IN (SELECT gs."playerId" FROM "GoalieGameStat" gs JOIN "Game" g ON g.id = gs."gameId" WHERE g.season = '${sea}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL)`;
         await prisma.$executeRawUnsafe(
-          `UPDATE "Player" SET condition = LEAST(100, condition + ${goalieRecSql}) WHERE "isGoalie" = true AND "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" IN (${playingTeams.join(",")}) AND id NOT IN (SELECT gs."playerId" FROM "GoalieGameStat" gs JOIN "Game" g ON g.id = gs."gameId" WHERE gs.started = true AND g.season = '${season.replace(/'/g, "")}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL)`
+          `UPDATE "Player" SET condition = LEAST(100, condition + (${breakDays} + CASE WHEN ${clubPlayedLast} AND NOT (${dressedLast}) THEN 1 ELSE 0 END) * ${perDay}) WHERE "isGoalie" = true AND "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" IN (${playingTeams.join(",")})`
         );
       }
     }
@@ -450,6 +461,12 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
 
   const finishGame = async (job: NonNullable<Awaited<ReturnType<typeof prepareGame>>>, result: GameResult) => {
     const { gm, home, away, round } = job;
+    // A dressed backup who never got in rested tonight: his one day of recovery is part of THIS game's
+    // record (conBefore → conAfter goes up, the way a starter's goes down), not added again next morning.
+    for (const [box, team] of [[result.home, home], [result.away, away]] as const) {
+      const bu = box.backupGoalie;
+      if (bu && !bu.started && team.backup && bu.id === team.backup.id) bu.conAfter = Math.min(100, bu.conBefore + (team.backup.du >= DU_HIGH ? 2 : 1));
+    }
     await saveGameResult(result, {
       gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round),
       homeLines: home.linesUsed, awayLines: away.linesUsed,
@@ -483,9 +500,9 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       // the starter. Without this he'd sit frozen at whatever CON he had, forever,
       // any night his team plays and he isn't the guy in net. One rest day's worth
       // of recovery, same rate as the bulk formula.
-      if (team.backup && team.backup.id !== starter.id) {
-        team.backup.con = Math.min(100, team.backup.con + (team.backup.du >= DU_HIGH ? 2 : 1));
-      }
+      // backup: tonight's rest credit (sat) or his post-relief CON (came in) — both already on his game line
+      const buLine = box.backupGoalie;
+      if (team.backup && team.backup.id !== starter.id && buLine && buLine.id === team.backup.id) team.backup.con = buLine.conAfter;
       // carry each skater's post-game conditioning into the next game
       const skMap = new Map([...team.forwards, ...team.defense].map((s) => [s.id, s]));
       for (const sb of box.skaters) { const s = skMap.get(sb.id); if (s) s.con = sb.conAfter; }
