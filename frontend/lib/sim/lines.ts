@@ -16,7 +16,9 @@ export async function loadTeamLines(teamId: number): Promise<TeamLinesData | nul
         select: {
           league: true,
           players: {
-            where: { scratched: false, rosterType: { in: ["NHL", "AHL"] } },
+            // injured / suspended players can't dress — treat them as gone so autoFill slots a healthy replacement
+            // (the saved row keeps him, so he drops back into his slot once he's healthy again)
+            where: { scratched: false, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 }, rosterType: { in: ["NHL", "AHL"] } },
             select: { id: true, rosterType: true, isGoalie: true, position: true, overall: true, shoots: true, df: true },
           },
         },
@@ -60,7 +62,7 @@ export async function validateTeamLines(teamId: number, data: TeamLinesData, opt
     select: {
       league: true,
       players: {
-        where: { scratched: false, rosterType: { in: ["NHL", "AHL"] } },
+        where: { scratched: false, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 }, rosterType: { in: ["NHL", "AHL"] } },
         select: { id: true, rosterType: true, isGoalie: true, position: true, overall: true, shoots: true, df: true },
       },
     },
@@ -88,7 +90,7 @@ export async function validateTeamLines(teamId: number, data: TeamLinesData, opt
   if (opts.strict && skaters.filter((p) => !isDefense(p.position)).length < 12) throw new Error("The active roster must contain at least 12 forwards.");
   if (opts.strict && skaters.filter((p) => isDefense(p.position)).length < 6) throw new Error("The active roster must contain at least 6 defensemen.");
   const activeIds = new Set(skaters.map((p) => p.id));
-  if (opts.strict && fiveOnFive.some((id) => !activeIds.has(id))) throw new Error("The lineup contains a player who is no longer on the active roster. Reload Lines and try again.");
+  if (opts.strict && fiveOnFive.some((id) => !activeIds.has(id))) throw new Error("The lineup contains a player who is no longer available (injured, suspended, scratched or off the roster). Reload Lines and try again.");
 
   // 5v5 is already complete and valid, so autoFill leaves the GM's exact lines
   // untouched and only reconciles/fills ancillary special-situation slots.
