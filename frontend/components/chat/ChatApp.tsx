@@ -66,6 +66,7 @@ export default function ChatApp() {
   const [reads, setReads] = useState<Record<number, Record<number, number>>>({}); // roomId -> teamId -> lastReadId
   const [picker, setPicker] = useState(false);
   const [groupNew, setGroupNew] = useState(false);
+  const [stale, setStale] = useState(false);
   const [pinSig, setPinSig] = useState<{ roomId: number; n: number }>({ roomId: 0, n: 0 });
   const [openUnread, setOpenUnread] = useState<{ roomId: number; n: number; afterId: number }>({ roomId: 0, n: 0, afterId: 0 });
   const [settings, setSettings] = useState(false);
@@ -211,7 +212,17 @@ export default function ChatApp() {
       if (dead) return;
       es = new EventSource(`/api/im/stream${lastSeen.current ? `?after=${lastSeen.current}` : ""}`);
       es.addEventListener("messages", (e) => { lastBeat = Date.now(); handleMessages(JSON.parse((e as MessageEvent).data) as Msg[]); });
-      es.addEventListener("hello", () => { lastBeat = Date.now(); });
+      es.addEventListener("hello", (e) => {
+        lastBeat = Date.now();
+        try { // the server runs a newer build than this window → refresh the app (never while a draft is being typed)
+          const b = (JSON.parse((e as MessageEvent).data) as { build?: string }).build;
+          const mine = process.env.NEXT_PUBLIC_BUILD_ID;
+          if (b && mine && b !== mine) {
+            const draft = (document.querySelector("textarea") as HTMLTextAreaElement | null)?.value ?? "";
+            if (!draft.trim()) window.location.reload(); else setStale(true);
+          }
+        } catch { /* old server */ }
+      });
       es.addEventListener("myread", () => { lastBeat = Date.now(); if (Date.now() - lastReload > 1500) { lastReload = Date.now(); void load(); } }); // read on another device → refresh unread counts + app badge
       es.addEventListener("hb", () => { lastBeat = Date.now(); });
       es.addEventListener("deleted", (e) => {
@@ -261,12 +272,13 @@ export default function ChatApp() {
     // watchdog: a healthy stream beats every ~8 s; if it goes quiet (proxy buffering, sleeping tab, dropped Wi-Fi) reconnect + catch up
     const wd = setInterval(() => { if (document.visibilityState === "visible" && (Date.now() - lastBeat > 14000 || es?.readyState === 2)) reopen(); }, 5000);
     const onVis = () => { if (document.visibilityState === "visible") { onFocus(); reopen(); void load(); if (activeRef.current) void loadRoom(activeRef.current); } };
+    const poll = setInterval(() => { if (document.visibilityState === "visible" && Date.now() - lastReload > 25000) { lastReload = Date.now(); void load(); } }, 30000); // safety net: unread counts self-heal even if a live event is ever missed
     const onOnline = () => reopen();
     const onFocus = () => { const a = activeRef.current; if (a != null && attending() && msgsRef.current[a]) markRead(a, msgsRef.current[a]); };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("online", onOnline);
-    return () => { dead = true; es?.close(); clearInterval(wd); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("online", onOnline); window.removeEventListener("focus", onFocus); };
+    return () => { dead = true; es?.close(); clearInterval(wd); clearInterval(poll); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("online", onOnline); window.removeEventListener("focus", onFocus); };
   }, [boot?.me.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // app-icon badge with total unread
@@ -324,6 +336,7 @@ export default function ChatApp() {
           <button onClick={() => setPrefs({ ...prefs, theme: light ? "dark" : "light" })} aria-label="Svetlý / tmavý režim" title={light ? "Tmavý režim" : "Svetlý režim"} className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700">{light ? "🌙" : "☀️"}</button>
           <button onClick={() => setSettings(true)} aria-label="Nastavenia" className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700">⚙︎</button>
         </header>
+        {stale && <button onClick={() => window.location.reload()} className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium">🔄 Je nová verzia chatu — ťukni pre obnovenie</button>}
         <InstallBanner />
         <PushBanner api={pushApi} />
         {!boot.enabled && <div className="bg-amber-500/10 text-amber-300 text-xs px-4 py-2">Chat je pre ostatných GM zatiaľ vypnutý (vidíš ho ako admin).</div>}

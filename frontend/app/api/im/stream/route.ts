@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     async start(controller) {
       const started = Date.now();
       const send = (s: string) => { try { controller.enqueue(enc.encode(s)); } catch { /* closed */ } };
-      send(`retry: 2000\n\nid: ${cursor}\nevent: hello\ndata: ${cursor}\n\n`); // id: so a reconnect resumes exactly here (no gap)
+      send(`retry: 2000\n\nid: ${cursor}\nevent: hello\ndata: ${JSON.stringify({ cursor, build: process.env.NEXT_PUBLIC_BUILD_ID ?? "" })}\n\n`); // id: so a reconnect resumes exactly here (no gap)
       let beat = 0;
       const tick = async () => {
         try {
