@@ -1416,7 +1416,8 @@ function advanceShift(st: SimState, teamId: number, sh: ShiftState, dur: number,
       // V3: coaches roll their lines to the set shares — the next unit over the boards is the one furthest
       // BELOW its share of the 5-on-5 time so far (the late-game shortening lowers the deep units' targets).
       // A home matchup call still wins when that unit isn't already well over its share. No RNG.
-      const eff = lines.map((_, i) => Math.max(0.01, weights[i] ?? 1) * (i >= deepFrom ? deep : 1));
+      // the coach's own order breaks ties: his top line (and 1st pair) gets a touch more than an equally-set second one
+      const eff = lines.map((_, i) => Math.max(0.01, weights[i] ?? 1) * (i >= deepFrom ? deep : 1) * (1 + (LINE_ORDER_BONUS[i] ?? 0)));
       const wsum = eff.reduce((a, b) => a + b, 0), tot = toi.reduce((a, b) => a + (b ?? 0), 0) + 40;
       const deficit = (i: number) => (eff[i] / wsum) * tot - (toi[i] ?? 0);
       if (biasIdx !== undefined && biasIdx !== cur && biasIdx < lines.length && deficit(biasIdx) > -LINE_ROTATION_SLACK) return biasIdx;
@@ -3319,6 +3320,7 @@ export const DUMP_TUNING = { share: 0.35, race: 0.8, goalie: 0.15, boost: 1.0 };
 /** V3: with pace + dump-ins the game's flow is more regular, so the team-quality edge in the possession battles is scaled down (1 = unchanged) to keep the favourite's win rate where it was. */
 export const TEAM_EDGE_TUNING = { edge: 0.55 };
 /** V3 overtime: attempts per 15 s step (was 0.07), and the conversion scale that keeps goals per OT where they were (0.07 / rate). */
+export const LINE_ORDER_BONUS = [0.15, 0.06]; // V3 rotation: +share for the GM's 1st / 2nd line (and pair) — the top unit plays a bit more than an equally-set 2nd one
 export const LINE_ROTATION_SLACK = 25; // V3: a home matchup call overrides the rotation unless that unit is already 25 s+ over its share
 export const DEPTH_TUNING = { l2: 0.1, l3: 0.22, l4: 0.18, standout: 1.5 }; // V3 5-on-5 finishing by forward line (+share over line 1) and, on lines 2-4, (carrier OFF / his line's avg OFF)^standout
 export const FIGHT_TUNING = { rate: 1.05 }; // V3: × the per-game fight chance (NHL 2023-24: 311 fights / 1,312 games ≈ 0.24 per game)
