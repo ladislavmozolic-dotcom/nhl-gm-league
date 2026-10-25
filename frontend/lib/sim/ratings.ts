@@ -56,7 +56,7 @@ export function goalieQuality(a: GoalieAttrs, overall: number): number {
 // (avgOV → who wins & climbs the standings) has a realistic spread. Attributes are
 // left untouched so the shot/goal calibration holds; scoring concentration is
 // handled by starExponent instead.
-const OV_SPREAD = 1.2;
+const OV_SPREAD = 1.5; // was 1.2: measured true team win% sd .055 -> .069 (NHL ~.07) at unchanged goals/g and star scoring
 const stretchOV = (v: number, mean = 59) => Math.max(30, Math.min(99, mean + (v - mean) * OV_SPREAD));
 
 export function buildSkater(row: {
