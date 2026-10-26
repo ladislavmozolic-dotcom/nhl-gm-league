@@ -124,6 +124,8 @@ export const DEFAULT_GOALIE_WEIGHTS: LiveCalcGoalieWeights = {
   customMetrics: {},
 };
 
+export type StatSourcePreference = "auto" | "nhl" | "moneypuck";
+
 export type LiveCalcConfigData = {
   latestSeason: string;
   previousSeason: string;
@@ -135,6 +137,7 @@ export type LiveCalcConfigData = {
   nhlGpPrevMin: number;
   ahlNhleLatest: number;
   ahlNhlePrevious: number;
+  statSourcePreference?: StatSourcePreference;
   weights: LiveCalcWeights;
   goalieWeights: LiveCalcGoalieWeights;
   managerTeamIds?: number[];
@@ -153,6 +156,7 @@ export const DEFAULT_CONFIG: LiveCalcConfigData = {
   nhlGpPrevMin: 10,
   ahlNhleLatest: 0.446,
   ahlNhlePrevious: 0.448,
+  statSourcePreference: "auto",
   weights: DEFAULT_LIVE_CALC_WEIGHTS,
   goalieWeights: DEFAULT_GOALIE_WEIGHTS,
   managerTeamIds: [],
@@ -168,8 +172,12 @@ export async function getLiveCalculatorConfig(): Promise<LiveCalcConfigData> {
 
     let weights = DEFAULT_LIVE_CALC_WEIGHTS;
     let goalieWeights = DEFAULT_GOALIE_WEIGHTS;
+    let statSourcePreference: StatSourcePreference = "auto";
     if (row.weightsJson && typeof row.weightsJson === "object") {
       const wj = row.weightsJson as any;
+      if (wj.statSourcePreference === "nhl" || wj.statSourcePreference === "moneypuck" || wj.statSourcePreference === "auto") {
+        statSourcePreference = wj.statSourcePreference;
+      }
       weights = {
         ...DEFAULT_LIVE_CALC_WEIGHTS,
         ...(wj as Partial<LiveCalcWeights>),
@@ -192,6 +200,7 @@ export async function getLiveCalculatorConfig(): Promise<LiveCalcConfigData> {
       nhlGpPrevMin: row.nhlGpPrevMin ?? DEFAULT_CONFIG.nhlGpPrevMin,
       ahlNhleLatest: row.ahlNhleLatest ?? DEFAULT_CONFIG.ahlNhleLatest,
       ahlNhlePrevious: row.ahlNhlePrevious ?? DEFAULT_CONFIG.ahlNhlePrevious,
+      statSourcePreference,
       weights,
       goalieWeights,
       managerTeamIds: row.managerTeamIds ?? [],
@@ -219,6 +228,7 @@ export async function updateLiveCalculatorConfig(data: LiveCalcConfigUpdate): Pr
   const merged: LiveCalcConfigData = {
     ...current,
     ...data,
+    statSourcePreference: data.statSourcePreference ?? current.statSourcePreference ?? "auto",
     managerTeamIds: data.managerTeamIds ?? current.managerTeamIds ?? [],
     weights: {
       ...current.weights,
@@ -233,6 +243,7 @@ export async function updateLiveCalculatorConfig(data: LiveCalcConfigUpdate): Pr
   const weightsJsonToSave = {
     ...merged.weights,
     goalieWeights: merged.goalieWeights,
+    statSourcePreference: merged.statSourcePreference,
   };
 
   await prisma.liveCalcConfig.upsert({

@@ -268,6 +268,18 @@ export default function LiveCalculatorConfigModal({
     );
   };
 
+  const renderSourceBadge = (source: "nhl" | "moneypuck" | "edge" | "bio", label?: string) => {
+    let color = "text-sky-400 bg-sky-500/10 border-sky-500/20";
+    if (source === "moneypuck") color = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+    if (source === "edge") color = "text-teal-400 bg-teal-500/10 border-teal-500/20";
+    if (source === "bio") color = "text-amber-400 bg-amber-500/10 border-amber-500/20";
+    return (
+      <span className={`text-[9px] px-1.5 py-0.5 rounded border font-mono font-medium ${color}`}>
+        {label || source.toUpperCase()}
+      </span>
+    );
+  };
+
   const renderCustomMetricsSection = (groupKey: string, targetType: "skater" | "goalie" = "skater") => {
     const list =
       targetType === "goalie"
@@ -1068,6 +1080,72 @@ export default function LiveCalculatorConfigModal({
                   </div>
                 </div>
 
+                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3 sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                      <span>🌐</span> Data Source Preference (Zdroj dát pre štatistiky)
+                    </h3>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono font-medium">
+                      {config.statSourcePreference === "nhl" ? "NHL API Only" : config.statSourcePreference === "moneypuck" ? "MoneyPuck Only" : "Auto (Hybrid)"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Determines where the calculation engine primarily derives counting and rate metrics (assists, goals, hits, blocks, penalties, icetime).
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, statSourcePreference: "auto" })}
+                      className={`p-3 rounded-xl border text-left transition ${
+                        (config.statSourcePreference ?? "auto") === "auto"
+                          ? "bg-sky-950/60 border-sky-500/80 text-white shadow-sm shadow-sky-500/20"
+                          : "bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-semibold text-xs mb-1 text-sky-400">
+                        <span>⚡</span> Auto (Hybrid & Fallback)
+                      </div>
+                      <div className="text-[11px] text-slate-400 leading-snug">
+                        Combines official NHL boxscore stats with MoneyPuck advanced analytics. Automatically falls back to MoneyPuck if prior season stats are 0 or empty.
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, statSourcePreference: "nhl" })}
+                      className={`p-3 rounded-xl border text-left transition ${
+                        config.statSourcePreference === "nhl"
+                          ? "bg-sky-950/60 border-sky-500/80 text-white shadow-sm shadow-sky-500/20"
+                          : "bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-semibold text-xs mb-1 text-sky-400">
+                        <span>🏒</span> NHL API First
+                      </div>
+                      <div className="text-[11px] text-slate-400 leading-snug">
+                        Strictly prioritizes official boxscores from the league database for all counting stats. Uses MoneyPuck solely for 5v5/xG/finishing analytics.
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, statSourcePreference: "moneypuck" })}
+                      className={`p-3 rounded-xl border text-left transition ${
+                        config.statSourcePreference === "moneypuck"
+                          ? "bg-sky-950/60 border-sky-500/80 text-white shadow-sm shadow-sky-500/20"
+                          : "bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-semibold text-xs mb-1 text-emerald-400">
+                        <span>📊</span> MoneyPuck Only
+                      </div>
+                      <div className="text-[11px] text-slate-400 leading-snug">
+                        Takes all regular-season skater counting stats and advanced metrics directly from MoneyPuck season summary CSVs.
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Admin GM Delegation for Live Calculator */}
                 {isAdmin && (
                   <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-3 sm:col-span-2">
@@ -1167,7 +1245,10 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">A/GP (Assists / game):</label>
+                    <label className="flex items-center justify-between text-slate-400 mb-1">
+                      <span>A/GP (Assists / game):</span>
+                      {renderSourceBadge("nhl", "NHL / MP")}
+                    </label>
                     <input
                       type="number"
                       step="0.01"
@@ -1185,7 +1266,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">A/60 All (All game situations):</label>
+                    <label className="flex items-center justify-between text-slate-400 mb-1">
+                      <span>A/60 All (All game situations):</span>
+                      {renderSourceBadge("nhl", "NHL / MP")}
+                    </label>
                     <input
                       type="number"
                       step="0.01"
@@ -1203,7 +1287,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">A/60 5v5 (Even strength):</label>
+                    <label className="flex items-center justify-between text-slate-400 mb-1">
+                      <span>A/60 5v5 (Even strength):</span>
+                      {renderSourceBadge("moneypuck", "MP 5v5")}
+                    </label>
                     <input
                       type="number"
                       step="0.01"
@@ -1237,7 +1324,10 @@ export default function LiveCalculatorConfigModal({
                 )}
                 <div className="grid grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">G/GP (Goals / game):</label>
+                    <label className="flex items-center justify-between text-slate-400 mb-1">
+                      <span>G/GP (Goals / game):</span>
+                      {renderSourceBadge("nhl", "NHL / MP")}
+                    </label>
                     <input
                       type="number"
                       step="0.01"
@@ -1255,7 +1345,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">G/60 (Goals / 60 min):</label>
+                    <label className="flex items-center justify-between text-slate-400 mb-1">
+                      <span>G/60 (Goals / 60 min):</span>
+                      {renderSourceBadge("nhl", "NHL / MP")}
+                    </label>
                     <input
                       type="number"
                       step="0.01"
@@ -1273,7 +1366,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">xG/60 (Expected goals):</label>
+                    <label className="flex items-center justify-between text-slate-400 mb-1">
+                      <span>xG/60 (Expected goals):</span>
+                      {renderSourceBadge("moneypuck", "MoneyPuck")}
+                    </label>
                     <input
                       type="number"
                       step="0.01"
@@ -1291,7 +1387,10 @@ export default function LiveCalculatorConfigModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">(G - xG)/60 (Finishing):</label>
+                    <label className="flex items-center justify-between text-slate-400 mb-1">
+                      <span>(G - xG)/60:</span>
+                      {renderSourceBadge("moneypuck", "Finishing")}
+                    </label>
                     <input
                       type="number"
                       step="0.01"

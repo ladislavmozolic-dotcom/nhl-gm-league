@@ -217,6 +217,8 @@ async function fetchSeason(year: number): Promise<SeasonData> {
         const onGa = num(r, iOnGa);
         m.toi5v5 = toi; m.onIceAxg5v5 = onAxg; m.onIceGa5v5 = onGa;
         m.onIceFxg5v5 = num(r, iOnFxg);
+        m.a1_5v5 = num(r, iA1);
+        m.a2_5v5 = num(r, iA2);
         if (t) {
           m.offIceAxg5v5 = Math.max(0, t.xga5v5 - onAxg); m.offIceToi5v5 = Math.max(0, t.toi5v5 - toi);
           m.offIceGa5v5 = Math.max(0, t.ga5v5 - onGa);

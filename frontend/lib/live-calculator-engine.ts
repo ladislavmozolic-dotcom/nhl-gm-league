@@ -38,13 +38,13 @@ const isDefenseman = (pos = ""): boolean =>
   pos.toUpperCase().includes("/D") ||
   pos.toUpperCase().includes("D/");
 
-function safePer60(count: number, toiSec: number): number | null {
-  if (!toiSec || toiSec <= 0) return null;
+function safePer60(count: number | null | undefined, toiSec: number | null | undefined): number | null {
+  if (count == null || !toiSec || toiSec <= 0) return null;
   return (count / toiSec) * 3600;
 }
 
-function safeRate(count: number, gp: number): number | null {
-  if (!gp || gp <= 0) return null;
+function safeRate(count: number | null | undefined, gp: number | null | undefined): number | null {
+  if (count == null || !gp || gp <= 0) return null;
   return count / gp;
 }
 
@@ -209,13 +209,63 @@ export async function runLiveCalculatorRecompute(): Promise<{
       return null;
     };
 
+    const pref = config.statSourcePreference ?? "auto";
+
+    const getStat = (
+      nhlVal: number | null | undefined,
+      nhlGp: number | null | undefined,
+      mpVal: number | null | undefined,
+      mpGp: number | null | undefined
+    ): { val: number | null; gp: number } => {
+      const hasNhl = nhlGp != null && nhlGp > 0 && nhlVal != null;
+      const hasMp = mpGp != null && mpGp > 0 && mpVal != null && !isNaN(mpVal);
+
+      if (pref === "moneypuck") {
+        if (hasMp) return { val: mpVal!, gp: mpGp! };
+        if (hasNhl) return { val: nhlVal!, gp: nhlGp! };
+        return { val: null, gp: 0 };
+      }
+      if (pref === "nhl") {
+        if (hasNhl) return { val: nhlVal!, gp: nhlGp! };
+        if (hasMp) return { val: mpVal!, gp: mpGp! };
+        return { val: null, gp: 0 };
+      }
+      // auto: prefer NHL if present with GP > 0, fallback to MP
+      if (hasNhl) return { val: nhlVal!, gp: nhlGp! };
+      if (hasMp) return { val: mpVal!, gp: mpGp! };
+      return { val: null, gp: 0 };
+    };
+
+    const getToiTotalSec = (
+      nhlToiPerGpSec: number | null | undefined,
+      nhlGp: number | null | undefined,
+      mpToiTotalSec: number | null | undefined,
+      mpGp: number | null | undefined
+    ): number | null => {
+      const hasNhl = nhlGp != null && nhlGp > 0 && nhlToiPerGpSec != null && nhlToiPerGpSec > 0;
+      const hasMp = mpGp != null && mpGp > 0 && mpToiTotalSec != null && mpToiTotalSec > 0;
+
+      if (pref === "moneypuck") {
+        if (hasMp) return mpToiTotalSec!;
+        if (hasNhl) return nhlToiPerGpSec! * nhlGp!;
+        return null;
+      }
+      if (hasNhl) return nhlToiPerGpSec! * nhlGp!;
+      if (hasMp) return mpToiTotalSec!;
+      return null;
+    };
+
     // A/GP, A/60 all, A/60 5v5
-    const apgCur = safeRate(p.curSeasonA ?? mpCur.a1 + mpCur.a2, nhlGpLatest);
-    const apgLast = safeRate(p.lastSeasonA ?? mpLast.a1 + mpLast.a2, nhlGpPrevious);
+    const aCur = getStat(p.curSeasonA, p.curSeasonGP, mpCur.a1 != null || mpCur.a2 != null ? (mpCur.a1 ?? 0) + (mpCur.a2 ?? 0) : null, mpCur.gp);
+    const aLast = getStat(p.lastSeasonA, p.lastSeasonGP, mpLast.a1 != null || mpLast.a2 != null ? (mpLast.a1 ?? 0) + (mpLast.a2 ?? 0) : null, mpLast.gp);
+    const apgCur = safeRate(aCur.val, aCur.gp || nhlGpLatest);
+    const apgLast = safeRate(aLast.val, aLast.gp || nhlGpPrevious);
     const apg = blendVal(apgCur, apgLast);
 
-    const a60Cur = safePer60(p.curSeasonA ?? mpCur.a1 + mpCur.a2, (p.curSeasonToi ?? 0) * nhlGpLatest || mpCur.toi);
-    const a60Last = safePer60(p.lastSeasonA ?? mpLast.a1 + mpLast.a2, (p.lastSeasonToi ?? 0) * nhlGpPrevious || mpLast.toi);
+    const toiCurTotal = getToiTotalSec(p.curSeasonToi, p.curSeasonGP, mpCur.toi, mpCur.gp);
+    const toiLastTotal = getToiTotalSec(p.lastSeasonToi, p.lastSeasonGP, mpLast.toi, mpLast.gp);
+    const a60Cur = safePer60(aCur.val, toiCurTotal);
+    const a60Last = safePer60(aLast.val, toiLastTotal);
     const a60 = blendVal(a60Cur, a60Last);
 
     const a605v5Cur = safePer60((mpCur.a1_5v5 ?? 0) + (mpCur.a2_5v5 ?? 0), mpCur.toi5v5);
@@ -223,12 +273,14 @@ export async function runLiveCalculatorRecompute(): Promise<{
     const a60_5v5 = blendVal(a605v5Cur, a605v5Last);
 
     // G/GP, G/60, xG/60, (G-xG)/60
-    const gpgCur = safeRate(p.curSeasonG ?? mpCur.g, nhlGpLatest);
-    const gpgLast = safeRate(p.lastSeasonG ?? mpLast.g, nhlGpPrevious);
+    const gCur = getStat(p.curSeasonG, p.curSeasonGP, mpCur.g, mpCur.gp);
+    const gLast = getStat(p.lastSeasonG, p.lastSeasonGP, mpLast.g, mpLast.gp);
+    const gpgCur = safeRate(gCur.val, gCur.gp || nhlGpLatest);
+    const gpgLast = safeRate(gLast.val, gLast.gp || nhlGpPrevious);
     const gpg = blendVal(gpgCur, gpgLast);
 
-    const g60Cur = safePer60(p.curSeasonG ?? mpCur.g, (p.curSeasonToi ?? 0) * nhlGpLatest || mpCur.toi);
-    const g60Last = safePer60(p.lastSeasonG ?? mpLast.g, (p.lastSeasonToi ?? 0) * nhlGpPrevious || mpLast.toi);
+    const g60Cur = safePer60(gCur.val, toiCurTotal);
+    const g60Last = safePer60(gLast.val, toiLastTotal);
     const g60 = blendVal(g60Cur, g60Last);
 
     const xg60Cur = safePer60(mpCur.ixg, mpCur.toi);
@@ -240,8 +292,8 @@ export async function runLiveCalculatorRecompute(): Promise<{
     const g_xg60 = blendVal(g_xgCur, g_xgLast);
 
     // DF sub-metrics
-    const pkToiCur = p.curSeasonShToi != null ? p.curSeasonShToi / 60 : (mpCur.toi4v5 ? mpCur.toi4v5 / 60 / nhlGpLatest : null);
-    const pkToiLast = p.lastSeasonShToi != null ? p.lastSeasonShToi / 60 : (mpLast.toi4v5 ? mpLast.toi4v5 / 60 / nhlGpPrevious : null);
+    const pkToiCur = p.curSeasonShToi != null && (p.curSeasonGP ?? 0) > 0 ? p.curSeasonShToi / 60 : (mpCur.toi4v5 && (mpCur.gp ?? 0) > 0 ? mpCur.toi4v5 / 60 / mpCur.gp : null);
+    const pkToiLast = p.lastSeasonShToi != null && (p.lastSeasonGP ?? 0) > 0 ? p.lastSeasonShToi / 60 : (mpLast.toi4v5 && (mpLast.gp ?? 0) > 0 ? mpLast.toi4v5 / 60 / mpLast.gp : null);
     const pkToiPg = blendVal(pkToiCur, pkToiLast);
 
     const xga5Cur = safePer60(mpCur.onIceAxg5v5, mpCur.toi5v5);
@@ -266,8 +318,10 @@ export async function runLiveCalculatorRecompute(): Promise<{
     const relXgaPkLast = pkXgaLast != null && offPkXgaLast != null ? pkXgaLast - offPkXgaLast : null;
     const relXgaPk = blendVal(relXgaPkCur, relXgaPkLast);
 
-    const blk60Cur = safePer60(p.curSeasonBlocks ?? mpCur.blk, (p.curSeasonToi ?? 0) * nhlGpLatest || mpCur.toi);
-    const blk60Last = safePer60(p.lastSeasonBlocks ?? mpLast.blk, (p.lastSeasonToi ?? 0) * nhlGpPrevious || mpLast.toi);
+    const blkCur = getStat(p.curSeasonBlocks, p.curSeasonGP, mpCur.blk, mpCur.gp);
+    const blkLast = getStat(p.lastSeasonBlocks, p.lastSeasonGP, mpLast.blk, mpLast.gp);
+    const blk60Cur = safePer60(blkCur.val, toiCurTotal);
+    const blk60Last = safePer60(blkLast.val, toiLastTotal);
     const blk60 = blendVal(blk60Cur, blk60Last);
 
     const xgfPctCur = mpCur.onIceFxg5v5 != null && mpCur.onIceAxg5v5 != null && mpCur.onIceFxg5v5 + mpCur.onIceAxg5v5 > 0
@@ -279,17 +333,21 @@ export async function runLiveCalculatorRecompute(): Promise<{
     const xgfPct = blendVal(xgfPctCur, xgfPctLast);
 
     // Hits
-    const hit60Cur = safePer60(p.curSeasonHits ?? mpCur.hits, (p.curSeasonToi ?? 0) * nhlGpLatest || mpCur.toi);
-    const hit60Last = safePer60(p.lastSeasonHits ?? mpLast.hits, (p.lastSeasonToi ?? 0) * nhlGpPrevious || mpLast.toi);
+    const hitCur = getStat(p.curSeasonHits, p.curSeasonGP, mpCur.hits, mpCur.gp);
+    const hitLast = getStat(p.lastSeasonHits, p.lastSeasonGP, mpLast.hits, mpLast.gp);
+    const hit60Cur = safePer60(hitCur.val, toiCurTotal);
+    const hit60Last = safePer60(hitLast.val, toiLastTotal);
     const hit60 = blendVal(hit60Cur, hit60Last);
 
-    const hitPgCur = safeRate(p.curSeasonHits ?? mpCur.hits, nhlGpLatest);
-    const hitPgLast = safeRate(p.lastSeasonHits ?? mpLast.hits, nhlGpPrevious);
+    const hitPgCur = safeRate(hitCur.val, hitCur.gp || nhlGpLatest);
+    const hitPgLast = safeRate(hitLast.val, hitLast.gp || nhlGpPrevious);
     const hitPg = blendVal(hitPgCur, hitPgLast);
 
     // Penalties / Discipline
-    const pim60Cur = safePer60(p.curSeasonPim ?? 0, (p.curSeasonToi ?? 0) * nhlGpLatest || mpCur.toi);
-    const pim60Last = safePer60(p.lastSeasonPim ?? 0, (p.lastSeasonToi ?? 0) * nhlGpPrevious || mpLast.toi);
+    const pimCur = getStat(p.curSeasonPim, p.curSeasonGP, mpCur.pim, mpCur.gp);
+    const pimLast = getStat(p.lastSeasonPim, p.lastSeasonGP, mpLast.pim, mpLast.gp);
+    const pim60Cur = safePer60(pimCur.val, toiCurTotal);
+    const pim60Last = safePer60(pimLast.val, toiLastTotal);
     const pim60 = blendVal(pim60Cur, pim60Last);
 
     const penDrawn60Cur = safePer60(mpCur.penaltiesDrawn, mpCur.toi);
