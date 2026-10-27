@@ -493,6 +493,7 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
           </div>
           <div>
             <NumField k="chemistryRolePenaltyPct" label="Role-redundancy penalty" step={0.01} w="w-28" />
+            <NumField k="tacticalFitPct" label="Tactical Fit effect % (per 30 pts, 0 = off)" step={0.5} w="w-28" />
           </div>
         </div>
         <p className="text-[11px] text-slate-500 mt-2">

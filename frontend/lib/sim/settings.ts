@@ -244,6 +244,7 @@ export type EngineSettings = {
   // +10%, 80 = +2%, 35 = -10%" directly instead of a single fixed-shape formula.
   chemistryCurve: { chem: number; bonusPct: number }[];
   chemistryRolePenaltyPct: number; // structural penalty for a role-redundant unit (3 snipers / 2 offensive D)
+  tacticalFitPct: number;          // Tactical Fit as a real multiplier on a unit's output: +/- this % per 30 points from the league-typical fit (0 = display only)
   // Graduated off-position penalties (STHS): wrong wing or off-hand D side (mild),
   // wing↔center (medium, + faceoff cap), forward↔defense (extreme). Not applied on PP/PK.
   offPosWingPct: number;   // wrong wing / off-hand D side
@@ -327,7 +328,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
     { chem: 80, bonusPct: 2 },
     { chem: 100, bonusPct: 10 },
   ],
-  chemistryRolePenaltyPct: 0.05,
+  chemistryRolePenaltyPct: 0.05, tacticalFitPct: 5,
   offPosWingPct: 0.07, offPosCenterPct: 0.17, offPosDefPct: 0.35, offPosChemCap: 55,
   physicalityEnabled: true, physicalityMeanLbs: 92, physicalityPct: 0.001,
 };

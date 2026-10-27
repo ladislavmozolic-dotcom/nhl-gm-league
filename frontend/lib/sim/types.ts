@@ -37,6 +37,7 @@ export type SimSkater = {
   con: number;           // post-game condition 1..100 (fatigue carried between games)
   chem: number;          // line-chemistry of this player's unit (0..100; 100 = no penalty)
   roleFit: number;       // 0..1 role diversity of the unit (1 = ideal C/sniper/grinder mix)
+  tFit?: number;         // 0..100 Tactical Fit of the unit (the Lines screen number); undefined = no manager line → neutral
   morale: number;        // persistent mood 1..100 (wins/ice-time/production drive it)
   goalDrought?: number;  // games since this forward last scored (feeds morale)
   weight: number;        // lbs — physicality (hits, board/net-front battles)

@@ -13,6 +13,7 @@ import type { TeamLinesData } from "./lines";
 import { naturalSlots } from "./lines-core";
 import { buildUnits, buildStUnits, depthChartUnits, playerChemistry, unitSignature } from "./chemistry";
 import { roleFitOf as roleFitPure } from "./role-fit";
+import { tacticalFitForwards, tacticalFitDefense, type TacticalFitPlayer } from "./tactical-fit";
 import { resolveTactics, resolveLineTactics, mergeTactics, type RosterProfile, type TeamTactics, type PpStyle, type PkStyle } from "./tactics";
 import { PP_LAYOUTS, PP4_LAYOUTS } from "./formation-layout";
 import { cleanName } from "../playerName";
@@ -260,6 +261,18 @@ export function buildTeam(input: {
     for (const id of u.members) roleFitMap.set(id, fit);
   }
   for (const s of roster) { s.chem = chemMap.get(s.id) ?? 100; s.roleFit = roleFitMap.get(s.id) ?? 1; }
+
+  // Tactical Fit (the same number the Lines screen shows): role mix × natural slots × how the unit suits
+  // the team system × depth-chart archetype. Read BEFORE the off-position cut below bakes into attrs.
+  // The engine turns it into a real output multiplier (CFG.tacticalFitPct).
+  const fitTac = mergeTactics(input.system ?? input.lines?.system);
+  const fitPlayer = (id: number | null): TacticalFitPlayer | null => {
+    const s = id != null ? byId.get(id) : undefined;
+    return s ? { id: s.id, position: s.position, shoots: s.shoots, weight: s.weight, ...s.attrs } : null;
+  };
+  const tagFit = (ids: (number | null)[], fit: number) => { for (const id of ids) { const s = id != null ? byId.get(id) : undefined; if (s) s.tFit = fit; } };
+  (input.lines?.forwardLines ?? []).forEach((l, i) => tagFit([l.lw, l.c, l.rw], tacticalFitForwards([fitPlayer(l.lw), fitPlayer(l.c), fitPlayer(l.rw)], fitTac, l.puck, i)));
+  (input.lines?.defensePairs ?? []).forEach((p, i) => tagFit([p.ld, p.rd], tacticalFitDefense([fitPlayer(p.ld), fitPlayer(p.rd)], fitTac, p.dzone, i)));
 
   // Graduated off-position penalty (manager lines only) — a defenseman's natural
   // side is his `shoots`, a forward's slots come from his `position`. Playing off
