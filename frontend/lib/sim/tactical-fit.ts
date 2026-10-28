@@ -1,7 +1,7 @@
 // Tactical fit shared by the editable Lines screen and the read-only Line Builder.
 // Keeping the calculation here ensures both screens always show the same value.
 
-import { roleFitOf, type RoleFitAttrs } from "./role-fit";
+import { roleFitOf, offenceGate, type RoleFitAttrs } from "./role-fit";
 import { systemFit, type DZone, type PuckStyle, type TeamTactics } from "./tactics";
 import { playerType } from "../player-type";
 
@@ -22,7 +22,7 @@ const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 // league's own role labels rather than a made-up separate scale. Mirrors
 // lines-core.ts's F_TACTIC/D_TACTIC defaults: 1st/2nd attack, 3rd checking, 4th
 // physical/energy; top D pair two-way, 2nd defensive, 3rd shut-down.
-type ArchetypeSlot = { weights: Record<string, number>; strictness: number };
+type ArchetypeSlot = { weights: Record<string, number>; strictness: number; powerGate?: boolean };
 // Full credit (1.0) for every listed type — used where a slot is fine with
 // any of several types equally, as opposed to a slot that prefers one type
 // over another (see the 3rd D pair below, which only half-credits "Defensive
@@ -37,8 +37,8 @@ const full = (types: string[]): Record<string, number> => Object.fromEntries(typ
 // rather than the 0 he'd get on the checking lines below.
 const SKILL_F = full(["Elite Forward", "Dual-Threat", "Sniper", "Playmaker", "Offensive Forward"]);
 const LINE_ARCHETYPE_F: ArchetypeSlot[] = [
-  { weights: { ...SKILL_F, "Forechecker / Grinder": 0.6 }, strictness: 1.0 },
-  { weights: { ...SKILL_F, "Two-Way Forward": 1, "Forechecker / Grinder": 0.6 }, strictness: 0.7 },
+  { weights: { ...SKILL_F, "Forechecker / Grinder": 0.6 }, strictness: 1.0, powerGate: true },
+  { weights: { ...SKILL_F, "Two-Way Forward": 1, "Forechecker / Grinder": 0.6 }, strictness: 0.7, powerGate: true },
   { weights: full(["Two-Way Forward", "Defensive Forward", "Forechecker / Grinder"]), strictness: 0.7 },
   { weights: full(["Forechecker / Grinder", "Defensive Forward"]), strictness: 1.0 },
 ];
@@ -58,11 +58,14 @@ const LINE_ARCHETYPE_D: ArchetypeSlot[] = [
  *  not enough ratings to judge). `strictness` sets how far a mismatch swings
  *  the score: the 4th line/3rd pair care a lot, a top pair barely (it's
  *  already rewarded for an off/def mix by roleFitOf above). */
-function archetypeFactor(types: (string | null)[], slot: ArchetypeSlot | undefined): number {
+function archetypeFactor(types: (string | null)[], slot: ArchetypeSlot | undefined, gates: number[] = []): number {
   if (!slot) return 1;
   const classified = types.filter((t): t is string => t != null);
   if (!classified.length) return 1;
-  const matchRatio = classified.reduce((sum, t) => sum + (slot.weights[t] ?? 0), 0) / classified.length;
+  // a Grinder is only "a real plus on a scoring line" (power forward) in proportion to his offence
+  const credit = (t: string | null, i: number) => (t ? (slot.weights[t] ?? 0) * (slot.powerGate && t === "Forechecker / Grinder" ? gates[i] ?? 1 : 1) : null);
+  const credits = types.map(credit).filter((c): c is number => c != null);
+  const matchRatio = credits.reduce((sum, c) => sum + c, 0) / classified.length;
   const range = 0.15 * slot.strictness;
   return 1 - range + matchRatio * 2 * range;
 }
@@ -86,7 +89,9 @@ export function tacticalFitForwards(
   const present = players.filter((player): player is TacticalFitPlayer => player != null);
   if (present.length < 2) return 0;
 
-  const roleScore = roleFitOf(present, false) * 100;
+  // on a scoring line (1st/2nd) a member with little offence adds less "role diversity" — a passenger isn't a complement
+  const scoring = lineIndex != null && LINE_ARCHETYPE_F[lineIndex]?.powerGate;
+  const roleScore = roleFitOf(present, false, scoring ? present.map((p) => 0.4 + 0.6 * offenceGate(p)) : undefined) * 100;
   const slots = ["LW", "C", "RW"];
   let good = 0;
   let count = 0;
@@ -104,8 +109,12 @@ export function tacticalFitForwards(
   const positionFactor = count ? 0.75 + 0.25 * (good / count) : 0.85;
   const effectiveTactics = puckOverride ? { ...tactics, puckStyle: puckOverride } : tactics;
   const types = present.map((p) => playerType({ id: p.id, position: p.position, sc: p.sc, pa: p.pa, df: p.df, ck: p.ck, st: p.st, sk: p.sk, ph: p.ph }));
-  const archFactor = lineIndex != null ? archetypeFactor(types, LINE_ARCHETYPE_F[lineIndex]) : 1;
-  return clamp(roleScore * positionFactor * systemFit(unitProfile(present), effectiveTactics) * archFactor);
+  const gates = present.map((p) => offenceGate(p));
+  const slot = lineIndex != null ? LINE_ARCHETYPE_F[lineIndex] : undefined;
+  const archFactor = lineIndex != null ? archetypeFactor(types, slot, gates) : 1;
+  // a scoring line (1st/2nd) with a man who brings no offence (a pure checker parked there) is a weaker unit
+  const threat = slot?.powerGate ? 0.8 + 0.2 * (0.5 * Math.min(...gates) + 0.5 * (gates.reduce((s, g) => s + g, 0) / gates.length)) : 1;
+  return clamp(roleScore * positionFactor * systemFit(unitProfile(present), effectiveTactics) * archFactor * threat);
 }
 
 /** Defence-pair fit: role mix × correct side/handedness × effective system fit. */

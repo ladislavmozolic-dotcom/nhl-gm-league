@@ -56,17 +56,23 @@ test("4th-line fit rewards checking/defensive forwards over top-line skill types
   assert.ok(grindOn4th > grindOn1st, "a checking/defensive trio should fit the 4th line better than the 1st");
 });
 
-test("both scoring lines (1st and 2nd) give credit, not a penalty, to a power-forward-style Forechecker/Grinder", () => {
-  // Raw rule (player-type.ts): CK>=75 & PA+SC<110 & DF<69 -> Forechecker/Grinder,
-  // even with a decent PA+SC (105 here) — a power forward, not a pure energy guy.
-  const powerForward = (pos: string) => forward(pos, { pa: 55, sc: 50, sk: 60, ck: 76, df: 60, st: 65 });
-  const trio = [powerForward("LW"), powerForward("C"), powerForward("RW")];
-  const neutral = tacticalFitForwards(trio, DEFAULT_TACTICS); // no lineIndex -> no archetype effect
-  const on1st = tacticalFitForwards(trio, DEFAULT_TACTICS, undefined, 0);
-  const on2nd = tacticalFitForwards(trio, DEFAULT_TACTICS, undefined, 1);
-  assert.ok(on1st >= neutral, "a power-forward-style Grinder trio should no longer be penalized on the 1st line");
-  assert.ok(on2nd >= neutral, "a power-forward-style Grinder trio should no longer be penalized on the 2nd line");
+test("scoring lines reward a hitter who also brings offence — a pure checker parked there is penalised", () => {
+  // power forward: real offence (SC+PA 124, ~league p80) AND checking → fine on both scoring lines
+  const power = (pos: string) => forward(pos, { pa: 62, sc: 62, sk: 62, ck: 82, df: 66, st: 70 });
+  // pure checker (Hathaway-type): CK/DF/ST high but SC+PA 98, below the league median
+  const checker = (pos: string) => forward(pos, { pa: 49, sc: 49, sk: 48, ck: 91, df: 69, st: 86 });
+  const pf = [power("LW"), power("C"), power("RW")], ck = [checker("LW"), checker("C"), checker("RW")];
+  for (const line of [0, 1]) {
+    assert.ok(tacticalFitForwards(pf, DEFAULT_TACTICS, undefined, line) >= tacticalFitForwards(pf, DEFAULT_TACTICS), "a power-forward trio is not penalised on a scoring line");
+    assert.ok(tacticalFitForwards(ck, DEFAULT_TACTICS, undefined, line) < tacticalFitForwards(ck, DEFAULT_TACTICS), "a pure-checker trio is penalised on a scoring line");
+  }
+  // FLA case: a Dual-Threat + a playmaking C with a pure checker (Hathaway) vs the same pair with a real power forward
+  const tk = forward("LW", { sc: 64, pa: 67, ck: 67, df: 62, st: 65, sk: 66 }), be = forward("C", { sc: 62, pa: 59, ck: 71, df: 66, st: 65 });
+  const hath = forward("RW", { sc: 49, pa: 49, ck: 91, df: 69, st: 86, sk: 48 }), wilson = forward("RW", { sc: 65, pa: 61, ck: 82, df: 66, st: 80, sk: 60 });
+  assert.ok(tacticalFitForwards([tk, be, wilson], DEFAULT_TACTICS, undefined, 0) >= tacticalFitForwards([tk, be, hath], DEFAULT_TACTICS, undefined, 0), "a power forward fits the 1st line at least as well as a pure checker");
+  assert.ok(tacticalFitForwards([tk, be, hath], DEFAULT_TACTICS, undefined, 3) > tacticalFitForwards([tk, be, hath], DEFAULT_TACTICS, undefined, 0), "…and the pure checker belongs on the 4th line");
 });
+
 
 test("3rd D pair rewards a true shut-down (Stay-at-Home) D more than a merely Defensive one", () => {
   // playerType() raw thresholds (lib/player-type.ts): P<53 & PA+SC<105 & DF>=78

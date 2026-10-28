@@ -43,6 +43,11 @@ const F_PLAY_CENTRE = 0.6 * AVG.F.pa + 0.4 * AVG.F.fo;
 const F_SNIPE_CENTRE = 0.6 * AVG.F.sc + 0.4 * AVG.F.sk;
 const F_GRIND_CENTRE = 0.5 * AVG.F.ck + 0.3 * AVG.F.df + 0.2 * AVG.F.st;
 
+/** 0..1: how much real offence (SC+PA) a forward brings — 0 at/below 92, 1 at 122+ (league median ~112, p90 ~129). */
+export function offenceGate(a: RoleFitAttrs): number {
+  return Math.max(0, Math.min(1, ((a.sc ?? 50) + (a.pa ?? 50) - 92) / 30));
+}
+
 /** This player's position in "role-space", relative to his position's league
  *  average: for a D, a single signed lean (>0 offense-leaning, <0 defense-leaning);
  *  for a forward, a 3-axis vector (play, snipe, grind), each relative to average. */
@@ -55,7 +60,9 @@ function roleVector(a: RoleFitAttrs, isDef: boolean): number[] {
   const play = 0.6 * (a.pa ?? 50) + 0.4 * (a.fo ?? 50);
   const snipe = 0.6 * (a.sc ?? 50) + 0.4 * (a.sk ?? 50);
   const grind = 0.5 * (a.ck ?? 50) + 0.3 * (a.df ?? 50) + 0.2 * (a.st ?? 50);
-  return [play - F_PLAY_CENTRE, snipe - F_SNIPE_CENTRE, grind - F_GRIND_CENTRE];
+  // A grinder only counts as a real complement to the extent he can also play offence (a power forward);
+  // otherwise any weak 4th-liner with high CK/DF would look like the "ideal" third man on a top line.
+  return [play - F_PLAY_CENTRE, snipe - F_SNIPE_CENTRE, (grind - F_GRIND_CENTRE) * (0.35 + 0.65 * offenceGate(a))];
 }
 
 const euclid = (v1: number[], v2: number[]) => Math.sqrt(v1.reduce((s, x, i) => s + (x - v2[i]) ** 2, 0));
@@ -83,12 +90,12 @@ const FLOOR = { def: 0.4, fwd: 0.25 };
  *  its members sit in role-space relative to the league average, continuous
  *  (not just same/different). 1 = ideally complementary (STHS rewards this
  *  in-sim via chemFactor); a unit of one member is neutral (1). */
-export function roleFitOf(members: RoleFitAttrs[], isDef: boolean): number {
+export function roleFitOf(members: RoleFitAttrs[], isDef: boolean, weights?: number[]): number {
   if (members.length < 2) return 1;
   const vecs = members.map((m) => roleVector(m, isDef));
   let total = 0, pairs = 0;
   for (let i = 0; i < vecs.length; i++) {
-    for (let j = i + 1; j < vecs.length; j++) { total += euclid(vecs[i], vecs[j]); pairs++; }
+    for (let j = i + 1; j < vecs.length; j++) { total += euclid(vecs[i], vecs[j]) * (weights ? Math.sqrt((weights[i] ?? 1) * (weights[j] ?? 1)) : 1); pairs++; }
   }
   const avgDist = pairs ? total / pairs : 0;
   const sat = isDef ? SATURATION.def : SATURATION.fwd;
