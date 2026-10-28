@@ -383,7 +383,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const label = good ? "Ideal mix" : fit >= 0.6 ? "Decent mix" : "Redundant";
     return (
       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
-        title={`Role fit — ${isDef ? "a pair wants one offensive + one stay-at-home D" : "a line wants a playmaker + a sniper + a grinder"}. Same-role players clash and sim at reduced offense.`}>
+        title={`Role fit — ${isDef ? "a pair wants one offensive + one stay-at-home D" : "a line wants its three jobs covered: a playmaker + a sniper + a puck-winner (a hitter only counts with real offence)"}. Same-role players clash and sim at reduced offense.`}>
         ⚙ {label}
       </span>
     );
@@ -399,7 +399,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const cls = fit >= 80 ? "bg-emerald-500/20 text-emerald-300" : fit >= 60 ? "bg-sky-500/20 text-sky-300" : fit >= 45 ? "bg-amber-500/20 text-amber-300" : "bg-rose-500/20 text-rose-300";
     return (
       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
-        title="Tactical Fit — the same calculation as in the Lines Builder: role mix, correct positions or stick hand, player suitability for the selected system and player types suited to the given line/pair (e.g. the 4th line wants a checking forward + defensive wingers).">
+        title="Tactical Fit — the same calculation as in the Lines Builder: role coverage, correct positions or stick hand, player suitability for the selected system and player types suited to the given line/pair (e.g. the 4th line wants a checking forward + defensive wingers; the top two lines want ~105+ SC+PA from everyone). It is a real game multiplier: about ±5% output per 30 points from the league-typical 68.">
         ♟ Fit {fit}
       </span>
     );
