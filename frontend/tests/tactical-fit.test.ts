@@ -26,9 +26,9 @@ test("defence tactical fit reacts to the LD/RD handedness", () => {
 
 test("per-line system override changes the same tactical-fit score", () => {
   const line = [
-    forward("LW", { pa: 85, st: 84 }),
-    forward("C", { pa: 83, fo: 82, st: 82 }),
-    forward("RW", { ck: 82, df: 76, st: 86 }),
+    forward("LW", { pa: 62, sc: 58, st: 60 }), // modest ratings so the 0..100 clamp doesn't hide the difference
+    forward("C", { pa: 60, sc: 58, fo: 62, st: 60 }),
+    forward("RW", { pa: 56, sc: 56, ck: 70, df: 66, st: 70 }),
   ];
   const balanced = tacticalFitForwards(line, DEFAULT_TACTICS);
   const cycle = tacticalFitForwards(line, DEFAULT_TACTICS, "cycle");

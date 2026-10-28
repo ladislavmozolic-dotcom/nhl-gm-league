@@ -89,9 +89,7 @@ export function tacticalFitForwards(
   const present = players.filter((player): player is TacticalFitPlayer => player != null);
   if (present.length < 2) return 0;
 
-  // on a scoring line (1st/2nd) a member with little offence adds less "role diversity" — a passenger isn't a complement
-  const scoring = lineIndex != null && LINE_ARCHETYPE_F[lineIndex]?.powerGate;
-  const roleScore = roleFitOf(present, false, scoring ? present.map((p) => 0.4 + 0.6 * offenceGate(p)) : undefined) * 100;
+  const roleScore = roleFitOf(present, false) * 100;
   const slots = ["LW", "C", "RW"];
   let good = 0;
   let count = 0;

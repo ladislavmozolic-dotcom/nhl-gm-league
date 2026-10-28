@@ -62,7 +62,10 @@ function roleVector(a: RoleFitAttrs, isDef: boolean): number[] {
   const grind = 0.5 * (a.ck ?? 50) + 0.3 * (a.df ?? 50) + 0.2 * (a.st ?? 50);
   // A grinder only counts as a real complement to the extent he can also play offence (a power forward);
   // otherwise any weak 4th-liner with high CK/DF would look like the "ideal" third man on a top line.
-  return [play - F_PLAY_CENTRE, snipe - F_SNIPE_CENTRE, (grind - F_GRIND_CENTRE) * (0.35 + 0.65 * offenceGate(a))];
+  // a role is what a player is GOOD at: below-average play/snipe/grind doesn't make him a "different" role, just a
+  // weaker player (otherwise a checker with no offence read as the perfect complement to two skill forwards)
+  const up = (v: number) => Math.max(0, v);
+  return [up(play - F_PLAY_CENTRE), up(snipe - F_SNIPE_CENTRE), up(grind - F_GRIND_CENTRE) * (0.35 + 0.65 * offenceGate(a))];
 }
 
 const euclid = (v1: number[], v2: number[]) => Math.sqrt(v1.reduce((s, x, i) => s + (x - v2[i]) ** 2, 0));
@@ -85,17 +88,26 @@ export function roleOf(a: RoleFitAttrs, isDef: boolean): Role {
 // same spirit as lib/sim/tactics.ts's fitDim centre/spread constants.
 const SATURATION = { def: 28, fwd: 24 };
 const FLOOR = { def: 0.4, fwd: 0.25 };
+// forward lean (points above the position's league average) at which a job counts as fully covered: play, snipe, grind
+const F_COVER = [12, 14, 12];
 
 /** 0..1 role diversity of a unit (forward trio/pair or D pair) — how far apart
  *  its members sit in role-space relative to the league average, continuous
  *  (not just same/different). 1 = ideally complementary (STHS rewards this
  *  in-sim via chemFactor); a unit of one member is neutral (1). */
-export function roleFitOf(members: RoleFitAttrs[], isDef: boolean, weights?: number[]): number {
+export function roleFitOf(members: RoleFitAttrs[], isDef: boolean): number {
   if (members.length < 2) return 1;
   const vecs = members.map((m) => roleVector(m, isDef));
+  if (!isDef) {
+    // Forwards: COVERAGE of the three jobs (create / finish / win pucks) by the unit's best man at each — not
+    // the distance between members, which handed a no-offence checker the "perfect complement" score just for
+    // being far from two skill players. A power forward (hits AND scores) covers the grind job with real offence.
+    const cover = [0, 1, 2].map((k) => Math.min(1, Math.max(...vecs.map((v) => v[k])) / F_COVER[k]));
+    return FLOOR.fwd + ((cover[0] + cover[1] + cover[2]) / 3) * (1 - FLOOR.fwd);
+  }
   let total = 0, pairs = 0;
   for (let i = 0; i < vecs.length; i++) {
-    for (let j = i + 1; j < vecs.length; j++) { total += euclid(vecs[i], vecs[j]) * (weights ? Math.sqrt((weights[i] ?? 1) * (weights[j] ?? 1)) : 1); pairs++; }
+    for (let j = i + 1; j < vecs.length; j++) { total += euclid(vecs[i], vecs[j]); pairs++; }
   }
   const avgDist = pairs ? total / pairs : 0;
   const sat = isDef ? SATURATION.def : SATURATION.fwd;
