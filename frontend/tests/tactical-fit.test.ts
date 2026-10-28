@@ -119,3 +119,13 @@ test("D pair role fit is coverage: two genuine two-way D are not marked down, tw
   assert.ok(fit(off("L"), def("R")) >= fit(two("L"), two("R")), "offence + defence covers both jobs");
   assert.ok(fit(two("L"), two("R")) > fit(off("L"), off("R")) + 10, "two two-way D beat two offensive D");
 });
+
+test("AHL players are judged on the NHL scale (their ratings sit ~10 lower league-wide)", () => {
+  const nhl = (pos: string) => forward(pos, { sc: 62, pa: 62, sk: 62, ck: 66, df: 63, st: 70, fo: 66, ph: 60 });
+  const ahlLow = (pos: string) => ({ ...forward(pos, { sc: 50, pa: 52, sk: 50, ck: 65, df: 58, st: 69, fo: 59, ph: 60 }), ahl: true });
+  const asNhl = tacticalFitForwards([nhl("LW"), nhl("C"), nhl("RW")], DEFAULT_TACTICS, undefined, 1);
+  const asAhl = tacticalFitForwards([ahlLow("LW"), ahlLow("C"), ahlLow("RW")], DEFAULT_TACTICS, undefined, 1);
+  const unshifted = tacticalFitForwards([ahlLow("LW"), ahlLow("C"), ahlLow("RW")].map((p) => ({ ...p, ahl: false })), DEFAULT_TACTICS, undefined, 1);
+  assert.ok(Math.abs(asNhl - asAhl) <= 6, "an AHL unit at the same place in its league as an NHL unit gets a comparable fit");
+  assert.ok(unshifted < asAhl - 15, "without the level shift the same AHL unit would collapse");
+});

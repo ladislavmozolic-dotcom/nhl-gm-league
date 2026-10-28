@@ -196,8 +196,8 @@ export function teamDefense(skaters: SimSkater[]): number {
 // Role diversity of a unit — shared with the Line Editor UI (role-fit.ts, so the
 // live badge a GM sees while building lines matches exactly what the sim rewards
 // via chemFactor below).
-function roleFitOf(members: SimSkater[], isDef: boolean): number {
-  return roleFitPure(members.map((s) => s.attrs), isDef);
+function roleFitOf(members: SimSkater[], isDef: boolean, ahl = false): number {
+  return roleFitPure(members.map((s) => ({ ...s.attrs, ahl })), isDef);
 }
 
 // A player's natural positions (LW/C/RW for forwards; LD or RD for a D by shoots).
@@ -221,6 +221,7 @@ export function buildTeam(input: {
   id: number; name: string; code: string | null;
   skaters: Array<Omit<SimSkater, "iceTime">>;
   goalies: SimGoalie[];
+  ahl?: boolean; // AHL club: fit thresholds are applied on the NHL scale (role-fit.ts toLeagueScale)
   lines?: TeamLinesData | null;
   chemistry?: Record<string, number>;
   chemBase?: number;
@@ -257,7 +258,7 @@ export function buildTeam(input: {
   const roleFitMap = new Map<number, number>();
   for (const u of units) {
     const members = u.members.map((id) => byId.get(id)).filter((s): s is SimSkater => !!s);
-    const fit = roleFitOf(members, u.isDef);
+    const fit = roleFitOf(members, u.isDef, input.ahl);
     for (const id of u.members) roleFitMap.set(id, fit);
   }
   for (const s of roster) { s.chem = chemMap.get(s.id) ?? 100; s.roleFit = roleFitMap.get(s.id) ?? 1; }
@@ -268,7 +269,7 @@ export function buildTeam(input: {
   const fitTac = mergeTactics(input.system ?? input.lines?.system);
   const fitPlayer = (id: number | null): TacticalFitPlayer | null => {
     const s = id != null ? byId.get(id) : undefined;
-    return s ? { id: s.id, position: s.position, shoots: s.shoots, weight: s.weight, ...s.attrs } : null;
+    return s ? { id: s.id, position: s.position, shoots: s.shoots, weight: s.weight, ...s.attrs, ahl: input.ahl } : null;
   };
   const tagFit = (ids: (number | null)[], fit: number) => { for (const id of ids) { const s = id != null ? byId.get(id) : undefined; if (s) s.tFit = fit; } };
   (input.lines?.forwardLines ?? []).forEach((l, i) => tagFit([l.lw, l.c, l.rw], tacticalFitForwards([fitPlayer(l.lw), fitPlayer(l.c), fitPlayer(l.rw)], fitTac, l.puck, i)));

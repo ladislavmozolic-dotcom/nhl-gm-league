@@ -214,7 +214,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   }
   const hc = team.headCoach;
   const simTeam = buildTeam({
-    id: team.id, name: team.name, code: team.code, skaters, goalies, lines,
+    id: team.id, name: team.name, code: team.code, skaters, goalies, lines, ahl: rt === "AHL",
     chemistry, chemBase: opts?.chemBase ?? 100, offPos: opts?.offPos,
     rivalTeamIds: (team as { rivalTeamIds?: number[] }).rivalTeamIds ?? [],
     coach: hc ? { style: hc.style, ph: hc.ph, df: hc.df, of: hc.of, pd: hc.pd, ex: hc.ex, ld: hc.ld } : null,

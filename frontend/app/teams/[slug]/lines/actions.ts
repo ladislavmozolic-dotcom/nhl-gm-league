@@ -20,9 +20,9 @@ export async function saveLines(slug: string, data: TeamLinesData) {
 
 type Atk = { id: number; name: string; position: string; overall: number; shoots: string | null; sc: number; pa: number; ck: number; df: number; st: number; fg: number; fo: number; ph: number; sk: number; en: number; weight: number };
 const A = (v: number | null | undefined, d = 50) => v ?? d;
-const fitPlayer = (p: Atk | undefined): TacticalFitPlayer | null => p == null
+const fitPlayer = (p: Atk | undefined, ahl = false): TacticalFitPlayer | null => p == null
   ? null
-  : { id: p.id, position: p.position, shoots: p.shoots, pa: p.pa, sc: p.sc, sk: p.sk, ck: p.ck, df: p.df, st: p.st, fo: p.fo, en: p.en, weight: p.weight, ph: p.ph };
+  : { ahl, id: p.id, position: p.position, shoots: p.shoots, pa: p.pa, sc: p.sc, sk: p.sk, ck: p.ck, df: p.df, st: p.st, fo: p.fo, en: p.en, weight: p.weight, ph: p.ph };
 const lastName = (byId: Map<number, Atk>, id: number) => displayName(byId.get(id)?.name ?? `#${id}`).split(" ").pop();
 
 /** AI GM Assistance — suggest a full lineup + per-line tactics + team system from
@@ -66,12 +66,12 @@ export async function suggestLinesAction(slug: string): Promise<{ ok: false; err
   // to slot onto the 1st line by raw overall alone moves to where his real
   // scouting archetype actually fits (see lib/sim/tactical-fit.ts, Rules §16).
   const fScore = (fs: ForwardLine[]) => fs.reduce((sum, l, i) =>
-    sum + tacticalFitForwards([l.lw, l.c, l.rw].map((id) => id != null ? fitPlayer(byId.get(id)) : null), chosenTactics, l.puck, i), 0);
+    sum + tacticalFitForwards([l.lw, l.c, l.rw].map((id) => id != null ? fitPlayer(byId.get(id), team.league === "AHL") : null), chosenTactics, l.puck, i), 0);
   const { units: reshuffledF, swaps: fSwaps } = reshuffleBySlot(lines.forwardLines, ["c", "lw", "rw"], fScore,
     (a, b, key, i, j) => `${lastName(byId, a)} ↔ ${lastName(byId, b)} (${String(key).toUpperCase()}, ${i + 1} ↔ ${j + 1} line) — fit better on the opposite line`);
   lines.forwardLines = reshuffledF;
   const dScore = (ds: DefensePair[]) => ds.reduce((sum, p, i) =>
-    sum + tacticalFitDefense([p.ld, p.rd].map((id) => id != null ? fitPlayer(byId.get(id)) : null), chosenTactics, p.dzone, i), 0);
+    sum + tacticalFitDefense([p.ld, p.rd].map((id) => id != null ? fitPlayer(byId.get(id), team.league === "AHL") : null), chosenTactics, p.dzone, i), 0);
   const { units: reshuffledD, swaps: dSwaps } = reshuffleBySlot(lines.defensePairs, ["ld", "rd"], dScore,
     (a, b, key, i, j) => `${lastName(byId, a)} ↔ ${lastName(byId, b)} (${String(key).toUpperCase()}, ${i + 1} ↔ ${j + 1} pair) — fit better on the opposite pair`);
   lines.defensePairs = reshuffledD;

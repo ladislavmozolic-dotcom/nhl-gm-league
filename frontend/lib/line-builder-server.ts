@@ -47,9 +47,9 @@ export async function positionPopulations(): Promise<{ F: RatingPop; D: RatingPo
   return pops;
 }
 
-const fitPlayer = (player: P | null): TacticalFitPlayer | null => player == null
+const fitPlayer = (player: P | null, ahl = false): TacticalFitPlayer | null => player == null
   ? null
-  : { ...player.a, id: player.id, position: player.position, shoots: player.shoots };
+  : { ...player.a, id: player.id, position: player.position, shoots: player.shoots, ahl };
 
 export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<TeamLineBuild> {
   const rosterType = league === "AHL" ? "AHL" : "NHL";
@@ -79,7 +79,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && offSlotForward(roles[idx], p.position), type: slotType(p) }));
     const profile = profileOf(present, "F", pops);
-    const tacticalFit = tacticalFitForwards(ps.map(fitPlayer), tactics, l.puck, i);
+    const tacticalFit = tacticalFitForwards(ps.map((p) => fitPlayer(p, rosterType === "AHL")), tactics, l.puck, i);
     const { chemistry, gelled, pairs } = chemFor(chem, slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "F", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "F") };
   });
@@ -91,7 +91,7 @@ export async function teamLineBuilder(teamId: number, league = "NHL"): Promise<T
     const slots: LineSlot[] = ps.map((p, idx) => ({ role: roles[idx], id: p?.id ?? null, name: p?.name ?? null, slug: p?.slug ?? null, overall: p?.overall ?? null,
       offSlot: !!p && offSlotDefense(idx as 0 | 1, p.shoots), type: slotType(p) }));
     const profile = profileOf(present, "D", pops);
-    const tacticalFit = tacticalFitDefense(ps.map(fitPlayer), tactics, l.dzone, i);
+    const tacticalFit = tacticalFitDefense(ps.map((p) => fitPlayer(p, rosterType === "AHL")), tactics, l.dzone, i);
     const { chemistry, gelled, pairs } = chemFor(chem, slots.map((s) => ({ role: s.role, id: s.id })), tacticalFit);
     return { kind: "D", index: i, slots, chemistry, gelled, pairs, tacticalFit, profile, summary: summaryOf(profile, "D") };
   });

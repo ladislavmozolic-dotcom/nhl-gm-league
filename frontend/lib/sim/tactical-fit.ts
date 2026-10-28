@@ -1,7 +1,7 @@
 // Tactical fit shared by the editable Lines screen and the read-only Line Builder.
 // Keeping the calculation here ensures both screens always show the same value.
 
-import { roleFitOf, offenceGate, type RoleFitAttrs } from "./role-fit";
+import { roleFitOf, offenceGate, toLeagueScale, type RoleFitAttrs } from "./role-fit";
 import { systemFit, type DZone, type PuckStyle, type TeamTactics } from "./tactics";
 import { playerType } from "../player-type";
 
@@ -81,11 +81,12 @@ function unitProfile(present: TacticalFitPlayer[]) {
 
 /** Forward-line fit: role mix × natural position × fit for the effective system. */
 export function tacticalFitForwards(
-  players: (TacticalFitPlayer | null)[],
+  rawPlayers: (TacticalFitPlayer | null)[],
   tactics: TeamTactics,
   puckOverride?: PuckStyle,
   lineIndex?: number,
 ): number {
+  const players = rawPlayers.map((p) => (p ? toLeagueScale(p, false) : null)); // AHL players on the NHL scale
   const present = players.filter((player): player is TacticalFitPlayer => player != null);
   if (present.length < 2) return 0;
 
@@ -117,11 +118,12 @@ export function tacticalFitForwards(
 
 /** Defence-pair fit: role mix × correct side/handedness × effective system fit. */
 export function tacticalFitDefense(
-  players: (TacticalFitPlayer | null)[],
+  rawPlayers: (TacticalFitPlayer | null)[],
   tactics: TeamTactics,
   dZoneOverride?: DZone,
   lineIndex?: number,
 ): number {
+  const players = rawPlayers.map((p) => (p ? toLeagueScale(p, true) : null));
   const present = players.filter((player): player is TacticalFitPlayer => player != null);
   if (present.length < 2) return 0;
 

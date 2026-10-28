@@ -29,6 +29,8 @@ type Player = {
 type SuggestResult = { ok: false; error: string } | { ok: true; lines: TeamLinesData; system: string; rationale: string[] };
 type Props = {
   teamName: string; teamSlug: string; jerseyTeamSlug?: string;
+  /** AHL club: Role/Tactical Fit are judged on the NHL scale (role-fit.ts toLeagueScale) */
+  ahl?: boolean;
   players: Player[]; goalies: Player[];
   /** goalie id → started the game-day before the team's next game (back-to-back) */
   goalieB2b?: Record<number, true>;
@@ -286,7 +288,7 @@ function Stepper({ value, onChange, min = 0, max = 99, step = 1, w = "w-14", com
   );
 }
 
-export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSlug, players, goalies, goalieB2b = {}, initial, chemistry, chemBase = 35, chemNeutral = 70, chemEnabled = true, onSave, onSuggest }: Props) {
+export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSlug, ahl = false, players, goalies, goalieB2b = {}, initial, chemistry, chemBase = 35, chemNeutral = 70, chemEnabled = true, onSave, onSuggest }: Props) {
   const lang = useLang();
   const [data, setData] = useState<TeamLinesData>(initial);
   // the last persisted snapshot — compared against `data` to know whether
@@ -377,7 +379,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   const RoleFitBadge = useStable(({ ids, isDef }: { ids: (number | null)[]; isDef: boolean }) => {
     const members = ids.filter((x): x is number => x != null).map((id) => byId.get(id)).filter((p): p is Player => !!p);
     if (members.length < 2) return null;
-    const fit = roleFitOf(members, isDef);
+    const fit = roleFitOf(members.map((m) => ({ ...m, ahl })), isDef);
     const good = fit >= 1;
     const cls = good ? "bg-emerald-500/20 text-emerald-300" : fit >= 0.6 ? "bg-sky-500/20 text-sky-300" : "bg-amber-500/20 text-amber-300";
     const label = good ? "Ideal mix" : fit >= 0.6 ? "Decent mix" : "Redundant";
@@ -390,7 +392,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
   });
 
   const TacticalFitBadge = useStable(({ ids, isDef, puck, dZone, lineIndex }: { ids: (number | null)[]; isDef: boolean; puck?: PuckStyle; dZone?: DZone; lineIndex: number }) => {
-    const members = ids.map((id) => id == null ? null : byId.get(id) ?? null);
+    const members = ids.map((id) => id == null ? null : (byId.get(id) ? { ...byId.get(id)!, ahl } : null));
     if (members.filter(Boolean).length < 2) return null;
     const tactics = mergeTactics(data.system);
     const fit = isDef

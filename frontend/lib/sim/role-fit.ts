@@ -31,7 +31,24 @@ import { playerType } from "../player-type";
 export type RoleFitAttrs = {
   pa?: number | null; sk?: number | null; sc?: number | null;
   ck?: number | null; fo?: number | null; st?: number | null; df?: number | null; ph?: number | null;
+  ahl?: boolean; // an AHL player: judged on the NHL scale after the level shift below
 };
+
+// AHL ratings sit well below the NHL's (forwards: SC/PA/SK ~11 lower), while every fit threshold is calibrated on the
+// NHL. Without a shift an AHL unit reads as "no offence, no skating" and its Tactical Fit collapses to ~30. An AHL
+// player is evaluated at (his ratings + the measured NHL-minus-AHL league gap), i.e. by where he stands in HIS league.
+// Gaps = mean NHL minus mean AHL skater rating (Oct 2026); re-measure if the AHL pool changes.
+const AHL_SHIFT: Record<"F" | "D", Record<string, number>> = {
+  F: { sc: 12, pa: 10, sk: 12, ck: 1, df: 5, st: 1, fo: 7 },
+  D: { sc: 8, pa: 10, sk: 9, ck: -1, df: 9, st: 2 },
+};
+export function toLeagueScale<T extends RoleFitAttrs>(m: T, isDef: boolean): T {
+  if (!m.ahl) return m;
+  const shift = AHL_SHIFT[isDef ? "D" : "F"];
+  const out: Record<string, unknown> = { ...m, ahl: false };
+  for (const k of Object.keys(shift)) { const v = (m as Record<string, unknown>)[k]; if (typeof v === "number") out[k] = v + shift[k]; }
+  return out as T;
+}
 
 export type Role = "OFD" | "DFD" | "PLAY" | "SNIPE" | "GRIND";
 
@@ -100,8 +117,9 @@ const DUAL_CONTROL = 0.6; // share of the puck-winning job a Dual-Threat covers 
  *  (not just same/different). 1 = ideally complementary (STHS rewards this
  *  in-sim via chemFactor); a unit of one member is neutral (1). */
 /** `scoringLine`: a 1st/2nd line — a checker adds NOTHING to the grind job unless he clears the 105 SC+PA bar. */
-export function roleFitOf(members: RoleFitAttrs[], isDef: boolean, scoringLine = false): number {
-  if (members.length < 2) return 1;
+export function roleFitOf(rawMembers: RoleFitAttrs[], isDef: boolean, scoringLine = false): number {
+  if (rawMembers.length < 2) return 1;
+  const members = rawMembers.map((m) => toLeagueScale(m, isDef));
   if (!isDef) {
     // Forwards: COVERAGE of the three jobs (create / finish / win pucks) by the unit's best man at each — not
     // the distance between members, which handed a no-offence checker the "perfect complement" score just for

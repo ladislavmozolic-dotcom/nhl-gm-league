@@ -72,6 +72,7 @@ export default async function LinesPage({ params }: { params: Promise<{ slug: st
 
   return (
     <LineEditor
+      ahl={team.league === "AHL"}
       teamName={team.name}
       teamSlug={slug}
       jerseyTeamSlug={team.league === "AHL" ? (team.parentTeam?.slug ?? slug) : slug}
