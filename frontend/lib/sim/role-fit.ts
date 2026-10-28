@@ -43,15 +43,15 @@ const F_PLAY_CENTRE = 0.6 * AVG.F.pa + 0.4 * AVG.F.fo;
 const F_SNIPE_CENTRE = 0.6 * AVG.F.sc + 0.4 * AVG.F.sk;
 const F_GRIND_CENTRE = 0.5 * AVG.F.ck + 0.3 * AVG.F.df + 0.2 * AVG.F.st;
 
-/** 0..1: how much real offence (SC+PA) a forward brings — 0 at/below 92, 1 at 122+ (league median ~112, p90 ~129). */
+/** 0..1: how much real offence (SC+PA) a forward brings — 0 at/below 98, 1 at 105+. 105 is the bar for a power forward to add anything on a scoring line (league median ~112). */
 export function offenceGate(a: RoleFitAttrs): number {
-  return Math.max(0, Math.min(1, ((a.sc ?? 50) + (a.pa ?? 50) - 92) / 30));
+  return Math.max(0, Math.min(1, ((a.sc ?? 50) + (a.pa ?? 50) - 98) / 7));
 }
 
 /** This player's position in "role-space", relative to his position's league
  *  average: for a D, a single signed lean (>0 offense-leaning, <0 defense-leaning);
  *  for a forward, a 3-axis vector (play, snipe, grind), each relative to average. */
-function roleVector(a: RoleFitAttrs, isDef: boolean): number[] {
+function roleVector(a: RoleFitAttrs, isDef: boolean, scoringLine = false): number[] {
   if (isDef) {
     const off = 0.5 * (a.pa ?? 50) + 0.3 * (a.sk ?? 50) + 0.2 * (a.sc ?? 50);
     const def = 0.5 * (a.df ?? 50) + 0.3 * (a.st ?? 50) + 0.2 * (a.ck ?? 50);
@@ -65,7 +65,7 @@ function roleVector(a: RoleFitAttrs, isDef: boolean): number[] {
   // a role is what a player is GOOD at: below-average play/snipe/grind doesn't make him a "different" role, just a
   // weaker player (otherwise a checker with no offence read as the perfect complement to two skill forwards)
   const up = (v: number) => Math.max(0, v);
-  return [up(play - F_PLAY_CENTRE), up(snipe - F_SNIPE_CENTRE), up(grind - F_GRIND_CENTRE) * (0.35 + 0.65 * offenceGate(a))];
+  return [up(play - F_PLAY_CENTRE), up(snipe - F_SNIPE_CENTRE), up(grind - F_GRIND_CENTRE) * (scoringLine ? offenceGate(a) : 0.35 + 0.65 * offenceGate(a))];
 }
 
 const euclid = (v1: number[], v2: number[]) => Math.sqrt(v1.reduce((s, x, i) => s + (x - v2[i]) ** 2, 0));
@@ -95,9 +95,10 @@ const F_COVER = [12, 14, 12];
  *  its members sit in role-space relative to the league average, continuous
  *  (not just same/different). 1 = ideally complementary (STHS rewards this
  *  in-sim via chemFactor); a unit of one member is neutral (1). */
-export function roleFitOf(members: RoleFitAttrs[], isDef: boolean): number {
+/** `scoringLine`: a 1st/2nd line — a checker adds NOTHING to the grind job unless he clears the 105 SC+PA bar. */
+export function roleFitOf(members: RoleFitAttrs[], isDef: boolean, scoringLine = false): number {
   if (members.length < 2) return 1;
-  const vecs = members.map((m) => roleVector(m, isDef));
+  const vecs = members.map((m) => roleVector(m, isDef, scoringLine));
   if (!isDef) {
     // Forwards: COVERAGE of the three jobs (create / finish / win pucks) by the unit's best man at each — not
     // the distance between members, which handed a no-offence checker the "perfect complement" score just for

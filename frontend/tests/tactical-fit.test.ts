@@ -70,6 +70,9 @@ test("scoring lines reward a hitter who also brings offence — a pure checker p
   const tk = forward("LW", { sc: 64, pa: 67, ck: 67, df: 62, st: 65, sk: 66 }), be = forward("C", { sc: 62, pa: 59, ck: 71, df: 66, st: 65 });
   const hath = forward("RW", { sc: 49, pa: 49, ck: 91, df: 69, st: 86, sk: 48 }), wilson = forward("RW", { sc: 65, pa: 61, ck: 82, df: 66, st: 80, sk: 60 });
   assert.ok(tacticalFitForwards([tk, be, wilson], DEFAULT_TACTICS, undefined, 0) >= tacticalFitForwards([tk, be, hath], DEFAULT_TACTICS, undefined, 0), "a power forward fits the 1st line at least as well as a pure checker");
+  // the 105 SC+PA bar: the same checker with SC+PA 106 instead of 98 adds clearly more on the 1st line, and the 4th line is unaffected
+  const hath106 = forward("RW", { sc: 53, pa: 53, ck: 91, df: 69, st: 86, sk: 48 });
+  assert.ok(tacticalFitForwards([tk, be, hath106], DEFAULT_TACTICS, undefined, 0) > tacticalFitForwards([tk, be, hath], DEFAULT_TACTICS, undefined, 0) + 10, "clearing 105 SC+PA matters on a scoring line");
   assert.ok(tacticalFitForwards([tk, be, hath], DEFAULT_TACTICS, undefined, 3) > tacticalFitForwards([tk, be, hath], DEFAULT_TACTICS, undefined, 0), "…and the pure checker belongs on the 4th line");
 });
 

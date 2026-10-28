@@ -89,7 +89,7 @@ export function tacticalFitForwards(
   const present = players.filter((player): player is TacticalFitPlayer => player != null);
   if (present.length < 2) return 0;
 
-  const roleScore = roleFitOf(present, false) * 100;
+  const roleScore = roleFitOf(present, false, lineIndex != null && !!LINE_ARCHETYPE_F[lineIndex]?.powerGate) * 100;
   const slots = ["LW", "C", "RW"];
   let good = 0;
   let count = 0;
@@ -110,8 +110,8 @@ export function tacticalFitForwards(
   const gates = present.map((p) => offenceGate(p));
   const slot = lineIndex != null ? LINE_ARCHETYPE_F[lineIndex] : undefined;
   const archFactor = lineIndex != null ? archetypeFactor(types, slot, gates) : 1;
-  // a scoring line (1st/2nd) with a man who brings no offence (a pure checker parked there) is a weaker unit
-  const threat = slot?.powerGate ? 0.8 + 0.2 * (0.5 * Math.min(...gates) + 0.5 * (gates.reduce((s, g) => s + g, 0) / gates.length)) : 1;
+  // a man below ~105 SC+PA adds nothing to a scoring line (1st/2nd): each missing share of offence costs the unit fit
+  const threat = slot?.powerGate ? 0.6 + 0.4 * (gates.reduce((s, g) => s + g, 0) / gates.length) : 1;
   return clamp(roleScore * positionFactor * systemFit(unitProfile(present), effectiveTactics) * archFactor * threat);
 }
 
