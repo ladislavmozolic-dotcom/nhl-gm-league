@@ -109,3 +109,13 @@ test("a line of Dual-Threats is not marked down for lacking a hitter, a no-offen
   const withChecker = tacticalFitForwards([dual("LW"), dual("C"), checker], DEFAULT_TACTICS, undefined, 0);
   assert.ok(stars >= 95 && stars > withChecker + 10, "three Dual-Threats beat two + a pure checker on the 1st line");
 });
+
+test("D pair role fit is coverage: two genuine two-way D are not marked down, two of the same kind are", () => {
+  const d = (shoots: string, a: Partial<TacticalFitPlayer>) => forward("D", { shoots, sk: 55, ck: 60, st: 78, ...a });
+  const off = (s: string) => d(s, { pa: 66, sc: 55, sk: 62, df: 70, st: 76, ck: 62 });
+  const def = (s: string) => d(s, { pa: 45, sc: 40, sk: 50, df: 82, st: 85, ck: 78 });
+  const two = (s: string) => d(s, { pa: 58, sc: 48, sk: 56, df: 78, st: 82, ck: 72 });
+  const fit = (a: TacticalFitPlayer, b: TacticalFitPlayer) => tacticalFitDefense([a, b], DEFAULT_TACTICS, undefined, 0);
+  assert.ok(fit(off("L"), def("R")) >= fit(two("L"), two("R")), "offence + defence covers both jobs");
+  assert.ok(fit(two("L"), two("R")) > fit(off("L"), off("R")) + 10, "two two-way D beat two offensive D");
+});

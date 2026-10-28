@@ -389,7 +389,7 @@ const conFactor = (con: number) => Math.max(0.5, 1 - (100 - (con ?? 100)) * CFG.
 // unit (three snipers / two offensive D) regardless of its chemistry.
 // Tactical Fit (the Lines-screen number, 0..100) is a real multiplier too: a unit that suits the team's
 // system and its depth-chart slot plays better, a mismatched one worse. Centred on the league-typical fit.
-export const TFIT_CENTRE = { F: 75, D: 56 }; // ice-time-weighted league-typical unit fit, per unit kind (D pairs score lower by construction) — keeps the league goal rate unchanged
+export const TFIT_CENTRE = { F: 75, D: 81 }; // ice-time-weighted league-typical unit fit, per unit kind (D pairs score lower by construction) — keeps the league goal rate unchanged
 export const tacticalFitFactor = (tFit?: number, isDef = false) =>
   CFG.tacticalFitPct > 0 && tFit != null ? Math.max(0.9, Math.min(1.1, 1 + (tFit - (isDef ? TFIT_CENTRE.D : TFIT_CENTRE.F)) / 30 * CFG.tacticalFitPct / 100)) : 1;
 const chemFactor = (chem: number, roleFit = 1, tFit?: number, isDef = false) => {

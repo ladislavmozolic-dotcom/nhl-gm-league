@@ -383,7 +383,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const label = good ? "Ideal mix" : fit >= 0.6 ? "Decent mix" : "Redundant";
     return (
       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
-        title={`Role fit — ${isDef ? "a pair wants one offensive + one stay-at-home D" : "a line wants its three jobs covered: a playmaker + a sniper + a puck-winner (a hitter only counts with real offence)"}. Same-role players clash and sim at reduced offense.`}>
+        title={`Role fit — ${isDef ? "a pair wants both jobs covered: puck-moving + defending (an offensive + a stay-at-home D, or two genuine two-way D)" : "a line wants its three jobs covered: a playmaker + a sniper + a puck-winner (a hitter only counts with real offence)"}. Same-role players clash and sim at reduced offense.`}>
         ⚙ {label}
       </span>
     );

@@ -68,14 +68,12 @@ function roleVector(a: RoleFitAttrs, isDef: boolean, scoringLine = false): numbe
   const up = (v: number) => Math.max(0, v);
   const pl = up(play - F_PLAY_CENTRE), sn = up(snipe - F_SNIPE_CENTRE);
   // a Dual-Threat (the league's own player type: creates AND finishes, with the skating/puck handling to carry it) wins
-  // pucks by puck control rather than checking — he carries most of the third job himself, so a line of such stars
-  // isn't marked down for lacking a hitter
+  // pucks by puck control (skating, puck handling) rather than physically — he carries part of the third job himself,
+  // so a line of such stars isn't marked down as hard for lacking a hitter, but a real checker with offence covers it better
   const dual = playerType({ position: "LW", sc: a.sc, pa: a.pa, df: a.df, ck: a.ck, st: a.st, sk: a.sk, ph: a.ph }) === "Dual-Threat";
   const control = dual ? DUAL_CONTROL * F_COVER[2] : 0;
   return [pl, sn, Math.max(control, up(grind - F_GRIND_CENTRE) * (scoringLine ? offenceGate(a) : 0.35 + 0.65 * offenceGate(a)))];
 }
-
-const euclid = (v1: number[], v2: number[]) => Math.sqrt(v1.reduce((s, x, i) => s + (x - v2[i]) ** 2, 0));
 
 /** This player's role LABEL — which way he leans relative to his position's
  *  league average (a genuinely offensive D by league standards, not just "less
@@ -89,15 +87,13 @@ export function roleOf(a: RoleFitAttrs, isDef: boolean): Role {
   return play >= snipe && play >= grind ? "PLAY" : snipe >= grind ? "SNIPE" : "GRIND";
 }
 
-// How far apart (in role-space) a unit's members need to sit before fit
-// saturates at 1.0, and the floor for a fully role-redundant unit (members
-// with an identical role-space position) — hand-tuned against real rosters,
-// same spirit as lib/sim/tactics.ts's fitDim centre/spread constants.
-const SATURATION = { def: 28, fwd: 24 };
+// Floor for a unit that covers none of its jobs — hand-tuned against real rosters, same spirit as
+// lib/sim/tactics.ts's fitDim centre/spread constants.
 const FLOOR = { def: 0.4, fwd: 0.25 };
 // forward lean (points above the position's league average) at which a job counts as fully covered: play, snipe, grind
 const F_COVER = [12, 14, 12];
-const DUAL_CONTROL = 0.8; // share of the puck-winning job a forward strong at BOTH creating and finishing covers by puck control alone
+const D_COVER = { off: 12, def: 6.5 }; // D lean (points above the D average) at which a job counts as fully covered
+const DUAL_CONTROL = 0.6; // share of the puck-winning job a Dual-Threat covers by puck control (skating/puck handling), NOT by checking — measured: CK 62 on average, none above 75
 
 /** 0..1 role diversity of a unit (forward trio/pair or D pair) — how far apart
  *  its members sit in role-space relative to the league average, continuous
@@ -106,22 +102,24 @@ const DUAL_CONTROL = 0.8; // share of the puck-winning job a forward strong at B
 /** `scoringLine`: a 1st/2nd line — a checker adds NOTHING to the grind job unless he clears the 105 SC+PA bar. */
 export function roleFitOf(members: RoleFitAttrs[], isDef: boolean, scoringLine = false): number {
   if (members.length < 2) return 1;
-  const vecs = members.map((m) => roleVector(m, isDef, scoringLine));
   if (!isDef) {
     // Forwards: COVERAGE of the three jobs (create / finish / win pucks) by the unit's best man at each — not
     // the distance between members, which handed a no-offence checker the "perfect complement" score just for
-    // being far from two skill players. A power forward (hits AND scores) covers the grind job with real offence.
+    // being far from two skill players. A hitter with real offence covers the grind job properly.
+    const vecs = members.map((m) => roleVector(m, false, scoringLine));
     const cover = [0, 1, 2].map((k) => Math.min(1, Math.max(...vecs.map((v) => v[k])) / F_COVER[k]));
     return FLOOR.fwd + ((cover[0] + cover[1] + cover[2]) / 3) * (1 - FLOOR.fwd);
   }
-  let total = 0, pairs = 0;
-  for (let i = 0; i < vecs.length; i++) {
-    for (let j = i + 1; j < vecs.length; j++) { total += euclid(vecs[i], vecs[j]); pairs++; }
-  }
-  const avgDist = pairs ? total / pairs : 0;
-  const sat = isDef ? SATURATION.def : SATURATION.fwd;
-  const floor = isDef ? FLOOR.def : FLOOR.fwd;
-  return Math.max(floor, Math.min(1, floor + (avgDist / sat) * (1 - floor)));
+  // D pairs: COVERAGE of the two jobs (move the puck / defend) by the pair's best man at each — a pair of two
+  // genuine two-way D covers both, an offensive D beside a stay-at-home D covers both, two of the same kind don't.
+  // (Defensive ratings cluster tightly league-wide, so that job saturates at a smaller lean than the offensive one.)
+  const lean = (m: RoleFitAttrs) => ({
+    off: Math.max(0, 0.5 * (m.pa ?? 50) + 0.3 * (m.sk ?? 50) + 0.2 * (m.sc ?? 50) - D_OFF_CENTRE),
+    def: Math.max(0, 0.5 * (m.df ?? 50) + 0.3 * (m.st ?? 50) + 0.2 * (m.ck ?? 50) - D_DEF_CENTRE),
+  });
+  const ls = members.map(lean);
+  const cover = (Math.min(1, Math.max(...ls.map((l) => l.off)) / D_COVER.off) + Math.min(1, Math.max(...ls.map((l) => l.def)) / D_COVER.def)) / 2;
+  return FLOOR.def + cover * (1 - FLOOR.def);
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
