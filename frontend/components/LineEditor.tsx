@@ -399,7 +399,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const cls = fit >= 80 ? "bg-emerald-500/20 text-emerald-300" : fit >= 60 ? "bg-sky-500/20 text-sky-300" : fit >= 45 ? "bg-amber-500/20 text-amber-300" : "bg-rose-500/20 text-rose-300";
     return (
       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls} cursor-help`}
-        title="Tactical Fit — the same calculation as in the Lines Builder: role coverage, correct positions or stick hand, player suitability for the selected system and player types suited to the given line/pair (e.g. the 4th line wants a checking forward + defensive wingers; the top two lines want ~105+ SC+PA from everyone). It is a real game multiplier: about ±5% output per 30 points from the league-typical 68.">
+        title="Tactical Fit — the same calculation as in the Lines Builder: role coverage, correct positions or stick hand, player suitability for the selected system and player types suited to the given line/pair (e.g. the 4th line wants a checking forward + defensive wingers; the top two lines want ~105+ SC+PA from everyone). It is a real game multiplier: about ±5% output per 30 points from the league-typical level (forwards and D pairs have their own scale).">
         ♟ Fit {fit}
       </span>
     );

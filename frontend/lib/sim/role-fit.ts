@@ -26,10 +26,11 @@
 // instead of both landing on the same flat "mixed" value.
 
 import { AVG } from "../ratingBands";
+import { playerType } from "../player-type";
 
 export type RoleFitAttrs = {
   pa?: number | null; sk?: number | null; sc?: number | null;
-  ck?: number | null; fo?: number | null; st?: number | null; df?: number | null;
+  ck?: number | null; fo?: number | null; st?: number | null; df?: number | null; ph?: number | null;
 };
 
 export type Role = "OFD" | "DFD" | "PLAY" | "SNIPE" | "GRIND";
@@ -60,12 +61,18 @@ function roleVector(a: RoleFitAttrs, isDef: boolean, scoringLine = false): numbe
   const play = 0.6 * (a.pa ?? 50) + 0.4 * (a.fo ?? 50);
   const snipe = 0.6 * (a.sc ?? 50) + 0.4 * (a.sk ?? 50);
   const grind = 0.5 * (a.ck ?? 50) + 0.3 * (a.df ?? 50) + 0.2 * (a.st ?? 50);
-  // A grinder only counts as a real complement to the extent he can also play offence (a power forward);
+  // A grinder only counts as a real complement to the extent he can also play offence;
   // otherwise any weak 4th-liner with high CK/DF would look like the "ideal" third man on a top line.
   // a role is what a player is GOOD at: below-average play/snipe/grind doesn't make him a "different" role, just a
   // weaker player (otherwise a checker with no offence read as the perfect complement to two skill forwards)
   const up = (v: number) => Math.max(0, v);
-  return [up(play - F_PLAY_CENTRE), up(snipe - F_SNIPE_CENTRE), up(grind - F_GRIND_CENTRE) * (scoringLine ? offenceGate(a) : 0.35 + 0.65 * offenceGate(a))];
+  const pl = up(play - F_PLAY_CENTRE), sn = up(snipe - F_SNIPE_CENTRE);
+  // a Dual-Threat (the league's own player type: creates AND finishes, with the skating/puck handling to carry it) wins
+  // pucks by puck control rather than checking — he carries most of the third job himself, so a line of such stars
+  // isn't marked down for lacking a hitter
+  const dual = playerType({ position: "LW", sc: a.sc, pa: a.pa, df: a.df, ck: a.ck, st: a.st, sk: a.sk, ph: a.ph }) === "Dual-Threat";
+  const control = dual ? DUAL_CONTROL * F_COVER[2] : 0;
+  return [pl, sn, Math.max(control, up(grind - F_GRIND_CENTRE) * (scoringLine ? offenceGate(a) : 0.35 + 0.65 * offenceGate(a)))];
 }
 
 const euclid = (v1: number[], v2: number[]) => Math.sqrt(v1.reduce((s, x, i) => s + (x - v2[i]) ** 2, 0));
@@ -90,6 +97,7 @@ const SATURATION = { def: 28, fwd: 24 };
 const FLOOR = { def: 0.4, fwd: 0.25 };
 // forward lean (points above the position's league average) at which a job counts as fully covered: play, snipe, grind
 const F_COVER = [12, 14, 12];
+const DUAL_CONTROL = 0.8; // share of the puck-winning job a forward strong at BOTH creating and finishing covers by puck control alone
 
 /** 0..1 role diversity of a unit (forward trio/pair or D pair) — how far apart
  *  its members sit in role-space relative to the league average, continuous

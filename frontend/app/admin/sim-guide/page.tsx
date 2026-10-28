@@ -43,7 +43,7 @@ export default async function SimGuidePage() {
           <li>Every game a unit plays <b>intact</b>, chemistry grows (~2/game); ~40–50 games together reaches the top.</li>
           <li>Break a unit (injury, call-up, a trade) and it drops back toward base — keep your lines stable to build it.</li>
           <li><b>Role coverage matters</b>: a forward line wants its three jobs covered — a playmaker, a sniper and a puck-winner who can also play (SC+PA ≥ ~105 on the top two lines); a pair wants an offensive + a stay-at-home D. Three of the same type never fully click.</li>
-          <li><b>Tactical Fit is a real multiplier</b>: each unit's Lines-screen fit (role coverage × slot × system × depth-chart archetype) scales its output by about ±5% per 30 points around the league-typical 68 (cap ±10%; setting <i>Tactical Fit effect %</i>, 0 = off).</li>
+          <li><b>Tactical Fit is a real multiplier</b>: each unit's Lines-screen fit (role coverage × slot × system × depth-chart archetype) scales its output by about ±5% per 30 points around the league-typical level (own scale for forward lines and D pairs) (cap ±10%; setting <i>Tactical Fit effect %</i>, 0 = off).</li>
           <li><b>Off-position caps it</b>: if even one player is out of his natural spot, that unit can never fully gel (capped, e.g. ~55%).</li>
           <li>A gelled line shoots &amp; defends at full strength; a fresh or mismatched one is quietly penalised — so chemistry never inflates league scoring, it only rewards stability.</li>
         </ul>

@@ -389,14 +389,14 @@ const conFactor = (con: number) => Math.max(0.5, 1 - (100 - (con ?? 100)) * CFG.
 // unit (three snipers / two offensive D) regardless of its chemistry.
 // Tactical Fit (the Lines-screen number, 0..100) is a real multiplier too: a unit that suits the team's
 // system and its depth-chart slot plays better, a mismatched one worse. Centred on the league-typical fit.
-export const TFIT_CENTRE = 68; // league mean/median of unit Tactical Fit (measured on all 32 NHL clubs, Oct 2026)
-export const tacticalFitFactor = (tFit?: number) =>
-  CFG.tacticalFitPct > 0 && tFit != null ? Math.max(0.9, Math.min(1.1, 1 + (tFit - TFIT_CENTRE) / 30 * CFG.tacticalFitPct / 100)) : 1;
-const chemFactor = (chem: number, roleFit = 1, tFit?: number) => {
-  if (!CFG.chemistryEnabled) return tacticalFitFactor(tFit);
+export const TFIT_CENTRE = { F: 75, D: 56 }; // ice-time-weighted league-typical unit fit, per unit kind (D pairs score lower by construction) — keeps the league goal rate unchanged
+export const tacticalFitFactor = (tFit?: number, isDef = false) =>
+  CFG.tacticalFitPct > 0 && tFit != null ? Math.max(0.9, Math.min(1.1, 1 + (tFit - (isDef ? TFIT_CENTRE.D : TFIT_CENTRE.F)) / 30 * CFG.tacticalFitPct / 100)) : 1;
+const chemFactor = (chem: number, roleFit = 1, tFit?: number, isDef = false) => {
+  if (!CFG.chemistryEnabled) return tacticalFitFactor(tFit, isDef);
   const curveBonus = chemCurveBonusPct(CFG.chemistryCurve, chem ?? 100) / 100;
   const role = (1 - (roleFit ?? 1)) * CFG.chemistryRolePenaltyPct;
-  return (1 + curveBonus - role) * tacticalFitFactor(tFit);
+  return (1 + curveBonus - role) * tacticalFitFactor(tFit, isDef);
 };
 
 // ---- momentum ---------------------------------------------------------------
@@ -1663,7 +1663,7 @@ function armLineupDerived(st: SimState, team: SimTeam) {
   st.momoDip[team.id] = CFG.momentumConcedeDip * (1 - (ex - 50) / 250) * team.coachLd; // EX 90→0.84x, 25→1.1x; coach LD softens further
   // defensive shield: a gelled, role-diverse D pair suppresses goals against
   st.defChem[team.id] = team.defense.length
-    ? team.defense.reduce((t, d) => t + chemFactor(d.chem, d.roleFit, d.tFit), 0) / team.defense.length : 1;
+    ? team.defense.reduce((t, d) => t + chemFactor(d.chem, d.roleFit, d.tFit, true), 0) / team.defense.length : 1;
 }
 
 /** Why play stopped — the moments a live GM may change tactics/lines. */
@@ -2485,7 +2485,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
     // harder than one on a deep team just because his linemates are weaker
     const dpRef = CFG.depthParityLeague ? (posAvgOff(home, false) + posAvgOff(away, false)) / 2 : posAvgOff(carrierTeam, false);
     const depthAdj = dp > 0 && !carrier.isDefense ? Math.max(0.8, Math.min(1.25, 1 + dp * ((dpRef / Math.max(1, carrier.offense)) - 1))) : 1;
-    const atkSkill = (v: number, of = true) => v * (of ? tOff.of * atkTilt.of : 1) * chemFactor(carrier.chem, carrier.roleFit, carrier.tFit) * moraleFactor(carrier.morale) * fat(carrierTeam, carrier) * catchUp * teamMult * depthAdj;
+    const atkSkill = (v: number, of = true) => v * (of ? tOff.of * atkTilt.of : 1) * chemFactor(carrier.chem, carrier.roleFit, carrier.tFit, carrier.isDefense) * moraleFactor(carrier.morale) * fat(carrierTeam, carrier) * catchUp * teamMult * depthAdj;
     const defSkill = (v: number) => v * tDef.df * defTilt.df * dfat(def, dman);
     // puck-protection: SK still leads (skating/hands to evade pressure), but PH
     // (stickhandling) is now a real secondary factor in keeping it on the tape.
@@ -2751,7 +2751,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       press++; // sustained pressure: screening / traffic / a tiring goalie
       if (press === 3) momoSwing(st, carrierTeam.id, absT, CFG.momentumFlurry); // shot flurry lifts the bench
       const pressBonus = 1 + 0.06 * Math.min(press - 1, 4);
-      const offMult = chemFactor(carrier.chem, carrier.roleFit, carrier.tFit) * moraleFactor(carrier.morale) * physFactor(carrier.weight) * fat(carrierTeam, carrier) * tOff.of * carrierTeam.coachOff;
+      const offMult = chemFactor(carrier.chem, carrier.roleFit, carrier.tFit, carrier.isDefense) * moraleFactor(carrier.morale) * physFactor(carrier.weight) * fat(carrierTeam, carrier) * tOff.of * carrierTeam.coachOff;
       const defShield = (2 - (st.defChem[def.id] ?? 1)) * (2 - dfat(def, dman)) * tDef.df * def.coachDef;
       // the DEFENCE in front of the goalie: a high-DF pair on the ice contests the lane
       // and lowers shot quality (fewer goals), a weak pair gives it up — so goals-against

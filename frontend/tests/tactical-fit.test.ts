@@ -101,3 +101,11 @@ test("no lineIndex leaves the score unaffected by depth-chart archetype", () => 
   const explicitUndefined = tacticalFitForwards(line, DEFAULT_TACTICS, undefined, undefined);
   assert.equal(noIndex, explicitUndefined);
 });
+
+test("a line of Dual-Threats is not marked down for lacking a hitter, a no-offence checker still is", () => {
+  const dual = (pos: string) => forward(pos, { sc: 66, pa: 67, ck: 64, df: 62, st: 64, sk: 66, ph: 66, fo: 66 });
+  const checker = forward("RW", { sc: 49, pa: 49, ck: 91, df: 69, st: 86, sk: 48 });
+  const stars = tacticalFitForwards([dual("LW"), dual("C"), dual("RW")], DEFAULT_TACTICS, undefined, 0);
+  const withChecker = tacticalFitForwards([dual("LW"), dual("C"), checker], DEFAULT_TACTICS, undefined, 0);
+  assert.ok(stars >= 95 && stars > withChecker + 10, "three Dual-Threats beat two + a pure checker on the 1st line");
+});
