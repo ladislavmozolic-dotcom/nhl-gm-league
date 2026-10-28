@@ -58,14 +58,17 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   let skaterRows = players.filter((p) => !p.isGoalie);
   let nF = skaterRows.filter((p) => !isDef(p.position)).length;
   let nD = skaterRows.filter((p) => isDef(p.position)).length;
-  if ((nF < MIN_F || nD < MIN_D || skaterRows.length < MIN_SKATERS) && affIds.length) {
-    // pull the whole available affiliate skater pool once, then fill by position:
-    // forwards up to MIN_F, defense up to MIN_D, then top up to MIN_SKATERS.
+  const short = () => nF < MIN_F || nD < MIN_D || skaterRows.length < MIN_SKATERS;
+  // pull the affiliate skater pool, then fill by position: forwards up to MIN_F, defense up to MIN_D, then top up to
+  // MIN_SKATERS. `farmOnly` false = real call-ups ($100k minor-league deals can never be called up); true = the
+  // last resort when the callable pool ran dry — a club must never dress an illegal lineup (e.g. 11 forwards),
+  // so $100k farm deals are borrowed for that one game (no contract or roster change).
+  const fillFromFarm = async (farmOnly: boolean) => {
     const pool = await prisma.player.findMany({
       where: {
         teamId: { in: affIds }, isGoalie: false, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 },
         id: { notIn: skaterRows.map((s) => s.id) },
-        NOT: { capHit: AHL_ONLY_CAP_HIT }, // $100k minor-league deals can never be called up
+        ...(farmOnly ? { capHit: AHL_ONLY_CAP_HIT } : { NOT: { capHit: AHL_ONLY_CAP_HIT } }),
       },
       include: { goalieRating: true },
       orderBy: { overall: "desc" },
@@ -76,6 +79,10 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
     while (nD < MIN_D && poolD.length) { skaterRows.push(poolD.shift()!); nD++; }
     const rest = [...poolF, ...poolD].sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0));
     while (skaterRows.length < MIN_SKATERS && rest.length) skaterRows.push(rest.shift()!);
+  };
+  if (short() && affIds.length) {
+    await fillFromFarm(false);
+    if (short()) await fillFromFarm(true);
   }
   // Manager lines (if set) — load now so their players are never trimmed below.
   // The team system is loaded separately: a GM can set a system without editing
