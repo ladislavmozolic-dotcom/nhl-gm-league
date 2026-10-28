@@ -1,18 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import Link from "next/link";
 import PlayerAvatar from "@/components/playerAvatar";
 import type { Lang } from "@/lib/i18n";
 
-export type SkaterRow = {
-  playerId: number;
-  name: string;
-  slug: string | null;
-  photoUrl: string | null;
-  number: number | null;
-  position: string;
-  rookie: boolean;
+export type SkaterSplitRow = {
+  teamId: number;
+  teamCode: string;
+  teamName: string;
+  teamSlug: string | null;
   gp: number;
   goals: number;
   assists: number;
@@ -38,11 +35,105 @@ export type SkaterRow = {
   p60: number;
 };
 
+export type SkaterRow = {
+  playerId: number;
+  name: string;
+  slug: string | null;
+  photoUrl: string | null;
+  number: number | null;
+  position: string;
+  rookie: boolean;
+  hasSplits?: boolean;
+  isDeparted?: boolean;
+  departedToTeamCode?: string | null;
+  splits?: SkaterSplitRow[];
+  teamForStats?: {
+    gp: number;
+    goals: number;
+    assists: number;
+    points: number;
+    plusMinus: number;
+    plusMinus5v5: number;
+    pim: number;
+    hits: number;
+    blocks: number;
+    shots: number;
+    ppGoals: number;
+    ppAssists: number;
+    ppp: number;
+    shGoals: number;
+    shAssists: number;
+    shp: number;
+    gwg: number;
+    toiMin: number;
+    toiPerGameMin: number;
+  };
+  gp: number;
+  goals: number;
+  assists: number;
+  points: number;
+  plusMinus: number;
+  plusMinus5v5: number;
+  pim: number;
+  hits: number;
+  blocks: number;
+  shots: number;
+  shtPct: number;
+  xg: number;
+  gax: number;
+  toiMin: number;
+  toiPerGameMin: number;
+  ppGoals: number;
+  ppAssists: number;
+  ppp: number;
+  shGoals: number;
+  shAssists: number;
+  shp: number;
+  gwg: number;
+  p60: number;
+};
+
+export type GoalieSplitRow = {
+  teamId: number;
+  teamCode: string;
+  teamName: string;
+  teamSlug: string | null;
+  gp: number;
+  wins: number;
+  losses: number;
+  otl: number;
+  shutouts: number;
+  shotsAgainst: number;
+  saves: number;
+  goalsAgainst: number;
+  toiMin: number;
+  svPct: number;
+  gaa: number;
+  xga: number;
+  gsax: number;
+  steals: number;
+};
+
 export type GoalieRow = {
   playerId: number;
   name: string;
   slug: string | null;
   photoUrl: string | null;
+  hasSplits?: boolean;
+  isDeparted?: boolean;
+  departedToTeamCode?: string | null;
+  splits?: GoalieSplitRow[];
+  teamForStats?: {
+    gp: number;
+    wins: number;
+    losses: number;
+    otl: number;
+    shutouts: number;
+    shotsAgainst: number;
+    saves: number;
+    goalsAgainst: number;
+    toiMin: number;
+  };
   gp: number;
   wins: number;
   losses: number;
@@ -216,25 +307,45 @@ export default function TeamStatsView({
     dir: -1,
   });
 
-  // 1. Top Leaders extraction
+  // 1. Top Leaders extraction (ranked by performance for this club)
   const pointsLeader = useMemo(() => {
-    return [...skaters].sort((a, b) => b.points - a.points || b.goals - a.goals)[0];
+    return [...skaters].sort((a, b) => {
+      const srcB = b.teamForStats ?? b;
+      const srcA = a.teamForStats ?? a;
+      return srcB.points - srcA.points || srcB.goals - srcA.goals || b.points - a.points;
+    })[0];
   }, [skaters]);
 
   const goalsLeader = useMemo(() => {
-    return [...skaters].sort((a, b) => b.goals - a.goals || b.shots - a.shots)[0];
+    return [...skaters].sort((a, b) => {
+      const srcB = b.teamForStats ?? b;
+      const srcA = a.teamForStats ?? a;
+      return srcB.goals - srcA.goals || srcB.shots - srcA.shots || b.goals - a.goals;
+    })[0];
   }, [skaters]);
 
   const assistsLeader = useMemo(() => {
-    return [...skaters].sort((a, b) => b.assists - a.assists || b.points - a.points)[0];
+    return [...skaters].sort((a, b) => {
+      const srcB = b.teamForStats ?? b;
+      const srcA = a.teamForStats ?? a;
+      return srcB.assists - srcA.assists || srcB.points - srcA.points || b.assists - a.assists;
+    })[0];
   }, [skaters]);
 
   const topGoalie = useMemo(() => {
-    return [...goalies].sort((a, b) => b.wins - a.wins || b.svPct - a.svPct)[0];
+    return [...goalies].sort((a, b) => {
+      const srcB = b.teamForStats ?? b;
+      const srcA = a.teamForStats ?? a;
+      return srcB.wins - srcA.wins || b.svPct - a.svPct;
+    })[0];
   }, [goalies]);
 
   const toiLeader = useMemo(() => {
-    return [...skaters].sort((a, b) => b.toiPerGameMin - a.toiPerGameMin)[0];
+    return [...skaters].sort((a, b) => {
+      const srcB = b.teamForStats ?? b;
+      const srcA = a.teamForStats ?? a;
+      return srcB.toiPerGameMin - srcA.toiPerGameMin;
+    })[0];
   }, [skaters]);
 
   // Filtered & Sorted Skaters
@@ -311,20 +422,21 @@ export default function TeamStatsView({
   const skaterTotalsRow = useMemo(() => {
     let gp = 0, g = 0, a = 0, pts = 0, pim = 0, hits = 0, blocks = 0, shots = 0, ppg = 0, ppa = 0, ppp = 0, shg = 0, sha = 0, shp = 0;
     for (const s of skaters) {
-      gp = Math.max(gp, s.gp);
-      g += s.goals;
-      a += s.assists;
-      pts += s.points;
-      pim += s.pim;
-      hits += s.hits;
-      blocks += s.blocks;
-      shots += s.shots;
-      ppg += s.ppGoals;
-      ppa += s.ppAssists;
-      ppp += s.ppp;
-      shg += s.shGoals;
-      sha += s.shAssists;
-      shp += s.shp;
+      const src = s.teamForStats ?? s;
+      gp = Math.max(gp, src.gp);
+      g += src.goals;
+      a += src.assists;
+      pts += src.points;
+      pim += src.pim;
+      hits += src.hits;
+      blocks += src.blocks;
+      shots += src.shots;
+      ppg += src.ppGoals;
+      ppa += src.ppAssists;
+      ppp += src.ppp;
+      shg += src.shGoals;
+      sha += src.shAssists;
+      shp += src.shp;
     }
     return { gp, g, a, pts, pim, hits, blocks, shots, ppg, ppa, ppp, shg, sha, shp };
   }, [skaters]);
@@ -902,178 +1014,305 @@ export default function TeamStatsView({
                   </tr>
                 ) : (
                   filteredSkaters.map((s, idx) => (
-                    <tr key={s.playerId} className="hover:bg-slate-800/40 transition-colors group">
-                      {/* Rank */}
-                      <td className="px-3 py-2.5 text-center text-slate-500 font-normal">
-                        {idx + 1}
-                      </td>
+                    <Fragment key={s.playerId}>
+                      <tr className="hover:bg-slate-800/40 transition-colors group">
+                        {/* Rank */}
+                        <td className="px-3 py-2.5 text-center text-slate-500 font-normal">
+                          {idx + 1}
+                        </td>
 
-                      {/* Player */}
-                      <td className="px-3 py-2.5 whitespace-nowrap font-sans font-medium text-white">
-                        <div className="flex items-center gap-2.5">
-                          <PlayerAvatar
-                            src={s.photoUrl}
-                            alt={s.name}
-                            size={28}
-                            className="shrink-0"
-                          />
-                          {s.number != null && (
-                            <span className="text-[11px] font-mono font-bold text-slate-500 w-5 text-right">
-                              #{s.number}
-                            </span>
+                        {/* Player */}
+                        <td className="px-3 py-2.5 whitespace-nowrap font-sans font-medium text-white">
+                          <div className="flex items-center gap-2.5">
+                            <PlayerAvatar
+                              src={s.photoUrl}
+                              alt={s.name}
+                              size={28}
+                              className="shrink-0"
+                            />
+                            {s.number != null && (
+                              <span className="text-[11px] font-mono font-bold text-slate-500 w-5 text-right">
+                                #{s.number}
+                              </span>
+                            )}
+                            <Link
+                              href={s.slug ? `/players/${s.slug}` : "#"}
+                              className="font-bold hover:text-blue-400 transition-colors truncate"
+                            >
+                              {s.name}
+                            </Link>
+                            {s.rookie && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                R
+                              </span>
+                            )}
+                            {s.hasSplits && (
+                              <span
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                                title={isCs ? "Celková sezónna bilancia hráča (hral za viac tímov)" : "Total season stats across all teams"}
+                              >
+                                TOT
+                              </span>
+                            )}
+                            {s.isDeparted && (
+                              <span
+                                className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                title={isCs ? "Hráč prestúpil do iného tímu" : "Traded to another club"}
+                              >
+                                {isCs ? "ODCHOD" : "TRADED"}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Position */}
+                        <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                            {s.position}
+                          </span>
+                        </td>
+
+                        {/* GP */}
+                        <td className="px-3 py-2.5 text-right text-slate-300">
+                          {s.gp}
+                        </td>
+
+                        {/* Standard Overview Columns */}
+                        {(activeTab === "OVERVIEW" || activeTab === "FORWARDS" || activeTab === "DEFENSE") && (
+                          <>
+                            <td className="px-3 py-2.5 text-right text-slate-200">
+                              {s.goals}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-200">
+                              {s.assists}
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-black text-amber-400 text-sm">
+                              {s.points}
+                            </td>
+                            <td className="px-3 py-2.5 text-right">
+                              <span
+                                className={`font-semibold ${
+                                  s.plusMinus > 0
+                                    ? "text-emerald-400"
+                                    : s.plusMinus < 0
+                                    ? "text-rose-400"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                {s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-400">
+                              {s.pim}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-300">
+                              {s.shots}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-400">
+                              {s.shtPct.toFixed(1)}%
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-400">
+                              {s.hits}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-400">
+                              {s.blocks}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-300 font-medium">
+                              {fmtClock(s.toiPerGameMin)}
+                            </td>
+                          </>
+                        )}
+
+                        {/* Special Teams Columns */}
+                        {activeTab === "SPECIAL_TEAMS" && (
+                          <>
+                            <td className="px-3 py-2.5 text-right font-black text-amber-400 text-sm">
+                              {s.points}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-200">
+                              {s.ppGoals}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-200">
+                              {s.ppAssists}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-sky-300 font-bold">
+                              {s.ppp}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-200">
+                              {s.shGoals}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-200">
+                              {s.shAssists}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-indigo-300 font-bold">
+                              {s.shp}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-amber-400 font-bold">
+                              {s.gwg}
+                            </td>
+                          </>
+                        )}
+
+                        {/* Advanced Analytics Columns */}
+                        {activeTab === "ADVANCED" && (
+                          <>
+                            <td className="px-3 py-2.5 text-right font-black text-amber-400 text-sm">
+                              {s.points}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-300">
+                              {s.xg.toFixed(1)}
+                            </td>
+                            <td className="px-3 py-2.5 text-right">
+                              <span
+                                className={`font-semibold ${
+                                  s.gax > 0
+                                    ? "text-emerald-400"
+                                    : s.gax < 0
+                                    ? "text-rose-400"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                {s.gax > 0 ? `+${s.gax.toFixed(1)}` : s.gax.toFixed(1)}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-300">
+                              {s.p60.toFixed(2)}
+                            </td>
+                            <td className="px-3 py-2.5 text-right">
+                              <span
+                                className={`font-semibold ${
+                                  s.plusMinus5v5 > 0
+                                    ? "text-emerald-400"
+                                    : s.plusMinus5v5 < 0
+                                    ? "text-rose-400"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                {s.plusMinus5v5 > 0 ? `+${s.plusMinus5v5}` : s.plusMinus5v5}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-400">
+                              {s.shtPct.toFixed(1)}%
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-300">
+                              {fmtClock(s.toiPerGameMin)}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-slate-400">
+                              {Math.round(s.toiMin)}
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                      {/* Split Sub-rows (like on EliteProspects) */}
+                      {s.splits && s.splits.length > 0 && s.splits.map((sp) => (
+                        <tr
+                          key={`${s.playerId}-${sp.teamId}`}
+                          className="bg-slate-950/40 text-xs text-slate-400 border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors"
+                        >
+                          <td className="px-3 py-1.5 text-center text-slate-600 font-mono text-[11px]">—</td>
+                          <td className="px-3 py-1.5 whitespace-nowrap pl-9 font-sans text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-500 font-mono text-[11px]">↳</span>
+                              <span className="font-semibold text-slate-300 bg-slate-800/80 px-1.5 py-0.5 rounded text-[10px] border border-slate-700 font-mono">
+                                {sp.teamCode}
+                              </span>
+                              <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                                {sp.teamName}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-1.5 text-center text-slate-600 font-normal">—</td>
+                          <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.gp}</td>
+
+                          {(activeTab === "OVERVIEW" || activeTab === "FORWARDS" || activeTab === "DEFENSE") && (
+                            <>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.goals}</td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.assists}</td>
+                              <td className="px-3 py-1.5 text-right font-bold text-amber-300/80 font-mono text-xs">
+                                {sp.points}
+                              </td>
+                              <td className="px-3 py-1.5 text-right font-mono">
+                                <span
+                                  className={
+                                    sp.plusMinus > 0
+                                      ? "text-emerald-400/80"
+                                      : sp.plusMinus < 0
+                                      ? "text-rose-400/80"
+                                      : "text-slate-500"
+                                  }
+                                >
+                                  {sp.plusMinus > 0 ? `+${sp.plusMinus}` : sp.plusMinus}
+                                </span>
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-slate-500 font-mono">{sp.pim}</td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.shots}</td>
+                              <td className="px-3 py-1.5 text-right text-slate-500 font-mono">{sp.shtPct.toFixed(1)}%</td>
+                              <td className="px-3 py-1.5 text-right text-slate-500 font-mono">{sp.hits}</td>
+                              <td className="px-3 py-1.5 text-right text-slate-500 font-mono">{sp.blocks}</td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono text-[11px]">
+                                {fmtClock(sp.toiPerGameMin)}
+                              </td>
+                            </>
                           )}
-                          <Link
-                            href={s.slug ? `/players/${s.slug}` : "#"}
-                            className="font-bold hover:text-blue-400 transition-colors truncate"
-                          >
-                            {s.name}
-                          </Link>
-                          {s.rookie && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              R
-                            </span>
+
+                          {activeTab === "SPECIAL_TEAMS" && (
+                            <>
+                              <td className="px-3 py-1.5 text-right font-bold text-amber-300/80 font-mono text-xs">
+                                {sp.points}
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.ppGoals}</td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.ppAssists}</td>
+                              <td className="px-3 py-1.5 text-right text-sky-400/80 font-mono">{sp.ppp}</td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.shGoals}</td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.shAssists}</td>
+                              <td className="px-3 py-1.5 text-right text-indigo-400/80 font-mono">{sp.shp}</td>
+                              <td className="px-3 py-1.5 text-right text-amber-400/80 font-mono">{sp.gwg}</td>
+                            </>
                           )}
-                        </div>
-                      </td>
 
-                      {/* Position */}
-                      <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                          {s.position}
-                        </span>
-                      </td>
-
-                      {/* GP */}
-                      <td className="px-3 py-2.5 text-right text-slate-300">
-                        {s.gp}
-                      </td>
-
-                      {/* Standard Overview Columns */}
-                      {(activeTab === "OVERVIEW" || activeTab === "FORWARDS" || activeTab === "DEFENSE") && (
-                        <>
-                          <td className="px-3 py-2.5 text-right text-slate-200">
-                            {s.goals}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-200">
-                            {s.assists}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-black text-amber-400 text-sm">
-                            {s.points}
-                          </td>
-                          <td className="px-3 py-2.5 text-right">
-                            <span
-                              className={`font-semibold ${
-                                s.plusMinus > 0
-                                  ? "text-emerald-400"
-                                  : s.plusMinus < 0
-                                  ? "text-rose-400"
-                                  : "text-slate-400"
-                              }`}
-                            >
-                              {s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-400">
-                            {s.pim}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-300">
-                            {s.shots}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-400">
-                            {s.shtPct.toFixed(1)}%
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-400">
-                            {s.hits}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-400">
-                            {s.blocks}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-300 font-medium">
-                            {fmtClock(s.toiPerGameMin)}
-                          </td>
-                        </>
-                      )}
-
-                      {/* Special Teams Columns */}
-                      {activeTab === "SPECIAL_TEAMS" && (
-                        <>
-                          <td className="px-3 py-2.5 text-right font-black text-amber-400 text-sm">
-                            {s.points}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-200">
-                            {s.ppGoals}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-200">
-                            {s.ppAssists}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-sky-300 font-bold">
-                            {s.ppp}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-200">
-                            {s.shGoals}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-200">
-                            {s.shAssists}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-indigo-300 font-bold">
-                            {s.shp}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-amber-400 font-bold">
-                            {s.gwg}
-                          </td>
-                        </>
-                      )}
-
-                      {/* Advanced Analytics Columns */}
-                      {activeTab === "ADVANCED" && (
-                        <>
-                          <td className="px-3 py-2.5 text-right font-black text-amber-400 text-sm">
-                            {s.points}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-300">
-                            {s.xg.toFixed(1)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right">
-                            <span
-                              className={`font-semibold ${
-                                s.gax > 0
-                                  ? "text-emerald-400"
-                                  : s.gax < 0
-                                  ? "text-rose-400"
-                                  : "text-slate-400"
-                              }`}
-                            >
-                              {s.gax > 0 ? `+${s.gax.toFixed(1)}` : s.gax.toFixed(1)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-300">
-                            {s.p60.toFixed(2)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right">
-                            <span
-                              className={`font-semibold ${
-                                s.plusMinus5v5 > 0
-                                  ? "text-emerald-400"
-                                  : s.plusMinus5v5 < 0
-                                  ? "text-rose-400"
-                                  : "text-slate-400"
-                              }`}
-                            >
-                              {s.plusMinus5v5 > 0 ? `+${s.plusMinus5v5}` : s.plusMinus5v5}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-400">
-                            {s.shtPct.toFixed(1)}%
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-300">
-                            {fmtClock(s.toiPerGameMin)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-slate-400">
-                            {Math.round(s.toiMin)}
-                          </td>
-                        </>
-                      )}
-                    </tr>
+                          {activeTab === "ADVANCED" && (
+                            <>
+                              <td className="px-3 py-1.5 text-right font-bold text-amber-300/80 font-mono text-xs">
+                                {sp.points}
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.xg.toFixed(1)}</td>
+                              <td className="px-3 py-1.5 text-right font-mono">
+                                <span
+                                  className={
+                                    sp.gax > 0
+                                      ? "text-emerald-400/80"
+                                      : sp.gax < 0
+                                      ? "text-rose-400/80"
+                                      : "text-slate-500"
+                                  }
+                                >
+                                  {sp.gax > 0 ? `+${sp.gax.toFixed(1)}` : sp.gax.toFixed(1)}
+                                </span>
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.p60.toFixed(2)}</td>
+                              <td className="px-3 py-1.5 text-right font-mono">
+                                <span
+                                  className={
+                                    sp.plusMinus5v5 > 0
+                                      ? "text-emerald-400/80"
+                                      : sp.plusMinus5v5 < 0
+                                      ? "text-rose-400/80"
+                                      : "text-slate-500"
+                                  }
+                                >
+                                  {sp.plusMinus5v5 > 0 ? `+${sp.plusMinus5v5}` : sp.plusMinus5v5}
+                                </span>
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-slate-500 font-mono">{sp.shtPct.toFixed(1)}%</td>
+                              <td className="px-3 py-1.5 text-right text-slate-400 font-mono text-[11px]">
+                                {fmtClock(sp.toiPerGameMin)}
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-slate-500 font-mono">{Math.round(sp.toiMin)}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))
                 )}
               </tbody>
@@ -1236,54 +1475,119 @@ export default function TeamStatsView({
                 </tr>
               ) : (
                 filteredGoalies.map((g, idx) => (
-                  <tr key={g.playerId} className="hover:bg-slate-800/40 transition-colors group">
-                    <td className="px-3 py-2.5 text-center text-slate-500 font-normal">
-                      {idx + 1}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap font-sans font-medium text-white">
-                      <div className="flex items-center gap-2.5">
-                        <PlayerAvatar
-                          src={g.photoUrl}
-                          alt={g.name}
-                          size={28}
-                          className="shrink-0"
-                        />
-                        <Link
-                          href={g.slug ? `/players/${g.slug}` : "#"}
-                          className="font-bold hover:text-blue-400 transition-colors truncate"
+                  <Fragment key={g.playerId}>
+                    <tr className="hover:bg-slate-800/40 transition-colors group">
+                      <td className="px-3 py-2.5 text-center text-slate-500 font-normal">
+                        {idx + 1}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap font-sans font-medium text-white">
+                        <div className="flex items-center gap-2.5">
+                          <PlayerAvatar
+                            src={g.photoUrl}
+                            alt={g.name}
+                            size={28}
+                            className="shrink-0"
+                          />
+                          <Link
+                            href={g.slug ? `/players/${g.slug}` : "#"}
+                            className="font-bold hover:text-blue-400 transition-colors truncate"
+                          >
+                            {g.name}
+                          </Link>
+                          {g.hasSplits && (
+                            <span
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                              title={isCs ? "Celková sezónna bilancia brankára (chytal za viac tímov)" : "Total season stats across all teams"}
+                            >
+                              TOT
+                            </span>
+                          )}
+                          {g.isDeparted && (
+                            <span
+                              className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              title={isCs ? "Brankár prestúpil do iného tímu" : "Traded to another club"}
+                            >
+                              {isCs ? "ODCHOD" : "TRADED"}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-slate-300">{g.gp}</td>
+                      <td className="px-3 py-2.5 text-right text-emerald-400 font-bold">{g.wins}</td>
+                      <td className="px-3 py-2.5 text-right text-rose-400">{g.losses}</td>
+                      <td className="px-3 py-2.5 text-right text-amber-400">{g.otl}</td>
+                      <td className="px-3 py-2.5 text-right font-black text-indigo-400 text-sm">
+                        {g.svPct.toFixed(3).replace(/^0/, "")}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-slate-200">{g.gaa.toFixed(2)}</td>
+                      <td className="px-3 py-2.5 text-right">
+                        <span
+                          className={`font-semibold ${
+                            g.gsax > 0
+                              ? "text-emerald-400"
+                              : g.gsax < 0
+                              ? "text-rose-400"
+                              : "text-slate-400"
+                          }`}
                         >
-                          {g.name}
-                        </Link>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-slate-300">{g.gp}</td>
-                    <td className="px-3 py-2.5 text-right text-emerald-400 font-bold">{g.wins}</td>
-                    <td className="px-3 py-2.5 text-right text-rose-400">{g.losses}</td>
-                    <td className="px-3 py-2.5 text-right text-amber-400">{g.otl}</td>
-                    <td className="px-3 py-2.5 text-right font-black text-indigo-400 text-sm">
-                      {g.svPct.toFixed(3).replace(/^0/, "")}
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-slate-200">{g.gaa.toFixed(2)}</td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span
-                        className={`font-semibold ${
-                          g.gsax > 0
-                            ? "text-emerald-400"
-                            : g.gsax < 0
-                            ? "text-rose-400"
-                            : "text-slate-400"
-                        }`}
+                          {g.gsax > 0 ? `+${g.gsax.toFixed(1)}` : g.gsax.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-amber-400 font-bold">{g.shutouts}</td>
+                      <td className="px-3 py-2.5 text-right text-slate-300">{g.shotsAgainst}</td>
+                      <td className="px-3 py-2.5 text-right text-slate-300">{g.saves}</td>
+                      <td className="px-3 py-2.5 text-right text-slate-400">{g.goalsAgainst}</td>
+                      <td className="px-3 py-2.5 text-right text-slate-300 font-bold">{g.steals}</td>
+                      <td className="px-3 py-2.5 text-right text-slate-400">{Math.round(g.toiMin)}</td>
+                    </tr>
+                    {/* Split Sub-rows for goalies */}
+                    {g.splits && g.splits.length > 0 && g.splits.map((sp) => (
+                      <tr
+                        key={`${g.playerId}-${sp.teamId}`}
+                        className="bg-slate-950/40 text-xs text-slate-400 border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors"
                       >
-                        {g.gsax > 0 ? `+${g.gsax.toFixed(1)}` : g.gsax.toFixed(1)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-amber-400 font-bold">{g.shutouts}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-300">{g.shotsAgainst}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-300">{g.saves}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-400">{g.goalsAgainst}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-300 font-bold">{g.steals}</td>
-                    <td className="px-3 py-2.5 text-right text-slate-400">{Math.round(g.toiMin)}</td>
-                  </tr>
+                        <td className="px-3 py-1.5 text-center text-slate-600 font-mono text-[11px]">—</td>
+                        <td className="px-3 py-1.5 whitespace-nowrap pl-9 font-sans text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500 font-mono text-[11px]">↳</span>
+                            <span className="font-semibold text-slate-300 bg-slate-800/80 px-1.5 py-0.5 rounded text-[10px] border border-slate-700 font-mono">
+                              {sp.teamCode}
+                            </span>
+                            <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                              {sp.teamName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.gp}</td>
+                        <td className="px-3 py-1.5 text-right text-emerald-400/80 font-mono">{sp.wins}</td>
+                        <td className="px-3 py-1.5 text-right text-rose-400/80 font-mono">{sp.losses}</td>
+                        <td className="px-3 py-1.5 text-right text-amber-400/80 font-mono">{sp.otl}</td>
+                        <td className="px-3 py-1.5 text-right font-bold text-indigo-400/80 font-mono">
+                          {sp.svPct.toFixed(3).replace(/^0/, "")}
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-slate-300 font-mono">{sp.gaa.toFixed(2)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">
+                          <span
+                            className={
+                              sp.gsax > 0
+                                ? "text-emerald-400/80"
+                                : sp.gsax < 0
+                                ? "text-rose-400/80"
+                                : "text-slate-500"
+                            }
+                          >
+                            {sp.gsax > 0 ? `+${sp.gsax.toFixed(1)}` : sp.gsax.toFixed(1)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-amber-400/80 font-mono">{sp.shutouts}</td>
+                        <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.shotsAgainst}</td>
+                        <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.saves}</td>
+                        <td className="px-3 py-1.5 text-right text-slate-500 font-mono">{sp.goalsAgainst}</td>
+                        <td className="px-3 py-1.5 text-right text-slate-400 font-mono">{sp.steals}</td>
+                        <td className="px-3 py-1.5 text-right text-slate-500 font-mono">{Math.round(sp.toiMin)}</td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))
               )}
             </tbody>
