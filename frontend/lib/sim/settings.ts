@@ -184,7 +184,7 @@ export type EngineSettings = {
   conRecovery: number;       // CON regained per rest day
   conRecoveryHighDu: number; // ... if DU >= duHighThreshold
   conSlope: number;          // save quality lost per CON point below 100
-  goalieFatiguePct: number;  // in-game: % of save quality lost per shot faced past the CON-drop threshold (0 = off)
+  goalieFatiguePct: number;  // in-game: % goal-chance rise per shot faced above a pivot (CON-drop shots - 6); first shots easier, late shots harder (0 = off)
   b2bFatigue: number;        // save quality multiplier on a back-to-back
   // "Any given night" variance — one form draw per team per game (survives the
   // law of large numbers, unlike per-tick noise) so favourites don't run away.
@@ -308,7 +308,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   disciplineEnabled: true, disciplinePct: 100, retireMinGames: 300,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
   duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,
-  conSlope: 0.045, goalieFatiguePct: 1.5, b2bFatigue: 0.885,
+  conSlope: 0.045, goalieFatiguePct: 3.5, b2bFatigue: 0.885,
   gameVariancePct: 108, nightSigmaGoalie: 0.11, nightSigmaOff: 0.07,
   parityPct: 100,
   conShotsLow1: 23, conShotsLow2: 32, conShotsHigh1: 27, conShotsHigh2: 34,

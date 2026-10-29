@@ -96,13 +96,14 @@ function effGoalieQuality(g: SimGoalie): number {
 }
 // Shot-load rule, driven by the goalie's durability (DU): workhorse (DU >= high)
 // goalies tolerate more shots before losing a CON point.
-// In-game workload fatigue: past the same shot count where a goalie starts losing CON, every extra shot
-// he faces this game costs a little save quality (a workhorse, DU >= duHighThreshold, tires later).
+// In-game workload: a multiplier on the chance a shot beats the goalie, by how many shots he has already faced
+// this game. Centred (a typical ~30-shot night is neutral on average): the first shots are easier, every shot
+// past the pivot (the CON-drop shot count minus 6) is harder, so a goalie peppered with 40 shots leaks more.
 function goalieWorkload(shotsFaced: number, du: number): number {
   const slope = (CFG.goalieFatiguePct ?? 0) / 100;
   if (slope <= 0) return 1;
-  const onset = du >= CFG.duHighThreshold ? CFG.conShotsHigh1 : CFG.conShotsLow1;
-  return Math.max(0.8, 1 - slope * Math.max(0, shotsFaced - onset));
+  const pivot = (du >= CFG.duHighThreshold ? CFG.conShotsHigh1 : CFG.conShotsLow1) - 6;
+  return Math.max(0.85, Math.min(1.7, 1 + slope * (shotsFaced - pivot)));
 }
 function conDrop(shots: number, du: number): number {
   if (du >= CFG.duHighThreshold) return shots <= CFG.conShotsHigh1 ? 1 : shots <= CFG.conShotsHigh2 ? 2 : 3;
@@ -2781,7 +2782,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       const pk = 1 - PARITY_CONV * parityAmt();
       const finishExponent = (st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7)
         + (st.v3OvertimeStars && shotSituation === "3V3" ? V3_OT_STAR_EXPONENT : 0);
-      const pTalent = conversion(shOff, effGoalieQuality(gSim) * goalieWorkload(gLine.shotsAgainst, gSim.du) + (st.v3CoreGoalie ? coreGoalieQualityAdj(gSim.attrs) : 0), isHome, strength, finishExponent, st.isExperimentalV3 ? GOALIE_TUNING.exp : 1.7);
+      const pTalent = conversion(shOff, effGoalieQuality(gSim) + (st.v3CoreGoalie ? coreGoalieQualityAdj(gSim.attrs) : 0), isHome, strength, finishExponent, st.isExperimentalV3 ? GOALIE_TUNING.exp : 1.7);
       // PARITY compresses only the GOALIE mismatch toward a league-average keeper —
       // a team-level edge — while the SHOOTER's finishing is left FULL, so elite
       // snipers still pile up goals (top scorers reach ~110-120) even as weak teams
@@ -2795,7 +2796,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       const pointFinish = pointShot ? Math.max(0.75, Math.min(1.5, 1 + 0.016 * ((carrier.attrs.sc ?? 50) - 58))) : 1;
       let p = pConv * danger * pressBonus * pointFinish * handMult
         * momoBoost(st, carrierTeam.id, absT) * clutchFactor(st, carrier, period, tick, margin)
-        * teamEdge * catchUp * ppMod
+        * teamEdge * catchUp * ppMod * goalieWorkload(gLine.shotsAgainst, gSim.du)
         * (st.nightOff[carrierTeam.id] ?? 1) * (st.nightDef[def.id] ?? 1) // any-given-night form
         * (st.v3NetFront && (pointShot || setup === "rebound") ? v3NetFrontMult(onIceF(carrierTeam), onIceD(def)) : 1);
       // V3: a goalie who has been idle for a long stretch is colder on the next shot.
