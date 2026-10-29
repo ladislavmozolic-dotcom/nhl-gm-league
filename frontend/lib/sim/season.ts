@@ -346,11 +346,14 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       if (moraleState.has(g.id)) g.morale = moraleState.get(g.id)!;
     }
   };
+  // farmers an NHL club dresses tonight (call-ups / borrowed): the AHL club must not dress them in its own game
+  const callUps = new Set<number>();
   const getTeam = async (id: number): Promise<SeasonTeam | null> => {
     if (cache.has(id)) return cache.get(id) ?? null;
     try {
-      const t = await loadSimTeam(id, undefined, { chemBase: settings.chemistryBase, offPos: { wing: settings.offPosWingPct, center: settings.offPosCenterPct, def: settings.offPosDefPct, chemCap: settings.offPosChemCap } });
+      const t = await loadSimTeam(id, undefined, { excludeIds: callUps, chemBase: settings.chemistryBase, offPos: { wing: settings.offPosWingPct, center: settings.offPosCenterPct, def: settings.offPosDefPct, chemCap: settings.offPosChemCap } });
       applyPersistentState(t); // restore evolved morale/CON/drought after a reload
+      for (const b of t.borrowedIds) callUps.add(b);
       const own = await prisma.team.findUnique({ where: { id }, select: { passwordHash: true, parentTeam: { select: { passwordHash: true } } } });
       (t as SeasonTeam).humanGm = !!(own?.passwordHash || own?.parentTeam?.passwordHash);
       cache.set(id, t); return t;
@@ -552,6 +555,9 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       hg: result.home.goals, ag: result.away.goals, endedIn: result.endedIn,
     });
   };
+
+  // NHL clubs load first, so every call-up is known before the AHL clubs build their own lineups
+  for (const gm of scheduled) if (gm.league !== "AHL") { await getTeam(gm.homeTeamId); await getTeam(gm.awayTeamId); }
 
   if (opts.runGames) {
     // live: prepare the whole day, let the runner play it out, then finish every game

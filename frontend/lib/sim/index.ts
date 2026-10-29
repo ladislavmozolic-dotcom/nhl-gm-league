@@ -29,7 +29,7 @@ export const goalieAttrs = (g: any): GoalieAttrs => ({
  * Load a team's active NHL roster and assemble a SimTeam.
  * Uses rosterType='NHL' players; picks the best-overall goalie as starter.
  */
-export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { chemBase?: number; offPos?: { wing: number; center: number; def: number; chemCap: number }; linesOverride?: TeamLinesData }): Promise<SimTeam & { linesUsed: TeamLinesData }> {
+export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { chemBase?: number; offPos?: { wing: number; center: number; def: number; chemCap: number }; linesOverride?: TeamLinesData; excludeIds?: Set<number> }): Promise<SimTeam & { linesUsed: TeamLinesData; borrowedIds: number[] }> {
   const team = await prisma.team.findUnique({ where: { id: teamId }, include: { headCoach: true } });
   if (!team) throw new Error(`Team ${teamId} not found`);
   // AHL affiliates dress their AHL roster; NHL clubs their NHL roster
@@ -38,7 +38,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   const players = await prisma.player.findMany({
     // injured and healthy-scratched players don't dress (the GM's roster-mover scratches
     // — NHL or AHL — sit out; the affiliate auto-fill below covers any resulting shortfall)
-    where: { teamId, rosterType: rt, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 }, scratched: false },
+    where: { teamId, rosterType: rt, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 }, scratched: false, ...(opts?.excludeIds?.size ? { id: { notIn: [...opts.excludeIds] } } : {}) },
     include: { goalieRating: true },
   });
 
@@ -59,30 +59,35 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   let nF = skaterRows.filter((p) => !isDef(p.position)).length;
   let nD = skaterRows.filter((p) => isDef(p.position)).length;
   const short = () => nF < MIN_F || nD < MIN_D || skaterRows.length < MIN_SKATERS;
-  // pull the affiliate skater pool, then fill by position: forwards up to MIN_F, defense up to MIN_D, then top up to
-  // MIN_SKATERS. `farmOnly` false = real call-ups ($100k minor-league deals can never be called up); true = the
-  // last resort when the callable pool ran dry — a club must never dress an illegal lineup (e.g. 11 forwards),
-  // so $100k farm deals are borrowed for that one game (no contract or roster change).
-  const fillFromFarm = async (farmOnly: boolean) => {
+  // Fill from a pool by position: forwards up to MIN_F, defense up to MIN_D, then top up to MIN_SKATERS. A club must
+  // never dress an illegal lineup (e.g. 11 forwards): after the real call-ups, $100k farm deals are borrowed for that
+  // one game (no contract or roster change).
+  const borrowedIds: number[] = []; // NHL club only: farmers dressed tonight — the AHL club must not dress them too
+  const fillSkaters = async (where: object, trackBorrowed: boolean) => {
     const pool = await prisma.player.findMany({
       where: {
-        teamId: { in: affIds }, isGoalie: false, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 },
-        id: { notIn: skaterRows.map((s) => s.id) },
-        ...(farmOnly ? { capHit: AHL_ONLY_CAP_HIT } : { NOT: { capHit: AHL_ONLY_CAP_HIT } }),
+        isGoalie: false, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 },
+        id: { notIn: [...skaterRows.map((s) => s.id), ...(opts?.excludeIds ?? [])] },
+        ...where,
       },
       include: { goalieRating: true },
       orderBy: { overall: "desc" },
     });
+    const take = (p: (typeof pool)[number]) => { skaterRows.push(p); if (trackBorrowed) borrowedIds.push(p.id); };
     const poolF = pool.filter((p) => !isDef(p.position));
     const poolD = pool.filter((p) => isDef(p.position));
-    while (nF < MIN_F && poolF.length) { skaterRows.push(poolF.shift()!); nF++; }
-    while (nD < MIN_D && poolD.length) { skaterRows.push(poolD.shift()!); nD++; }
+    while (nF < MIN_F && poolF.length) { take(poolF.shift()!); nF++; }
+    while (nD < MIN_D && poolD.length) { take(poolD.shift()!); nD++; }
     const rest = [...poolF, ...poolD].sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0));
-    while (skaterRows.length < MIN_SKATERS && rest.length) skaterRows.push(rest.shift()!);
+    while (skaterRows.length < MIN_SKATERS && rest.length) take(rest.shift()!);
   };
   if (short() && affIds.length) {
-    await fillFromFarm(false);
-    if (short()) await fillFromFarm(true);
+    // real call-ups first ($100k minor-league deals can never be called up), then the last resort: borrow farm-only deals
+    await fillSkaters({ teamId: { in: affIds }, NOT: { capHit: AHL_ONLY_CAP_HIT } }, true);
+    if (short()) await fillSkaters({ teamId: { in: affIds }, capHit: AHL_ONLY_CAP_HIT }, true);
+  } else if (short() && rt === "AHL") {
+    // an AHL club that lost skaters to the parent club's call-ups tonight dresses its own healthy scratches
+    await fillSkaters({ teamId, rosterType: "AHL", scratched: true }, false);
   }
   // Manager lines (if set) — load now so their players are never trimmed below.
   // The team system is loaded separately: a GM can set a system without editing
@@ -230,7 +235,7 @@ export async function loadSimTeam(teamId: number, rosterType?: string, opts?: { 
   // The exact deployed lines (post-distinct-dressing) so a saved game can freeze
   // a snapshot of what was actually iced — the Lines editor is live and can be
   // changed by the GM anytime after, which must not rewrite a past game's report.
-  return { ...simTeam, linesUsed: lines };
+  return { ...simTeam, linesUsed: lines, borrowedIds };
 }
 
 /** Load both rosters and simulate a single game. */
