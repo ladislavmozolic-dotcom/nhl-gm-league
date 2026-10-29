@@ -422,6 +422,7 @@ export default function SimSettingsForm({ initial, onSave }: Props) {
           </div>
           <div>
             <NumField k="conSlope" label="Save loss per CON point" step={0.001} w="w-28" />
+            <NumField k="goalieFatiguePct" label="Save loss per shot past the CON-drop shots (%)" step={0.1} w="w-28" />
             <NumField k="b2bFatigue" label="Back-to-back save multiplier" step={0.005} w="w-28" />
           </div>
         </div>

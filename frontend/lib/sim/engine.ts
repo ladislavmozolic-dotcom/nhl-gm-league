@@ -96,6 +96,14 @@ function effGoalieQuality(g: SimGoalie): number {
 }
 // Shot-load rule, driven by the goalie's durability (DU): workhorse (DU >= high)
 // goalies tolerate more shots before losing a CON point.
+// In-game workload fatigue: past the same shot count where a goalie starts losing CON, every extra shot
+// he faces this game costs a little save quality (a workhorse, DU >= duHighThreshold, tires later).
+function goalieWorkload(shotsFaced: number, du: number): number {
+  const slope = (CFG.goalieFatiguePct ?? 0) / 100;
+  if (slope <= 0) return 1;
+  const onset = du >= CFG.duHighThreshold ? CFG.conShotsHigh1 : CFG.conShotsLow1;
+  return Math.max(0.8, 1 - slope * Math.max(0, shotsFaced - onset));
+}
 function conDrop(shots: number, du: number): number {
   if (du >= CFG.duHighThreshold) return shots <= CFG.conShotsHigh1 ? 1 : shots <= CFG.conShotsHigh2 ? 2 : 3;
   return shots <= CFG.conShotsLow1 ? 1 : shots <= CFG.conShotsLow2 ? 2 : 3;
@@ -2773,7 +2781,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       const pk = 1 - PARITY_CONV * parityAmt();
       const finishExponent = (st.v3FinishingCurve ? v3FinishingExponent(CFG.finishExponent ?? 1.7) : CFG.finishExponent ?? 1.7)
         + (st.v3OvertimeStars && shotSituation === "3V3" ? V3_OT_STAR_EXPONENT : 0);
-      const pTalent = conversion(shOff, effGoalieQuality(gSim) + (st.v3CoreGoalie ? coreGoalieQualityAdj(gSim.attrs) : 0), isHome, strength, finishExponent, st.isExperimentalV3 ? GOALIE_TUNING.exp : 1.7);
+      const pTalent = conversion(shOff, effGoalieQuality(gSim) * goalieWorkload(gLine.shotsAgainst, gSim.du) + (st.v3CoreGoalie ? coreGoalieQualityAdj(gSim.attrs) : 0), isHome, strength, finishExponent, st.isExperimentalV3 ? GOALIE_TUNING.exp : 1.7);
       // PARITY compresses only the GOALIE mismatch toward a league-average keeper —
       // a team-level edge — while the SHOOTER's finishing is left FULL, so elite
       // snipers still pile up goals (top scorers reach ~110-120) even as weak teams
