@@ -19,7 +19,7 @@ import { pairSig, unitPairs } from "./chemistry";
 import { computeStandings } from "./standings";
 import { getArenaSections, selloutRevenue, attendanceRate, priceAttendanceFactor, projectedPointsPct } from "../finance";
 import { cleanName } from "../playerName";
-import { posGroup } from "../ratingBands";
+import { dressGroup, lineSideMap } from "../dress-side";
 import { DRESS_TARGET } from "../roster-rules";
 import type { SimTeam, SimGoalie, TeamBox, GameResult } from "./types";
 import type { TeamLinesData } from "./lines-core";
@@ -64,9 +64,10 @@ export async function updateInjuryCon() {
   // A healed player walks back into the dressed lineup. If his position group is already full
   // (12F/6D/2G) he'd make the club non-compliant (and get it fined), so he goes straight to the scratches.
   for (const p of returners.filter((r) => !r.scratched && r.teamId != null)) {
-    const g = posGroup(p.position, p.isGoalie);
-    const mates = await prisma.player.findMany({ where: { teamId: p.teamId, rosterType: p.rosterType, scratched: false, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 } }, select: { position: true, isGoalie: true } });
-    if (mates.filter((m) => posGroup(m.position, m.isGoalie) === g).length <= DRESS_TARGET[g]) continue;
+    const sides = await lineSideMap(p.teamId!);
+    const g = dressGroup(p, sides);
+    const mates = await prisma.player.findMany({ where: { teamId: p.teamId, rosterType: p.rosterType, scratched: false, injuryDaysLeft: { lte: 0 }, suspendedGames: { lte: 0 } }, select: { id: true, position: true, isGoalie: true } });
+    if (mates.filter((m) => dressGroup(m, sides) === g).length <= DRESS_TARGET[g]) continue;
     await prisma.player.update({ where: { id: p.id }, data: { scratched: true } });
     const gm = p.team?.parentTeam ?? { id: p.teamId!, slug: p.team?.slug }; // a farm club is run by its parent club's GM
     await prisma.dmMessage.create({ data: { fromTeamId: gm.id, toTeamId: gm.id, body: `🏥 ${cleanName(p.name)} is healthy again, but your ${g} lineup is already full — he was placed in the scratches so you aren't fined. Adjust it on Roster Moves if you want him in.`, tradeUrl: `/teams/${gm.slug}/rosters` } }).catch(() => {});

@@ -12,7 +12,7 @@
 //     read by lib/cap.ts and the Cap Central pages).
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import { posGroup } from "./ratingBands";
+import { dressGroup, lineSideMap } from "./dress-side";
 import { DRESS_TARGET, ROSTER_LIMITS } from "./roster-rules";
 import { teamCapStatus } from "./cap";
 import { getLeagueClock } from "./calendar-server";
@@ -80,7 +80,8 @@ async function sideCheck(teamId: number, rosterType: "NHL" | "AHL", asOf?: Suspe
   // (a player hurt in TODAY's game did dress for it — only an injury from before the game keeps him out)
   const eligible = rows.filter((p) => !((p.suspendedGames > 0 && !asOf?.newlyIssued.has(p.id)) || asOf?.atGame.has(p.id)
     || (p.injuryDaysLeft > 0 && !asOf?.injuredToday.has(p.id))));
-  for (const p of eligible) if (!p.scratched) counts[posGroup(p.position, p.isGoalie)]++;
+  const sides = await lineSideMap(teamId);
+  for (const p of eligible) if (!p.scratched) counts[dressGroup(p, sides)]++;
   return { total: eligible.length, counts };
 }
 const offLines = (c: Counts) => c.F !== DRESS_TARGET.F || c.D !== DRESS_TARGET.D || c.G !== DRESS_TARGET.G;
