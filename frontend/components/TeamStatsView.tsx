@@ -276,14 +276,17 @@ function fmtClock(min: number): string {
 }
 
 export default function TeamStatsView({
-  skaters,
-  goalies,
+  skaters: allSkaters,
+  goalies: allGoalies,
   lang,
 }: {
   skaters: SkaterRow[];
   goalies: GoalieRow[];
   lang: Lang;
 }) {
+  // Players traded away are listed only on their current club; their games for THIS club still count toward the team totals.
+  const skaters = useMemo(() => allSkaters.filter((s) => !s.isDeparted), [allSkaters]);
+  const goalies = useMemo(() => allGoalies.filter((g) => !g.isDeparted), [allGoalies]);
   const isCs = lang === "cs";
   const t = isCs ? i18nDict.cs : i18nDict.en;
 
@@ -421,7 +424,7 @@ export default function TeamStatsView({
   // Totals for skaters
   const skaterTotalsRow = useMemo(() => {
     let gp = 0, g = 0, a = 0, pts = 0, pim = 0, hits = 0, blocks = 0, shots = 0, ppg = 0, ppa = 0, ppp = 0, shg = 0, sha = 0, shp = 0;
-    for (const s of skaters) {
+    for (const s of allSkaters) {
       const src = s.teamForStats ?? s;
       gp = Math.max(gp, src.gp);
       g += src.goals;
@@ -439,7 +442,7 @@ export default function TeamStatsView({
       shp += src.shp;
     }
     return { gp, g, a, pts, pim, hits, blocks, shots, ppg, ppa, ppp, shg, sha, shp };
-  }, [skaters]);
+  }, [allSkaters]);
 
   return (
     <div className="space-y-6">
