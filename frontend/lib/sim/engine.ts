@@ -2236,7 +2236,7 @@ function* periodGen(st: SimState, period: number, opts: { suddenDeath?: boolean 
       // wide-open down-3 pull for the full 2 minutes was creating a lot of the
       // engine's excess blowout rate (a real, but too-generous, empty-net dagger).
       const trailWindow = trailBy === 1 ? pullWindow : trailBy === 2 ? pullWindow * (st.v3SixOnFive ? SIX_TUNING.down2 : 0.7) : pullWindow * 0.35; // V3: modern benches pull down 2 about as early as down 1
-      const eligible = period === 3 && (curStr[team.id] === "EV" || curStr[team.id] === "PP") && trailBy >= 1 && trailBy <= 3 && PERIOD_SECONDS - tick <= trailWindow;
+      const eligible = period === 3 && (curStr[team.id] === "EV" || curStr[team.id] === "PP") && trailBy >= 1 && trailBy <= (st.v3SixOnFive ? 2 : 3) && PERIOD_SECONDS - tick <= trailWindow; // V3: a modern bench doesn't pull down 3 (it only feeds the empty-net dagger)
       if (eligible !== !!st.emptyNet[team.id]) {
         if (eligible) useTimeout(team, tick, "before pulling the goalie");
         st.emptyNet[team.id] = eligible;
