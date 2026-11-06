@@ -113,7 +113,29 @@ export async function checkIceTimeMorale(opts: { dryRun?: boolean; season?: stri
       // hurt in a game before this one and not back on the ice in between → out injured
       return (injDates.get(pid) ?? []).some((de) => de <= gt && !apDates.some((ad) => ad > de && ad < gt));
     };
-    const memberGames = (pid: number) => { const f = firstApp.get(pid); return f == null ? 0 : gameIds.filter((id) => (wDate.get(id) ?? 0) >= f && !excusedMiss(pid, id)).length; };
+    // games he sat out on a suspension (the first `gamesServed` team games after the incident that he didn't play),
+    // and games he was ejected from (cut short by the ruling, not by the coach) — neither is a snub: they count as
+    // neither 0:00 nor a game "given". (Scheifele: 6 games banned + one ejection read as 12:41 a night.)
+    const suspExc = new Map<number, Set<number>>();
+    const ejectedIn = new Map<number, Set<number>>();
+    if (roster.length) {
+      const [susp, ejs] = await Promise.all([
+        prisma.suspension.findMany({ where: { playerId: { in: roster.map((p) => p.id) }, season, kind: "SUSPENSION", gamesServed: { gt: 0 } }, select: { playerId: true, gameId: true, createdAt: true, gamesServed: true } }),
+        prisma.gameEvent.findMany({ where: { type: "EJECTION", playerId: { in: roster.map((p) => p.id) }, gameId: { in: gameIds } }, select: { playerId: true, gameId: true } }),
+      ]);
+      const trigGames = await prisma.game.findMany({ where: { id: { in: susp.map((x) => x.gameId).filter((x): x is number => x != null) } }, select: { id: true, gameDate: true } });
+      const trigDate = new Map(trigGames.map((g) => [g.id, g.gameDate?.getTime() ?? 0]));
+      for (const sp of susp) {
+        const trig = (sp.gameId != null ? trigDate.get(sp.gameId) : undefined) ?? sp.createdAt.getTime();
+        const missed = gameIds.filter((id) => (wDate.get(id) ?? 0) > trig && !playedIn.get(sp.playerId)?.has(id)).sort((x, y) => (wDate.get(x) ?? 0) - (wDate.get(y) ?? 0)).slice(0, sp.gamesServed);
+        const set = suspExc.get(sp.playerId) ?? new Set<number>(); for (const id of missed) set.add(id); suspExc.set(sp.playerId, set);
+      }
+      for (const e of ejs) if (e.playerId != null && e.gameId != null) { const set = ejectedIn.get(e.playerId) ?? new Set<number>(); set.add(e.gameId); ejectedIn.set(e.playerId, set); }
+      // an ejected game's (short) ice time must not drag his total down either
+      const ejToi = ejs.length ? await prisma.playerGameStat.findMany({ where: { OR: ejs.filter((e) => e.playerId != null && e.gameId != null).map((e) => ({ playerId: e.playerId!, gameId: e.gameId! })), teamId: team.id }, select: { playerId: true, toi: true } }) : [];
+      for (const r of ejToi) toiBy.set(r.playerId, (toiBy.get(r.playerId) ?? 0) - r.toi);
+    }
+    const memberGames = (pid: number) => { const f = firstApp.get(pid); return f == null ? 0 : gameIds.filter((id) => (wDate.get(id) ?? 0) >= f && !excusedMiss(pid, id) && !suspExc.get(pid)?.has(id) && !ejectedIn.get(pid)?.has(id)).length; };
     const startsBy = new Map(gkStarts.map((r) => [r.playerId, r._count._all]));
     const skaters = roster.filter((p) => !p.isGoalie);
     const isD = (pos: string | null) => (pos ?? "").toUpperCase().startsWith("D");
