@@ -277,6 +277,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   };
 
+  const rankLeague = team.league === "AHL" ? "AHL" : "NHL"; // the rank is among the club's own league (a farm club is ranked in the AHL)
   const rankPP = getLeagueRank("ppPct", true);
   const rankPK = getLeagueRank("pkPct", true);
   const rankGF = getLeagueRank("gfPerGame", true);
@@ -486,7 +487,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                   <span className="text-[10px] font-mono text-slate-400">{teamStats?.ppGoalsFor ?? 0} / {teamStats?.ppOpp ?? 0} PPG</span>
                   {rankPP && (
                     <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                      {ord(rankPP, isEn)} {isEn ? "in NHL" : "v NHL"}
+                      {ord(rankPP, isEn)} {isEn ? `in ${rankLeague}` : `v ${rankLeague}`}
                     </span>
                   )}
                 </div>
@@ -501,7 +502,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                   </span>
                   {rankPK && (
                     <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                      {ord(rankPK, isEn)} {isEn ? "in NHL" : "v NHL"}
+                      {ord(rankPK, isEn)} {isEn ? `in ${rankLeague}` : `v ${rankLeague}`}
                     </span>
                   )}
                 </div>
@@ -514,7 +515,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                   <span className="text-[10px] font-mono text-slate-400">{gf} {isEn ? "goals" : "gólov"}</span>
                   {rankGF && (
                     <span className="text-[10px] text-slate-300 font-bold bg-slate-800 px-1.5 py-0.2 rounded">
-                      {ord(rankGF, isEn)} {isEn ? "in NHL" : "v NHL"}
+                      {ord(rankGF, isEn)} {isEn ? `in ${rankLeague}` : `v ${rankLeague}`}
                     </span>
                   )}
                 </div>
@@ -527,7 +528,7 @@ export default async function TeamHomePage({ params }: { params: Promise<{ slug:
                   <span className="text-[10px] font-mono text-slate-400">{ga} {isEn ? "allowed" : "inkasovaných"}</span>
                   {rankGA && (
                     <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                      {ord(rankGA, isEn)} {isEn ? "in NHL" : "v NHL"}
+                      {ord(rankGA, isEn)} {isEn ? `in ${rankLeague}` : `v ${rankLeague}`}
                     </span>
                   )}
                 </div>
