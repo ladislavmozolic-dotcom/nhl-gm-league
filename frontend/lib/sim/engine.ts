@@ -3340,7 +3340,7 @@ export const DEPTH_TUNING = { l2: 0.1, l3: 0.22, l4: 0.18, standout: 1.5 }; // V
 export const FIGHT_TUNING = { rate: 1.05 }; // V3: × the per-game fight chance (NHL 2023-24: 311 fights / 1,312 games ≈ 0.24 per game)
 // V3: display-only scale so the xG table matches the V3 goal rate (league goals / xG ~ 1 (measured 0.95 on live V3 games)): without it every keeper shows a positive GSAx.
 export const V3_XG_SCALE = 0.95;
-export const GOALIE_TUNING = { exp: 1.0, defTalent: 0.1 }; // defTalent: × how much the defending pair's DF moves shot conversion // V3: how strongly goalie quality moves the save chance (V2: 1.7) — tuned to the NHL's team save % spread
+export const GOALIE_TUNING = { exp: 0.7, defTalent: 0.1 }; // defTalent: × how much the defending pair's DF moves shot conversion // V3: how strongly goalie quality moves the save chance (V2: 1.7) — tuned to the NHL's team save % spread
 export const CORE_TUNING = { scale: 0.765, dump: 1.3, clear: 2.8 }; // clear: × Core's D-zone clear share → the icing multiplier (replaces the flat tired ×1.7; ≈7 icings/game kept) // dump: × Core's neutral-zone dump share (keeps ~24 dump-ins per team-game) // V3 Core hybrid: × Core's shoot share (keeps the league shot volume where V3 is calibrated)
 export const COMPRESS_TUNING = { catchUp: 0.6, early: 0.1, garbageLead: 1 }; // early: catch-up scale in periods 1-2 // V3: × the per-goal catch-up and × how much a team up 3+ eases off (1 = as before, 0 = none)
 export const BOUNCE_TUNING = { live: 0.12, lost: 0.15, blockLost: 0.25, comp: 1.0, conv: 0.982 }; // comp/conv keep shots ≈ NHL 29.5 and goals per game where they were // V3: after a miss — share off the end boards to an attacker in front / rimmed to the defence; after a block — share the defence clears
