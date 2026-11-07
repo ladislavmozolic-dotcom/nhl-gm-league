@@ -471,7 +471,7 @@ export default function LineEditor({ teamName, teamSlug, jerseyTeamSlug = teamSl
     const d = structuredClone(data);
     d.forwardLines.forEach((l) => { l.lw = null; l.c = null; l.rw = null; });
     d.defensePairs.forEach((p) => { p.ld = null; p.rd = null; });
-    // don't auto-dress injured players, or a goalie too gassed to go (CON < PLAY_CON)
+    // don't auto-dress injured players, or a goalie too gassed to go (CON < GOALIE_PLAY_CON)
     setData(autoFill(d, players.filter((p) => !p.injured), goalies.filter((p) => !p.injured && !p.tired)));
     setSaved(false);
   };

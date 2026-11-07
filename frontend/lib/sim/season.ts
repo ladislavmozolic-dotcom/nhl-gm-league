@@ -28,6 +28,7 @@ type SeasonTeam = SimTeam & { linesUsed: TeamLinesData; /** a registered human G
 
 const DU_HIGH = 95; // goalie durability at/above which CON recovers +2/day instead of +1 (only the true iron men — ~11 of 70)
 export const PLAY_CON = 95; // a skater must be at CON >= 95 to dress (below = still hurt / rusty)
+export const GOALIE_PLAY_CON = 96; // a goalie must be at CON >= 96 to start (a skater only needs PLAY_CON 95)
 const PICKED_REST_CON = 92; // the GM's chosen #1 is spelled below this CON
 const PICKED_MAX_STARTS = 64; // …and after this many starts (a real workhorse load)
 const GOALIE_REST_CON = 98; // auto-rotation: a goalie below this CON on game day is spelled by the fresher one (so CON 97 → backup starts)
@@ -196,7 +197,7 @@ function chooseStarter(team: SeasonTeam, prevRound: number, state: Map<number, G
   // Honor the GM's explicit starter pick from Lines whenever he's actually fit
   // to go — the auto-rotation below exists to manage goalies the GM never set
   // an opinion on, not to overrule a deliberate choice (rest a hot backup, etc).
-  // Same fitness bar as a skater dressing (PLAY_CON) rather than the AI's own
+  // Goalie fitness bar (GOALIE_PLAY_CON, stricter than a skater's PLAY_CON) rather than the AI's own
   // stricter GOALIE_REST_CON, which is tuned for its own rotation heuristic.
   // …but the GM's pick is his NUMBER ONE, not an iron man: he still sits the second
   // night of a back-to-back, when he's run down, and once he's carried a real #1's
@@ -206,13 +207,13 @@ function chooseStarter(team: SeasonTeam, prevRound: number, state: Map<number, G
   const picked = team.goalies.find((g) => g.id === team.linesUsed?.situations?.others?.starter);
   // A human GM decides who is in net — full stop. No back-to-back / workload / CON-rest
   // rotation overrides his pick (that rotation exists for AI-run clubs); the only thing that
-  // keeps his starter out is being genuinely unfit to dress (below PLAY_CON), and a b2b still
+  // keeps his starter out is being genuinely unfit to dress (below GOALIE_PLAY_CON), and a b2b still
   // costs the starter a little performance via `fatigued`.
-  if (team.humanGm && picked && picked.con >= PLAY_CON) return picked;
-  if (picked && picked.con >= PLAY_CON) {
+  if (team.humanGm && picked && picked.con >= GOALIE_PLAY_CON) return picked;
+  if (picked && picked.con >= GOALIE_PLAY_CON) {
     const st = state.get(picked.id);
     const startedYesterday = (st?.lastStartRound ?? -99) === prevRound;
-    const hasBackup = team.goalies.some((g) => g.id !== picked.id && g.con >= PLAY_CON);
+    const hasBackup = team.goalies.some((g) => g.id !== picked.id && g.con >= GOALIE_PLAY_CON);
     if (!hasBackup || (!startedYesterday && picked.con >= PICKED_REST_CON && (st?.starts ?? 0) < PICKED_MAX_STARTS)) return picked;
   }
   const scored = [...team.goalies]
@@ -244,11 +245,11 @@ function chooseStarter(team: SeasonTeam, prevRound: number, state: Map<number, G
   // ground.
   const eligible = scored.filter((s) => s.g.con >= GOALIE_REST_CON);
   if (eligible.length) return eligible.sort((a, b) => b.score - a.score)[0].g;
-  // Nobody's fully rested. A goalie below PLAY_CON is genuinely gassed and must not
-  // start — fall back to whoever is still fit to dress (>= PLAY_CON) instead.
-  const fit = scored.filter((s) => s.g.con >= PLAY_CON);
+  // Nobody's fully rested. A goalie below GOALIE_PLAY_CON is genuinely gassed and must not
+  // start — fall back to whoever is still fit to dress (>= GOALIE_PLAY_CON) instead.
+  const fit = scored.filter((s) => s.g.con >= GOALIE_PLAY_CON);
   if (fit.length) return fit.sort((a, b) => b.score - a.score)[0].g;
-  // Both goalies are below PLAY_CON (shouldn't happen once rest-day recovery tops
+  // Both goalies are below GOALIE_PLAY_CON (shouldn't happen once rest-day recovery tops
   // them up) — can't forfeit for lack of a fit netminder, so the freshest starts anyway.
   return scored.sort((a, b) => b.g.con - a.g.con)[0].g;
 }
