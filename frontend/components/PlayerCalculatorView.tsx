@@ -1575,6 +1575,10 @@ function PlayerHoverComparisonCard({
           </div>
         </div>
 
+        {p.noData && p.noteText && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">{p.noteText}</div>
+        )}
+
         {/* Footer */}
         <div className="pt-1 border-t border-slate-800/60 text-[10px] text-slate-400 flex items-center justify-between">
           <span>✨ Prepočet v reálnom čase</span>

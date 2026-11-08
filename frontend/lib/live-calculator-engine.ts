@@ -9,6 +9,7 @@ import {
 import { percentileOf, ratingFromCurve, durabilityFromAvailability, leadershipFrom } from "./edge-params";
 import { METRIC_BY_KEY } from "./live-calculator-catalog";
 import { calculateRookieRatings } from "./rookie-calculator-engine";
+import { loadSettings } from "./sim/settings";
 
 export const SKATER_PARAMS: ParamKey[] = [
   "ck", "fg", "di", "sk", "st",
@@ -19,6 +20,9 @@ export const SKATER_PARAMS: ParamKey[] = [
 export type SkaterLiveRatingBlob = {
   classification: "NHL" | "AHL/FARM";
   status: string;
+  /** no 2026-27 games in NHL or AHL: nothing is calculated (projected = actual, all deltas 0) */
+  noData?: boolean;
+  note?: string;
   nhlGpLatest: number;
   nhlGpPrevious: number;
   ahlGpLatest: number;
@@ -121,6 +125,7 @@ export async function runLiveCalculatorRecompute(): Promise<{
     }
   }
 
+  const { rfaMaxAge } = await loadSettings();
   const sumSeasonW = (config.latestWeight || 0) + (config.previousWeight || 0);
   const REC_CUR = sumSeasonW > 0 ? config.latestWeight / sumSeasonW : 0.8;
   const REC_LAST = sumSeasonW > 0 ? config.previousWeight / sumSeasonW : 0.2;
@@ -914,6 +919,11 @@ export async function runLiveCalculatorRecompute(): Promise<{
       projected.ph = Math.round(actual.ph * 0.80 + projected.ph * 0.20);
     }
 
+    // No game in the current season, neither NHL nor AHL → there is nothing to project from. Last season's
+    // line must not move his parameters, so nothing is calculated (projected = actual, every delta 0).
+    const noData = e.nhlGpLatest <= 0 && e.ahlGpLatest <= 0;
+    if (noData) for (const key of SKATER_PARAMS) projected[key] = actual[key];
+
     // Compute deltas
     for (const key of SKATER_PARAMS) {
       const act = actual[key] ?? 50;
@@ -925,12 +935,18 @@ export async function runLiveCalculatorRecompute(): Promise<{
     // Delta is formula-vs-formula so a stored OVR computed differently (it runs ~3-4 above the
     // formula) can't inflate every player's delta; projected = stored base + that delta.
     const overallActual = baseline?.ov ?? p.overall ?? calculateSimonTOverall(actual);
-    const overallDelta = calculateSimonTOverall(projected) - calculateSimonTOverall(actual);
+    const overallDelta = noData ? 0 : calculateSimonTOverall(projected) - calculateSimonTOverall(actual);
     const overallProjected = overallActual + overallDelta;
 
     const liveRating: SkaterLiveRatingBlob = {
       classification: e.classGroup,
-      status: e.isNhl ? `NHL rule: latest=${e.nhlGpLatest}, prev=${e.nhlGpPrevious}` : `AHL / Farm: latest=${e.ahlGpLatest}, prev=${e.ahlGpPrevious}`,
+      status: noData ? "No data" : e.isNhl ? `NHL rule: latest=${e.nhlGpLatest}, prev=${e.nhlGpPrevious}` : `AHL / Farm: latest=${e.ahlGpLatest}, prev=${e.ahlGpPrevious}`,
+      ...(noData ? {
+        noData: true,
+        note: `Žiadny zápas v sezóne 2026-27 (NHL ani AHL) — nie sú dáta, parametre sa nepočítajú. ${(p.age ?? 99) <= rfaMaxAge
+          ? `RFA vek (${rfaMaxAge} a menej): ak mu končí zmluva, presunie sa do prospektov.`
+          : "UFA vek: ak mu končí zmluva, bude vymazaný."}`,
+      } : {}),
       nhlGpLatest: e.nhlGpLatest,
       nhlGpPrevious: e.nhlGpPrevious,
       ahlGpLatest: e.ahlGpLatest,

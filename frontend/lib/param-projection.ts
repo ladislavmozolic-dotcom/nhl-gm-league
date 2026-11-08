@@ -141,6 +141,8 @@ export type ProjSkater = {
   overallProjected?: number | null;
   classification?: "NHL" | "AHL/FARM" | null;
   statusText?: string | null;
+  noData?: boolean;
+  noteText?: string | null;
   gp: number;
   missedPenalty: number;
   actual: Record<SkaterParamKey, number | null>;
@@ -223,6 +225,8 @@ export async function projectAllSkaters(): Promise<{ rows: ProjSkater[]; active:
         overallProjected: live.overallProjected ?? p.overall,
         classification: live.classification ?? null,
         statusText: live.status ?? null,
+        noData: live.noData === true,
+        noteText: live.note ?? null,
         gp,
         missedPenalty: 0,
         actual: live.actual,
