@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { SKATER_FIELDS } from "@/lib/skater-fields";
 import { computeContractExpiry } from "@/lib/finance";
+import { getLeagueDate } from "@/lib/calendar-server";
+import { ageOnDate } from "@/lib/world-scouting";
 
 const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
@@ -38,7 +40,7 @@ export async function createPlayer(formData: FormData) {
     teamId, rosterType: str("rosterType") ?? "NHL",
     nationality: str("nationality"), shoots: str("shoots"),
     height: heightCm ? `${heightCm} cm` : null, weight: num("weightKg"),
-    birthDate: str("birthDate"), number: num("number"),
+    birthDate: str("birthDate"), age: ageOnDate(str("birthDate"), await getLeagueDate()), number: num("number"),
     capHit, contractYears, contractExpiry: contractYears ? computeContractExpiry(contractYears) : null, contractType,
     ahlSalary: null,
     contractText: capHit ? `${capHit.toLocaleString("en-US")}$ / ${contractYears ?? 0}yr${contractYears === 1 ? "" : "s"}` : null,

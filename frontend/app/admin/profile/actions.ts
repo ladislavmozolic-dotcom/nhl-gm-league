@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cleanName } from "@/lib/playerName";
+import { getLeagueDate } from "@/lib/calendar-server";
+import { ageOnDate } from "@/lib/world-scouting";
 
 export type FoundProfilePlayer = {
   id: number; name: string; teamName: string | null; isGoalie: boolean;
@@ -40,10 +42,14 @@ export type ProfileValues = {
 /** Save a player's bio/profile fields. */
 export async function savePlayerProfile(id: number, v: ProfileValues) {
   if (!(await isAdmin())) throw new Error("Only a league admin can manage profile.");
+  // Player.age is a stored column (only the daily rollover refreshes it), so re-derive it here;
+  // an unparseable/empty date leaves the old age alone.
+  const age = ageOnDate(v.birthDate || null, await getLeagueDate());
   await prisma.player.update({
     where: { id },
     data: {
       birthDate: v.birthDate || null,
+      ...(age != null ? { age } : {}),
       birthPlace: v.birthPlace?.trim() || null,
       nationality: v.nationality?.trim().toUpperCase() || null,
       height: v.height?.trim() || null,
