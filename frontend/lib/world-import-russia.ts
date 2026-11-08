@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { epSearchName } from "@/lib/playerName";
-import { resolveWorldPlayer } from "@/lib/world-player-identity";
+import { resolveWorldPlayer, upsertWorldTeamByName } from "@/lib/world-player-identity";
 import { scrapeEpPlayer, mapEpLeagueToCode } from "@/lib/ep-scraper";
 
 const norm = (s: string) =>
@@ -321,11 +321,7 @@ export async function importRussianProspects() {
 
       const teamName = s.teamName ?? "Unknown Club";
       const teamSlug = norm(teamName).replace(/ /g, "-");
-      const team = await prisma.worldTeam.upsert({
-        where: { leagueId_slug: { leagueId: targetLeague.id, slug: teamSlug } },
-        update: { name: teamName },
-        create: { leagueId: targetLeague.id, slug: teamSlug, name: teamName },
-      });
+      const team = await upsertWorldTeamByName(targetLeague.id, teamSlug, teamName);
 
       const { player } = await resolveWorldPlayer({
         provider: "ep-scraper",
@@ -526,11 +522,7 @@ export async function importRussianProspects() {
             });
             const epTeamName = s.teamName ?? "Unknown Club";
             const epTeamSlug = norm(epTeamName).replace(/ /g, "-");
-            const epTeam = await prisma.worldTeam.upsert({
-              where: { leagueId_slug: { leagueId: epLeague.id, slug: epTeamSlug } },
-              update: { name: epTeamName },
-              create: { leagueId: epLeague.id, slug: epTeamSlug, name: epTeamName },
-            });
+            const epTeam = await upsertWorldTeamByName(epLeague.id, epTeamSlug, epTeamName);
             await prisma.worldPlayerSeasonStat.upsert({
               where: { playerId_leagueId_season: { playerId: player.id, leagueId: epLeague.id, season: seasonLabel } },
               update: { teamId: epTeam.id, isGoalie, gamesPlayed: s.gp, goals: s.g, assists: s.a, points: s.pts, plusMinus: s.pm, penaltyMinutes: s.pim, wins: isGoalie ? s.w : null, savePercentage: isGoalie ? s.svp : null, goalsAgainstAverage: isGoalie ? s.gaa : null, shutouts: isGoalie ? s.so : null, source: "ep-scraper", syncedAt: new Date() },

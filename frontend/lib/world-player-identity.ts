@@ -102,3 +102,12 @@ export async function reconcileAllProspects() {
 
   return { reconciled: linkedCount };
 }
+
+/** Team for an importer that only knows the club NAME (NHL-profile / EliteProspects): reuse the league's
+ * existing club of that name instead of upserting on a name-derived slug — the league feeds use their own
+ * slugs ("mh", "Boston-University"), so a slug-only upsert minted a second, stat-less copy of the same club. */
+export async function upsertWorldTeamByName(leagueId: number, slug: string, name: string) {
+  const existing = await prisma.worldTeam.findFirst({ where: { leagueId, name: { equals: name, mode: "insensitive" } }, orderBy: { id: "asc" } });
+  if (existing) return existing;
+  return prisma.worldTeam.upsert({ where: { leagueId_slug: { leagueId, slug } }, update: { name }, create: { leagueId, slug, name } });
+}
