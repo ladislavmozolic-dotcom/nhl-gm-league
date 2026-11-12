@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { payWeeklyPicksWinners, paySeasonTop3, getBank, postEntry, moveTeamBank, enforceLeagueDay, recomputeCapPenalties } from "@/lib/league-bank-server";
+import { payWeeklyPicksWinners, payMonthlyPicksWinners, paySeasonTop3, getBank, postEntry, moveTeamBank, enforceLeagueDay, recomputeCapPenalties } from "@/lib/league-bank-server";
 import { CURRENT_SEASON_START } from "@/lib/finance";
 
 async function guard() {
@@ -109,3 +109,15 @@ export async function payPicksSeason(fd: FormData) {
   await paySeasonTop3(ids);
   done();
 }
+
+export async function payPicksMonth(fd: FormData) {
+  await guard();
+  const month = String(fd.get("month") ?? "").trim();
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("Month = YYYY-MM (e.g. 2026-10)");
+  const res = await payMonthlyPicksWinners(month);
+  revalidatePath("/league/picks");
+  revalidatePath("/draft/room");
+  done();
+  return res;
+}
+

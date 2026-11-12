@@ -1713,6 +1713,38 @@ export default function GamePicksView({
             </div>
           </div>
 
+          {selectedMonth !== "all" && (() => {
+            const sorted = leaderboard
+              .map((p) => ({ p, pts: (p.monthlyPoints as Record<string, number>)?.[selectedMonth] || 0 }))
+              .sort((a, b) => b.pts - a.pts);
+            const winner = sorted[0];
+            const nowKey = new Date().toISOString().slice(0, 7);
+            const isFinished = selectedMonth < nowKey;
+            if (!winner || winner.pts <= 0) return null;
+            const gmTitle = winner.p.team?.gmNickname || winner.p.team?.gm || winner.p.team?.name;
+            return (
+              <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-indigo-500/10 to-slate-900 border border-amber-500/30 flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🏆</span>
+                  <div>
+                    <div className="text-xs uppercase tracking-wider font-bold text-amber-400">
+                      {isFinished ? (isEn ? "Monthly Champion" : "Mesačný šampión") : (isEn ? "Current Leader of the Month" : "Priebežný líder mesiaca")}
+                    </div>
+                    <div className="text-sm font-extrabold text-white">
+                      {gmTitle} ({winner.p.team?.code}) — <span className="text-amber-300 font-mono">{winner.pts} {isEn ? "pts" : "b"}</span>
+                    </div>
+                  </div>
+                </div>
+                {isFinished && (
+                  <div className="flex items-center gap-2 text-xs text-amber-200/90 bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20">
+                    <span>🎟️</span>
+                    <span>{isEn ? "Awarded: Round 8 Draft Pick +10 pts" : "Odmena: Entry Draft Pick v 8. kole + 10 bodov"}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60 shadow-xl">
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-slate-900/90 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
@@ -1749,7 +1781,7 @@ export default function GamePicksView({
                       const isMe = viewerTeam && prof.teamId === viewerTeam.id;
                       const displayPts =
                         selectedMonth === "all"
-                          ? prof.totalPoints
+                           ? prof.totalPoints
                           : (prof.monthlyPoints as Record<string, number>)?.[selectedMonth] || 0;
 
                       return (
@@ -1770,8 +1802,13 @@ export default function GamePicksView({
                                 </div>
                               )}
                               <div>
-                                <div className="font-bold text-white">
-                                  {prof.team?.gmNickname || prof.team?.gm || prof.team?.name}
+                                <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
+                                  <span>{prof.team?.gmNickname || prof.team?.gm || prof.team?.name}</span>
+                                  {Array.isArray(prof.badges) && (prof.badges as any[]).map((b: any, bIdx: number) => (
+                                    <span key={bIdx} title={b.title ?? "Badge"} className="text-xs inline-block cursor-help">
+                                      🥇
+                                    </span>
+                                  ))}
                                 </div>
                                 <div className="text-[10px] text-slate-400">{prof.team?.name}</div>
                               </div>

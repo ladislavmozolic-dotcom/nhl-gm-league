@@ -266,7 +266,7 @@ export async function payWeeklyPicksWinners(weekKey: string): Promise<{ paid: st
 }
 
 /** Called every cron tick: from 09:00 pays each completed week (up to yesterday's) that hasn't been paid yet. */
-export async function payPicksIfDue(now: Date, hour: number): Promise<{ ran: boolean; weeks?: string[]; reason?: string }> {
+export async function payPicksIfDue(now: Date, hour: number): Promise<{ ran: boolean; weeks?: string[]; months?: string[]; reason?: string }> {
   const bank = await getBank();
   if (!bank.autoPickPayouts) return { ran: false, reason: "auto payouts off" };
   if (hour < 9) return { ran: false, reason: "before 09:00" };
@@ -278,7 +278,158 @@ export async function payPicksIfDue(now: Date, hour: number): Promise<{ ran: boo
   const sorted = [...weeks].sort();
   for (const w of sorted) await payWeeklyPicksWinners(w);
   if (sorted.length) await prisma.leagueBank.update({ where: { id: 1 }, data: { lastPickWeekPaid: sorted[sorted.length - 1] } });
-  return { ran: true, weeks: sorted };
+  const monthlyRes = await payMonthlyPicksIfDue(now);
+  return { ran: true, weeks: sorted, months: monthlyRes.months };
+}
+
+function formatMonthName(monthKey: string): string {
+  const [y, m] = monthKey.split("-");
+  const months: Record<string, string> = {
+    "01": "Január", "02": "Február", "03": "Marec", "04": "Apríl",
+    "05": "Máj", "06": "Jún", "07": "Júl", "08": "August",
+    "09": "September", "10": "Október", "11": "November", "12": "December",
+  };
+  return `${months[m] ?? m} ${y}`;
+}
+
+/**
+ * Award the Monthly Champion of Game Picks for a finished calendar month (e.g. "2026-10").
+ * Rewards per League Rule 17:
+ *  - Bonus Entry Draft Pick in Round 8 (or Round 9 if Round 8 has reached 32 capacity)
+ *  - +10 bonus points to GamePicksProfile.totalPoints
+ *  - Profile badge 🥇 Monthly Champion
+ *  - DM notification to the winning GM
+ *  - League transaction log
+ * Idempotent per month + club via postEntry dedupeKey `PICKS_MONTH:${monthKey}:${teamId}`.
+ */
+export async function payMonthlyPicksWinners(monthKey: string): Promise<{ winners: string[]; month: string }> {
+  const profiles = await prisma.gamePicksProfile.findMany({
+    where: { season: PICKS_SEASON, league: "NHL" },
+    include: { team: { select: { id: true, name: true, code: true, gm: true, gmNickname: true } } },
+  });
+  const pts = profiles
+    .map((p) => ({
+      profileId: p.id,
+      teamId: p.teamId,
+      team: p.team,
+      totalPoints: p.totalPoints,
+      badges: (p.badges as Array<{ id: string; title: string; month?: string; date?: string }> | null) ?? [],
+      pts: Number((p.monthlyPoints as Record<string, number> | null)?.[monthKey] ?? 0),
+    }))
+    .filter((x) => x.pts > 0);
+
+  if (!pts.length) return { winners: [], month: monthKey };
+  const top = Math.max(...pts.map((x) => x.pts));
+  const topWinners = pts.filter((x) => x.pts === top);
+  const winners: string[] = [];
+  const monthLabel = formatMonthName(monthKey);
+
+  const { currentDraftYear } = await import("./draft-class-import");
+  const draftYear = await currentDraftYear();
+  const cfg = await prisma.leagueConfig.findUnique({ where: { id: 1 }, select: { rosterMode: true } });
+  const source = cfg?.rosterMode === "real" ? "real" : "profinhl";
+
+  for (const w of topWinners) {
+    const dedupeKey = `PICKS_MONTH:${monthKey}:${w.teamId}`;
+    const ok = await postEntry({
+      kind: "AWARD_MONTHLY_PICK",
+      amount: 0,
+      teamId: w.teamId,
+      note: `Game Picks — Monthly Champion ${monthLabel} (${top} pts)`,
+      dedupeKey,
+    });
+    if (!ok) continue; // Already awarded
+
+    // 1. Determine target draft round (Round 8, or Round 9 if Round 8 is full with 32 picks)
+    const existingBonusRound8 = await prisma.draftBonusPick.count({
+      where: { year: draftYear, round: 8, ...(source === "real" ? { source: "real" } : { OR: [{ source: null }, { source: "profinhl" }] }) },
+    });
+    const targetRound = existingBonusRound8 >= 32 ? 9 : 8;
+
+    // 2. Create DraftBonusPick
+    await prisma.draftBonusPick.create({
+      data: {
+        year: draftYear,
+        round: targetRound,
+        teamId: w.teamId,
+        reason: `Mesačný šampión tipovačky — ${monthLabel}`.slice(0, 120),
+        source,
+      },
+    });
+
+    // 3. Add +10 bonus points and badge to GamePicksProfile
+    const badgeId = `monthly_champion_${monthKey.replace("-", "_")}`;
+    const newBadge = {
+      id: badgeId,
+      title: `Monthly Champion (${monthLabel})`,
+      month: monthKey,
+      date: new Date().toISOString(),
+    };
+    const hasBadge = w.badges.some((b) => b.id === badgeId);
+    const updatedBadges = hasBadge ? w.badges : [...w.badges, newBadge];
+
+    await prisma.gamePicksProfile.update({
+      where: { id: w.profileId },
+      data: {
+        totalPoints: { increment: 10 },
+        badges: updatedBadges,
+      },
+    });
+
+    // 4. Send DM to GM
+    await prisma.dmMessage.create({
+      data: {
+        fromTeamId: w.teamId,
+        toTeamId: w.teamId,
+        body: `🏆 Tipovačka: Stali ste sa mesačným šampiónom za ${monthLabel} (${top} b)! Získavate Entry Draft Pick v ${targetRound}. kole draftu ${draftYear}, +10 bonusových bodov do celkového poradia a odznak 🥇 Monthly Champion.`,
+        tradeUrl: "/draft/room",
+      },
+    }).catch(() => {});
+
+    // 5. Create Transaction announcement
+    const gmName = w.team?.gmNickname || w.team?.gm || w.team?.name || "Klub";
+    await prisma.transaction.create({
+      data: {
+        type: "OTHER",
+        teamId: w.teamId,
+        message: `🏆 Tipovačka — Mesačný šampión (${monthLabel}): ${w.team?.code ?? ""} (${gmName}) ovládol mesiac s ${top} bodmi a získava bonusový Draft Pick v ${targetRound}. kole draftu ${draftYear} a +10 bonusových bodov!`,
+      },
+    }).catch(() => {});
+
+    winners.push(w.team?.name ?? String(w.teamId));
+  }
+
+  return { winners, month: monthKey };
+}
+
+/**
+ * Called on every cron tick (alongside payPicksIfDue): checks completed months
+ * (months strictly earlier than current calendar month) and awards Monthly Champions.
+ */
+export async function payMonthlyPicksIfDue(now: Date): Promise<{ ran: boolean; months?: string[]; reason?: string }> {
+  const bank = await getBank();
+  if (!bank.autoPickPayouts) return { ran: false, reason: "auto payouts off" };
+  const currentMonthKey = now.toISOString().slice(0, 7); // e.g. "2026-11"
+  const profiles = await prisma.gamePicksProfile.findMany({
+    where: { season: PICKS_SEASON, league: "NHL" },
+    select: { monthlyPoints: true },
+  });
+  const pastMonths = new Set<string>();
+  for (const p of profiles) {
+    const mp = (p.monthlyPoints as Record<string, number> | null) ?? {};
+    for (const m of Object.keys(mp)) {
+      if (m < currentMonthKey && m >= "2026-10" && m <= "2027-04") {
+        pastMonths.add(m);
+      }
+    }
+  }
+  const sortedMonths = [...pastMonths].sort();
+  const processed: string[] = [];
+  for (const m of sortedMonths) {
+    const res = await payMonthlyPicksWinners(m);
+    if (res.winners.length > 0) processed.push(m);
+  }
+  return { ran: true, months: processed };
 }
 
 /** Season-end TOP 3 (Game Picks + Season Picks combined — the commissioner picks the clubs). Idempotent per place. */
