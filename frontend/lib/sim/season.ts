@@ -332,6 +332,14 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     }
   }
   const cache = new Map<number, SeasonTeam | null>();
+  // A team dropped from `cache` (injury -> reload before its next game) still holds the evolved CON / morale /
+  // chemistry of the games it already played, so it is kept here for the end-of-run persist; without it a club
+  // with an injury that night silently lost its chemistry growth and its players'/goalies' CON + morale.
+  const evicted = new Map<number, SeasonTeam>();
+  const evict = (id: number) => { const t = cache.get(id); if (t) evicted.set(id, t); cache.delete(id); };
+  // evolved line chemistry per club, so a reloaded roster doesn't restart from the DB copy
+  const chemState = new Map<number, Record<string, number>>();
+  const injuredIds = new Set<number>(); // hurt tonight: his CON was just set from the injury, the persist must not overwrite it
   // Season-long MORALE state that must SURVIVE a mid-season roster reload
   // (injuries force a reload, which otherwise re-reads stale morale from the DB
   // and wipes the in-memory evolution — flattening morale to the base). NB: CON is
@@ -355,6 +363,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     try {
       const t = await loadSimTeam(id, undefined, { excludeIds: callUps, chemBase: settings.chemistryBase, offPos: { wing: settings.offPosWingPct, center: settings.offPosCenterPct, def: settings.offPosDefPct, chemCap: settings.offPosChemCap } });
       applyPersistentState(t); // restore evolved morale/CON/drought after a reload
+      if (chemState.has(id)) t.chemistry = { ...chemState.get(id)! };
       for (const b of t.borrowedIds) callUps.add(b);
       const own = await prisma.team.findUnique({ where: { id }, select: { passwordHash: true, parentTeam: { select: { passwordHash: true } } } });
       (t as SeasonTeam).humanGm = !!(own?.passwordHash || own?.parentTeam?.passwordHash);
@@ -399,7 +408,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     await prisma.player.updateMany({ where: { injuryDaysLeft: { lt: 0 } }, data: { injuryDaysLeft: 0 } });
     await updateInjuryCon(); // injured skaters' CON tracks days-to-go; returners come back at 95
     // rosters of previously-injured teams may have changed (returns) -> reload
-    for (const tid of injuredTeams) cache.delete(tid);
+    for (const tid of injuredTeams) evict(tid);
     const stillHurt = await prisma.player.findMany({
       where: { injuryDaysLeft: { gt: 0 }, team: { league: "NHL" } },
       select: { teamId: true },
@@ -500,6 +509,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     // chemistry grows for intact units, drops for units broken by injury/call-up
     evolveChem(home, settings);
     evolveChem(away, settings);
+    chemState.set(home.id, home.chemistry); chemState.set(away.id, away.chemistry);
 
     // morale: winners rise, losers fall (producers a touch more)
     const homeWon = result.winner === home.id;
@@ -546,7 +556,8 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
           condition: injuryConTarget(inj.days),
         },
       });
-      cache.delete(inj.teamId);
+      injuredIds.add(inj.playerId);
+      evict(inj.teamId);
       injuredTeams.add(inj.teamId);
     }
 
@@ -599,14 +610,14 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   // thrown away the moment it's saved.
   const con2 = (v: number) => Math.round(v * 100) / 100;
   const updates: Promise<unknown>[] = [];
-  for (const team of cache.values()) {
+  for (const team of new Map<number, SeasonTeam | null>([...evicted, ...cache]).values()) {
     for (const g of team?.goalies ?? []) {
       const gm = Math.round(moraleState.get(g.id) ?? g.morale);
-      updates.push(prisma.player.update({ where: { id: g.id }, data: { condition: con2(g.con), morale: gm, mo: gm } }));
+      updates.push(prisma.player.update({ where: { id: g.id }, data: { ...(injuredIds.has(g.id) ? {} : { condition: con2(g.con) }), morale: gm, mo: gm } }));
     }
     for (const s of [...(team?.forwards ?? []), ...(team?.defense ?? [])]) {
       const sm = Math.round(moraleState.get(s.id) ?? s.morale);
-      updates.push(prisma.player.update({ where: { id: s.id }, data: { condition: con2(s.con), morale: sm, mo: sm } }));
+      updates.push(prisma.player.update({ where: { id: s.id }, data: { ...(injuredIds.has(s.id) ? {} : { condition: con2(s.con) }), morale: sm, mo: sm } }));
     }
     // persist evolved line chemistry back to the team's lines
     if (team && team.units.length)
