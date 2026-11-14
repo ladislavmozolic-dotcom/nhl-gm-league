@@ -7,7 +7,8 @@ import { getLeagueClock } from "./calendar-server";
 import { loadLeagueCap } from "./free-agency-server";
 import { loadSettings } from "./sim/settings";
 import { capPenaltyFor, capFloorPenaltyFor } from "./cap-penalty";
-import { capCeilingForPhase, ltirRelief, deadMoneyForYear, liveCapHit, CURRENT_SEASON_START, DEFAULT_PROJECTED_CAPS } from "./finance";
+import { capCeilingForPhase, ltirRelief, deadMoneyForYear, liveCapHit, CURRENT_SEASON_START, DEFAULT_PROJECTED_CAPS, LTIR_CON } from "./finance";
+import { injuryConTarget } from "./sim/season";
 
 export type CapStatus = {
   committed: number; ltir: number; ceiling: number; space: number;
@@ -103,11 +104,19 @@ export async function teamCapCommitted(teamId: number): Promise<{ totalSalaries:
   return { totalSalaries, retainsBuyouts, committed: totalSalaries + retainsBuyouts };
 }
 
+export type CapStatusOpts = {
+  /** When true (daily enforcement), skaters who crossed 90% CON in today's sim tick
+   *  (their CON was < 90 before today's 1-day heal) retain LTIR relief for today's check,
+   *  giving the GM until the next simulation day to adjust their roster. */
+  asOfGame?: boolean;
+  injuredToday?: Set<number>;
+};
+
 /** Cap status for one club. Pass `phaseOverride` (e.g. "regular") to test
  *  compliance against a different phase — used for the opening-day check. */
-export async function teamCapStatus(teamId: number, phaseOverride?: string): Promise<CapStatus> {
+export async function teamCapStatus(teamId: number, phaseOverride?: string, opts?: CapStatusOpts): Promise<CapStatus> {
   const [roster, capInfo, cap, clock, settings, retention, retainedIn, capPenalty, capFloorPenalty] = await Promise.all([
-    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true, contractYears: true } }),
+    prisma.player.findMany({ where: { teamId, rosterType: "NHL" }, select: { id: true, capHit: true, retainedSalary: true, injuryDaysLeft: true, condition: true, isGoalie: true, contractYears: true } }),
     teamCapCommitted(teamId),
     loadLeagueCap(),
     getLeagueClock(),
@@ -122,8 +131,19 @@ export async function teamCapStatus(teamId: number, phaseOverride?: string): Pro
   // LTIR relief is based on what this club actually carries for the injured
   // player (net of any retention it benefits from), matching `committed` above —
   // and, same as there, a contract-less player's frozen capHit is 0, not stale.
-  const ltirRoster = roster.map((p) => ({ ...p, capHit: Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) }));
-  const ltir = ltirRelief(ltirRoster);
+  const ltirRoster = roster.map((p) => {
+    let qualifies = !p.isGoalie && (p.injuryDaysLeft ?? 0) > 0 && (p.condition ?? 100) < LTIR_CON;
+    if (!qualifies && opts?.asOfGame && !p.isGoalie && (p.injuryDaysLeft ?? 0) > 0 && !opts.injuredToday?.has(p.id)) {
+      // Player crossed 90% CON during today's simulation healing (was < LTIR_CON before the 1-day heal).
+      // Throughout the day as of the game, he was on LTIR, so his LTIR relief is preserved for today's post-sim check.
+      const conBefore = injuryConTarget((p.injuryDaysLeft ?? 0) + 1);
+      if (conBefore < LTIR_CON) {
+        qualifies = true;
+      }
+    }
+    return { ...p, capHit: qualifies ? Math.max(0, liveCapHit(p) - (p.retainedSalary ?? 0)) : 0 };
+  });
+  const ltir = ltirRoster.reduce((s, p) => s + (p.capHit ?? 0), 0);
   const ceiling = capCeilingForPhase(cap.upper - capPenalty, phase) + ltir;
   const floor = cap.lower + capFloorPenalty;
   return {

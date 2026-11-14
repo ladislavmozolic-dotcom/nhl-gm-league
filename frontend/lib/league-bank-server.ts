@@ -16,7 +16,9 @@ import { dressGroup, lineSideMap } from "./dress-side";
 import { DRESS_TARGET, ROSTER_LIMITS } from "./roster-rules";
 import { teamCapStatus } from "./cap";
 import { getLeagueClock } from "./calendar-server";
-import { CURRENT_SEASON_START, money } from "./finance";
+import { CURRENT_SEASON_START, money, LTIR_CON } from "./finance";
+import { cleanName } from "./playerName";
+import { injuryConTarget } from "./sim/season";
 
 export async function getBank() {
   return prisma.leagueBank.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
@@ -212,8 +214,40 @@ export async function enforceLeagueDay(day: string, opts: { force?: boolean } = 
     if (playedNhl && problems.nhl && await charge("FINE_NHL_ROSTER", bank.nhlRosterFine, `NHL roster not compliant on ${day}: ${problems.nhl}`)) rosterFines++;
     if (playedAhl && problems.ahl && await charge("FINE_AHL_ROSTER", bank.ahlRosterFine, `AHL roster not compliant on ${day}: ${problems.ahl}`)) rosterFines++;
 
-    const cap = await teamCapStatus(t.id);
+    const cap = await teamCapStatus(t.id, undefined, { asOfGame: true, injuredToday: hurtToday });
     if (!playedNhl) continue; // cap/floor fines also need an NHL game that day
+
+    // If club is compliant as of today's game thanks to the 1-day grace period for a player
+    // who crossed 90% CON during today's simulation healing, warn the GM so they can adjust
+    // their roster before the next simulation day!
+    if (cap.overBy <= 0) {
+      const strictCap = await teamCapStatus(t.id);
+      if (strictCap.overBy > 0) {
+        const nhlInjured = await prisma.player.findMany({
+          where: { teamId: t.id, rosterType: "NHL", isGoalie: false, injuryDaysLeft: { gt: 0 } },
+          select: { id: true, name: true, condition: true, injuryDaysLeft: true },
+        });
+        const crossedToday = nhlInjured.filter(
+          (p) => !hurtToday.has(p.id) && (p.condition ?? 100) >= LTIR_CON && injuryConTarget(p.injuryDaysLeft + 1) < LTIR_CON
+        );
+        for (const p of crossedToday) {
+          const pName = cleanName(p.name);
+          await notifyClub(
+            t.id,
+            t.slug,
+            `⚠️ ${pName} prekročil hranicu 90 % kondície (${p.condition} %) a od ďalšej simulácie už nebude poskytovať LTIR úľavu. Váš tím prekračuje platový strop o ${money(strictCap.overBy)}. Máte čas do ďalšej simulácie (20:30) na úpravu zostavy na stránke Roster Moves.`
+          );
+          await prisma.transaction.create({
+            data: {
+              type: "CAP_WARNING",
+              message: `⚠️ CAP UPOZORNENIE: ${t.name} (${pName} opustil LTIR) prekračuje platový strop o ${money(strictCap.overBy)}. Klub má čas do ďalšej simulácie na úpravu zostavy pod platový strop.`,
+              teamId: t.id,
+            },
+          });
+        }
+      }
+    }
+
     if (cap.overBy > 0) {
       const over = Math.round(cap.overBy);
       const fineAmount = bank.capFinePerDay ?? 200000;
