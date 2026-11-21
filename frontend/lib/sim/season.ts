@@ -129,12 +129,13 @@ export function evolveChem(team: SimTeam, cfg: EngineSettings) {
 
 // ---- morale (STHS "MO"): team result, personal production, scoring droughts and
 // ice-time-vs-role all push it; mean-reverts to base so the league stays calibrated.
-/** Mean-reversion strength per game. A loss by a club riding high used to add the full pull-down on top of the −2
- *  (a 64-morale skater lost ~4 points per defeat, while a win gave only ~+0.3); after a loss that drag is now
- *  weaker (0.05 vs 0.12), so a defeat costs ~3 instead of ~4. Wins and low-morale players are unchanged. */
-const MORALE_PULL = 0.12, MORALE_PULL_AFTER_LOSS_ABOVE_BASE = 0.05;
+/** Mean-reversion strength per game. Above base the pull is softened both ways: it used to eat most of a win
+ *  (a 64-morale skater gained only ~+0.3 for a win but lost ~4 for a defeat). Now a win above base is pulled
+ *  back by 0.09 (~+0.7) and a loss by 0.05 (~-2.7). At or below base the old 0.12 keeps pulling up to 50. */
+const MORALE_PULL = 0.12, MORALE_PULL_WIN_ABOVE_BASE = 0.09, MORALE_PULL_LOSS_ABOVE_BASE = 0.05;
 function moralePull(won: boolean, morale: number, base: number): number {
-  return !won && morale > base ? MORALE_PULL_AFTER_LOSS_ABOVE_BASE : MORALE_PULL;
+  if (morale <= base) return MORALE_PULL;
+  return won ? MORALE_PULL_WIN_ABOVE_BASE : MORALE_PULL_LOSS_ABOVE_BASE;
 }
 
 function evolveMorale(team: SimTeam, box: TeamBox, won: boolean, cfg: EngineSettings) {
