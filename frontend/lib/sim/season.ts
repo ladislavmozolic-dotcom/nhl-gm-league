@@ -26,7 +26,7 @@ import type { TeamLinesData } from "./lines-core";
 
 type SeasonTeam = SimTeam & { linesUsed: TeamLinesData; /** a registered human GM runs this club (AHL farm → its parent club's GM) */ humanGm?: boolean };
 
-const DU_HIGH = 95; // goalie durability at/above which CON recovers +2/day instead of +1 (only the true iron men — ~11 of 70)
+const DU_HIGH = 95; // goalie durability at/above which CON recovers at settings.conRecoveryHighDu per rest day instead of settings.conRecovery (only the true iron men — ~11 of 70)
 export const PLAY_CON = 95; // a skater must be at CON >= 95 to dress (below = still hurt / rusty)
 export const GOALIE_PLAY_CON = 96; // a goalie must be at CON >= 96 to start (a skater only needs PLAY_CON 95)
 const PICKED_REST_CON = 92; // the GM's chosen #1 is spelled below this CON
@@ -214,16 +214,10 @@ function chooseStarter(team: SeasonTeam, prevRound: number, state: Map<number, G
   // b2bFatigue penalty) and won 55-60 games. The auto-rotation below then decides,
   // and it still favours him by OVERALL on normal nights.
   const picked = team.goalies.find((g) => g.id === team.linesUsed?.situations?.others?.starter);
-  // A human GM decides who is in net. The CON / workload rotation below is for AI-run clubs; his starter
-  // is kept out when genuinely unfit to dress (below GOALIE_PLAY_CON) or on the second night of a back-to-back.
-  if (team.humanGm && picked && picked.con >= GOALIE_PLAY_CON) {
-    // …but even a GM's #1 sits the second night of a back-to-back when a fit backup exists (he used to start every
-    // game: Sorokin 24 of 24). Nobody else's workload is touched.
-    const backup = (state.get(picked.id)?.lastStartRound ?? -99) === prevRound
-      ? [...team.goalies].filter((g) => g.id !== picked.id && g.con >= GOALIE_PLAY_CON).sort((x, y) => y.overall - x.overall)[0]
-      : undefined;
-    return backup ?? picked;
-  }
+  // A human GM decides who is in net — full stop. No back-to-back / workload / CON-rest rotation overrides his
+  // pick (that rotation is for AI-run clubs); the only thing that keeps his starter out is being unfit to dress
+  // (below GOALIE_PLAY_CON). Resting him on a back-to-back is the GM's job — that is what CON is for.
+  if (team.humanGm && picked && picked.con >= GOALIE_PLAY_CON) return picked;
   if (picked && picked.con >= GOALIE_PLAY_CON) {
     const st = state.get(picked.id);
     const startedYesterday = (st?.lastStartRound ?? -99) === prevRound;
@@ -292,6 +286,9 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
 
   const settings = await loadSettings();
   const engineVersion = engineVersionFor(await activeSimEngine());
+  // goalie CON recovered per rest day (admin-tunable: Sim Settings → CON recovery); it is what makes a workhorse tire
+  // over a season, because a GM-picked starter plays whenever his CON is >= GOALIE_PLAY_CON
+  const GOALIE_REC = settings.conRecovery ?? 1, DU_HIGH_REC = settings.conRecoveryHighDu ?? 2;
 
   // Off-day CON recovery: top up every healthy player for the days elapsed since the
   // last games were played, BEFORE tonight's games. This runs even when you step one
@@ -316,8 +313,8 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       // handled by the game itself (the starter's conAfter etc.), so a starter never
       // gets a spurious rest-day bump on his own game day (which over-inflated CON).
       const goalieRec = restDays * 1;                                 // goalies +1/rest day …
-      // … or +2 for a goalie with DU >= DU_HIGH (same rule as the in-memory recovery below)
-      const goalieRecSql = `${goalieRec} * CASE WHEN COALESCE((SELECT r.du FROM "GoalieRating" r WHERE r."playerId" = "Player".id), 0) >= ${DU_HIGH} THEN 2 ELSE 1 END`;
+      // … or DU_HIGH_REC for a goalie with DU >= DU_HIGH (same rule as the in-memory recovery below)
+      const goalieRecSql = `${goalieRec} * CASE WHEN COALESCE((SELECT r.du FROM "GoalieRating" r WHERE r."playerId" = "Player".id), 0) >= ${DU_HIGH} THEN ${DU_HIGH_REC} ELSE ${GOALIE_REC} END`;
       const skaterRec = restDays * (settings.skaterConRecovery ?? 1);
       await prisma.$executeRawUnsafe(
         `UPDATE "Player" SET condition = LEAST(100, condition + CASE WHEN "isGoalie" THEN ${goalieRecSql} ELSE ${skaterRec} END) WHERE "injuryDaysLeft" <= 0 AND condition < 100 AND "teamId" NOT IN (${playingTeams.join(",")})`
@@ -336,7 +333,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
       if (lastDay != null) {
         const sea = season.replace(/'/g, "");
         const breakDays = Math.max(0, restDays - 1);
-        const perDay = `CASE WHEN COALESCE((SELECT r.du FROM "GoalieRating" r WHERE r."playerId" = "Player".id), 0) >= ${DU_HIGH} THEN 2 ELSE 1 END`;
+        const perDay = `CASE WHEN COALESCE((SELECT r.du FROM "GoalieRating" r WHERE r."playerId" = "Player".id), 0) >= ${DU_HIGH} THEN ${DU_HIGH_REC} ELSE ${GOALIE_REC} END`;
         const clubPlayedLast = `"teamId" IN (SELECT g."homeTeamId" FROM "Game" g WHERE g.season = '${sea}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL AND g.status = 'FINAL' UNION SELECT g."awayTeamId" FROM "Game" g WHERE g.season = '${sea}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL AND g.status = 'FINAL')`;
         const dressedLast = `id IN (SELECT gs."playerId" FROM "GoalieGameStat" gs JOIN "Game" g ON g.id = gs."gameId" WHERE g.season = '${sea}' AND g.round = ${Number(lastDay)} AND g."seriesId" IS NULL)`;
         await prisma.$executeRawUnsafe(
@@ -404,7 +401,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
   const recoverCon = (days: number) => {
     for (const team of cache.values()) {
       for (const g of team?.goalies ?? [])
-        g.con = Math.min(100, g.con + days * (g.du >= DU_HIGH ? 2 : 1));
+        g.con = Math.min(100, g.con + days * (g.du >= DU_HIGH ? DU_HIGH_REC : GOALIE_REC));
       // skaters recover post-game conditioning per rest day (admin-tunable)
       for (const s of [...(team?.forwards ?? []), ...(team?.defense ?? [])])
         s.con = Math.min(100, s.con + days * settings.skaterConRecovery);
@@ -505,7 +502,7 @@ export async function playScheduledGames(opts: PlayOptions = {}) {
     // record (conBefore → conAfter goes up, the way a starter's goes down), not added again next morning.
     for (const [box, team] of [[result.home, home], [result.away, away]] as const) {
       const bu = box.backupGoalie;
-      if (bu && !bu.started && team.backup && bu.id === team.backup.id) bu.conAfter = Math.min(100, bu.conBefore + (team.backup.du >= DU_HIGH ? 2 : 1));
+      if (bu && !bu.started && team.backup && bu.id === team.backup.id) bu.conAfter = Math.min(100, bu.conBefore + (team.backup.du >= DU_HIGH ? DU_HIGH_REC : GOALIE_REC));
     }
     await saveGameResult(result, {
       gameId: gm.id, season, gameDate: gm.gameDate ?? seasonDateFor(season, round),

@@ -307,7 +307,7 @@ export const DEFAULT_SETTINGS: EngineSettings = {
   specialHomeBonus: 3000000, specialAwayBonus: 1000000, globalSeriesBonus: 1500000,
   disciplineEnabled: true, disciplinePct: 100, retireMinGames: 300,
   rewardPlayoff: 8000000, rewardCup: 3000000, rewardAhlCup: 4000000, rewardAhlFinalist: 2000000,
-  duHighThreshold: 90, conRecovery: 1, conRecoveryHighDu: 2,
+  duHighThreshold: 90, conRecovery: 0.6, conRecoveryHighDu: 0.65,
   conSlope: 0.06, goalieFatiguePct: 3.5, b2bFatigue: 0.885,
   gameVariancePct: 108, nightSigmaGoalie: 0.11, nightSigmaOff: 0.07,
   parityPct: 100,
