@@ -152,6 +152,7 @@ export async function goalieTotals(season: string, league = "NHL", playoffs = fa
       shotsAgainst: true,
       saves: true,
       goalsAgainst: true,
+      shutout: true,
       decision: true,
       started: true,
       xga: true,
@@ -219,7 +220,7 @@ export async function goalieTotals(season: string, league = "NHL", playoffs = fa
     } else if (r.decision === "OTL") {
       a.otl++;
     }
-    if (r.goalsAgainst === 0) a.shutouts++;
+    if (r.shutout) a.shutouts++;
   }
   const [players, teams] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: [...acc.values()].map((a) => a.playerId) } }, select: { id: true, name: true, photoUrl: true, slug: true, teamId: true } }),

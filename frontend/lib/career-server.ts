@@ -36,13 +36,13 @@ export async function archiveSeasonStats(season: string, league = "NHL"): Promis
       skaters++;
     }
     // goalies (conditional counts → aggregate in JS)
-    const gr = await prisma.goalieGameStat.findMany({ where: { gameId: { in: ids }, started: true }, select: { playerId: true, teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true } });
+    const gr = await prisma.goalieGameStat.findMany({ where: { gameId: { in: ids }, started: true }, select: { playerId: true, teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, shutout: true, decision: true } });
     const gAgg = new Map<number, { teamId: number; gp: number; w: number; l: number; otl: number; so: number; sa: number; sv: number; ga: number }>();
     for (const r of gr) {
       const a = gAgg.get(r.playerId) ?? { teamId: r.teamId, gp: 0, w: 0, l: 0, otl: 0, so: 0, sa: 0, sv: 0, ga: 0 };
       a.gp++; a.sa += r.shotsAgainst; a.sv += r.saves; a.ga += r.goalsAgainst;
       if (r.decision === "W") a.w++; else if (r.decision === "OTL") a.otl++; else if (r.decision === "L") a.l++;
-      if (r.goalsAgainst === 0) a.so++;
+      if (r.shutout) a.so++;
       a.teamId = r.teamId;
       gAgg.set(r.playerId, a);
     }
@@ -160,13 +160,13 @@ async function liveSkater(playerId: number, season: string, league: string, isPl
   return groups.sort((x, y) => (x._min.gameId ?? 0) - (y._min.gameId ?? 0)).map((g) => ({ teamId: g.teamId, gp: g._count._all, goals: g._sum.goals ?? 0, assists: g._sum.assists ?? 0, points: g._sum.points ?? 0, shots: g._sum.shots ?? 0, pim: g._sum.pim ?? 0, plusMinus: g._sum.plusMinus ?? 0, hits: g._sum.hits ?? 0, blocks: g._sum.blocks ?? 0 }));
 }
 async function liveGoalie(playerId: number, season: string, league: string, isPlayoff: boolean) {
-  const rows = await prisma.goalieGameStat.findMany({ where: { playerId, started: true, game: { season, league, status: "FINAL", ...(isPlayoff ? { seriesId: { not: null } } : { seriesId: null }) } }, orderBy: { gameId: "asc" }, select: { teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true } });
+  const rows = await prisma.goalieGameStat.findMany({ where: { playerId, started: true, game: { season, league, status: "FINAL", ...(isPlayoff ? { seriesId: { not: null } } : { seriesId: null }) } }, orderBy: { gameId: "asc" }, select: { teamId: true, shotsAgainst: true, saves: true, goalsAgainst: true, shutout: true, decision: true } });
   const by = new Map<number, { teamId: number; gp: number; wins: number; losses: number; otl: number; shutouts: number; shotsAgainst: number; saves: number; goalsAgainst: number }>();
   for (const r of rows) {
     const e = by.get(r.teamId) ?? { teamId: r.teamId, gp: 0, wins: 0, losses: 0, otl: 0, shutouts: 0, shotsAgainst: 0, saves: 0, goalsAgainst: 0 };
     e.gp++; e.shotsAgainst += r.shotsAgainst; e.saves += r.saves; e.goalsAgainst += r.goalsAgainst;
     if (r.decision === "W") e.wins++; else if (r.decision === "OTL") e.otl++; else if (r.decision === "L") e.losses++;
-    if (r.goalsAgainst === 0) e.shutouts++;
+    if (r.shutout) e.shutouts++;
     by.set(r.teamId, e);
   }
   return [...by.values()]; // Map keeps first-appearance order (games are ordered oldest-first)
@@ -238,9 +238,9 @@ async function franchiseLeaders(teamId: number, league: string): Promise<Franchi
   if (gameIds.length) {
     const sg = await prisma.playerGameStat.groupBy({ by: ["playerId"], where: { teamId, gameId: { in: gameIds } }, _sum: { goals: true, assists: true, points: true }, _count: { _all: true } });
     for (const r of sg) skAdd(r.playerId, { gp: r._count._all, g: r._sum.goals ?? 0, a: r._sum.assists ?? 0, pts: r._sum.points ?? 0 });
-    const gg = await prisma.goalieGameStat.findMany({ where: { teamId, started: true, gameId: { in: gameIds } }, select: { playerId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true } });
+    const gg = await prisma.goalieGameStat.findMany({ where: { teamId, started: true, gameId: { in: gameIds } }, select: { playerId: true, shotsAgainst: true, saves: true, goalsAgainst: true, shutout: true, decision: true } });
     const liveGl = new Map<number, GlAcc>();
-    for (const r of gg) { const c = liveGl.get(r.playerId) ?? { gp: 0, w: 0, so: 0, sa: 0, sv: 0, ga: 0 }; c.gp++; c.sa += r.shotsAgainst; c.sv += r.saves; c.ga += r.goalsAgainst; if (r.decision === "W") c.w++; if (r.goalsAgainst === 0) c.so++; liveGl.set(r.playerId, c); }
+    for (const r of gg) { const c = liveGl.get(r.playerId) ?? { gp: 0, w: 0, so: 0, sa: 0, sv: 0, ga: 0 }; c.gp++; c.sa += r.shotsAgainst; c.sv += r.saves; c.ga += r.goalsAgainst; if (r.decision === "W") c.w++; if (r.shutout) c.so++; liveGl.set(r.playerId, c); }
     for (const [id, c] of liveGl) glAdd(id, c);
   }
 
@@ -279,7 +279,7 @@ export async function careerLeaderboard(league = "NHL", isPlayoff = false): Prom
       _sum: { goals: true, assists: true, points: true, shots: true, pim: true, plusMinus: true, ppGoals: true, shGoals: true, gwg: true, hits: true, blocks: true },
       _count: { _all: true },
     }),
-    prisma.goalieGameStat.findMany({ where: { started: true, game: gameFilter }, select: { playerId: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true } }),
+    prisma.goalieGameStat.findMany({ where: { started: true, game: gameFilter }, select: { playerId: true, shotsAgainst: true, saves: true, goalsAgainst: true, shutout: true, decision: true } }),
   ]);
 
   const sk = new Map<number, Omit<CareerSkaterTotal, "name" | "slug" | "photoUrl" | "position" | "teamId" | "teamCode" | "teamSlug" | "teamLogo" | "playerId">>();
@@ -308,7 +308,7 @@ export async function careerLeaderboard(league = "NHL", isPlayoff = false): Prom
     if (!liveSeen.has(g.playerId)) { liveSeen.add(g.playerId); r.seasons++; }
     r.gp++; r.shotsAgainst += g.shotsAgainst; r.saves += g.saves; r.goalsAgainst += g.goalsAgainst;
     if (g.decision === "W") r.wins++; else if (g.decision === "OTL") r.otl++; else if (g.decision === "L") r.losses++;
-    if (g.goalsAgainst === 0) r.shutouts++;
+    if (g.shutout) r.shutouts++;
   }
 
   const ids = [...new Set([...sk.keys(), ...gk.keys()])];

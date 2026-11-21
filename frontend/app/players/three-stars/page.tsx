@@ -22,7 +22,7 @@ export default async function ThreeStarsPage() {
     }),
     prisma.goalieGameStat.findMany({
       where: { game: GAME_FILTER },
-      select: { gameId: true, playerId: true, started: true, saves: true, shotsAgainst: true, goalsAgainst: true },
+      select: { gameId: true, playerId: true, started: true, saves: true, shotsAgainst: true, goalsAgainst: true, shutout: true },
     }),
   ]);
 
@@ -44,7 +44,7 @@ export default async function ThreeStarsPage() {
   for (const g of goalieStats) {
     if (!g.started || g.shotsAgainst < 15) continue;
     const savesAbove = g.saves - g.shotsAgainst * 0.915;
-    const shutout = g.goalsAgainst === 0 ? 2 : 0;
+    const shutout = g.shutout ? 2 : 0;
     const score = savesAbove * 3 + shutout;
     push(g.gameId, { playerId: g.playerId, score });
   }

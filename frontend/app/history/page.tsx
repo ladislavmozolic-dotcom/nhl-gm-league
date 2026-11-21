@@ -89,6 +89,7 @@ export default async function HistoryPage() {
         saves: true,
         decision: true,
         goalsAgainst: true,
+        shutout: true,
         game: { select: { league: true } },
       },
     }),
@@ -210,7 +211,7 @@ export default async function HistoryPage() {
       acc.saves += g.saves;
       acc.ga += g.goalsAgainst;
       if (g.decision === "W") acc.wins += 1;
-      if (g.goalsAgainst === 0) acc.shutouts += 1;
+      if (g.shutout) acc.shutouts += 1;
       if (g.teamId) acc.teamId = g.teamId;
     }
 

@@ -43,7 +43,7 @@ export async function computeResumes(where?: { retiredOnly?: boolean }): Promise
   // live active season (regular season)
   const liveGameIds = (await prisma.game.findMany({ where: { season: ACTIVE_SEASON, league: "NHL", status: "FINAL", seriesId: null }, select: { id: true } })).map((g) => g.id);
   const liveSk = liveGameIds.length ? await prisma.playerGameStat.groupBy({ by: ["playerId", "teamId"], where: { playerId: { in: ids }, gameId: { in: liveGameIds } }, _sum: { goals: true, assists: true, points: true }, _count: { _all: true } }) : [];
-  const liveGlRows = liveGameIds.length ? await prisma.goalieGameStat.findMany({ where: { playerId: { in: ids }, started: true, gameId: { in: liveGameIds } }, select: { playerId: true, teamId: true, decision: true, goalsAgainst: true, shotsAgainst: true, saves: true } }) : [];
+  const liveGlRows = liveGameIds.length ? await prisma.goalieGameStat.findMany({ where: { playerId: { in: ids }, started: true, gameId: { in: liveGameIds } }, select: { playerId: true, teamId: true, decision: true, goalsAgainst: true, shutout: true, shotsAgainst: true, saves: true } }) : [];
 
   // awards per player
   const awards = await prisma.seasonAward.findMany({ where: { OR: [{ playerId: { in: ids } }] }, select: { playerId: true, category: true, season: true, teamId: true } });
@@ -59,7 +59,7 @@ export async function computeResumes(where?: { retiredOnly?: boolean }): Promise
   for (const r of archGl) { if (!idSet.has(r.playerId)) continue; const x = mk(r.playerId); x.seasons.add(r.season); x.gp += r.gp; x.wins += r.wins; x.so += r.shutouts; x.sa += r.shotsAgainst; x.sv += r.saves; x.teamThisSeason.set(r.season, r.teamId); }
   for (const r of liveSk) { const x = mk(r.playerId); x.seasons.add(ACTIVE_SEASON); x.gp += r._count._all; x.g += r._sum.goals ?? 0; x.a += r._sum.assists ?? 0; x.p += r._sum.points ?? 0; x.peak = Math.max(x.peak, r._sum.points ?? 0); x.teamThisSeason.set(ACTIVE_SEASON, r.teamId); }
   const glLive = new Map<number, { teamId: number }>();
-  for (const r of liveGlRows) { const x = mk(r.playerId); x.seasons.add(ACTIVE_SEASON); x.sa += r.shotsAgainst; x.sv += r.saves; if (r.decision === "W") x.wins++; if (r.goalsAgainst === 0) x.so++; glLive.set(r.playerId, { teamId: r.teamId }); x.teamThisSeason.set(ACTIVE_SEASON, r.teamId); }
+  for (const r of liveGlRows) { const x = mk(r.playerId); x.seasons.add(ACTIVE_SEASON); x.sa += r.shotsAgainst; x.sv += r.saves; if (r.decision === "W") x.wins++; if (r.shutout) x.so++; glLive.set(r.playerId, { teamId: r.teamId }); x.teamThisSeason.set(ACTIVE_SEASON, r.teamId); }
   // live goalie GP = distinct games started; approximate via decisions+others → count rows per player
   const glGp = new Map<number, number>();
   for (const r of liveGlRows) glGp.set(r.playerId, (glGp.get(r.playerId) ?? 0) + 1);

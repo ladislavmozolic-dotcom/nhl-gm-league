@@ -107,7 +107,7 @@ function aggSkater(rows: {
 // aggregate goalie per-game rows into a single stat line
 function aggGoalie(rows: {
   started: boolean; shotsAgainst: number; saves: number; goalsAgainst: number; decision: string | null;
-  xga?: number | null; isSteal?: boolean;
+  xga?: number | null; isSteal?: boolean; shutout?: boolean;
 }[]) {
   const started = rows.filter((r) => r.started);
   const gp = started.length || rows.length;
@@ -125,7 +125,7 @@ function aggGoalie(rows: {
     gaa: gp ? ga / gp : 0,
     gsax: xga - ga,
     steals,
-    so: rows.filter((r) => r.started && r.goalsAgainst === 0).length,
+    so: rows.filter((r) => r.shutout).length,
     sa, sv, ga,
     toi: `${gp * 60}:00`,
   };
@@ -296,7 +296,7 @@ export default async function PlayerPage({
     const rows = await prisma.goalieGameStat.findMany({
       where: { playerId: p.id, game: { season: activeSeason, status: "FINAL" } },
       select: {
-        started: true, shotsAgainst: true, saves: true, goalsAgainst: true, decision: true,
+        started: true, shotsAgainst: true, saves: true, goalsAgainst: true, shutout: true, decision: true,
         xga: true, teamId: true,
         game: {
           select: {

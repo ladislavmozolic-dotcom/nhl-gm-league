@@ -1725,6 +1725,7 @@ model GoalieGameStat {
   shotsAgainst Int     @default(0)
   saves        Int     @default(0)
   goalsAgainst Int     @default(0)
+  shutout      Boolean @default(false) // whole game, no goal against, no other keeper faced a shot (a 0-GA relief stint is NOT a shutout)
   conBefore    Int?
   conAfter     Int?
   fatigued     Boolean @default(false)

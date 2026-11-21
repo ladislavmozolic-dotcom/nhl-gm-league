@@ -1877,6 +1877,7 @@ export async function getLeagueRecords(
             shotsAgainst: true,
             saves: true,
             goalsAgainst: true,
+            shutout: true,
             decision: true,
             xga: true,
             game: { select: { id: true, gameDate: true, playedAt: true, season: true, seriesId: true, round: true, homeTeamId: true, awayTeamId: true, homeGoals: true, awayGoals: true, goalEvents: true, league: true } },
@@ -2383,7 +2384,7 @@ export async function getLeagueRecords(
     else if (g.decision === "OTL") a.otl++;
     else if (g.decision === "L") a.losses++;
 
-    if (g.goalsAgainst === 0) a.shutouts++;
+    if (g.shutout) a.shutouts++;
 
     const gsax = (g.xga ?? 0) - g.goalsAgainst;
     a.gsax += gsax;
@@ -3176,7 +3177,7 @@ export async function getLeagueRecords(
     if (g.decision === "W") acc.wins += 1;
     else if (g.decision === "OTL") acc.otl += 1;
     else if (g.decision === "L") acc.losses += 1;
-    if (g.goalsAgainst === 0) acc.shutouts += 1;
+    if (g.shutout) acc.shutouts += 1;
     const gsax = (g.xga ?? 0) - g.goalsAgainst;
     acc.gsax += gsax;
     if (g.decision === "W" && g.game) {
@@ -3312,7 +3313,7 @@ export async function getLeagueRecords(
       }
 
       // Shutout streak
-      if (g.goalsAgainst === 0) {
+      if (g.shutout) {
         if (curSO === 0) curStartSO = seas;
         curSO++;
         if (curSO > maxSO) {
@@ -3425,7 +3426,7 @@ export async function getLeagueRecords(
     if (g.decision === "W") a.wins++;
     else if (g.decision === "OTL") a.otl++;
     else if (g.decision === "L") a.losses++;
-    if (g.goalsAgainst === 0) a.shutouts++;
+    if (g.shutout) a.shutouts++;
     const gsax = (g.xga ?? 0) - g.goalsAgainst;
     a.gsax += gsax;
     if (g.decision === "W" && g.game) {
@@ -3532,7 +3533,7 @@ export async function getLeagueRecords(
     if (g.decision === "W") acc.wins += 1;
     else if (g.decision === "OTL") acc.otl += 1;
     else if (g.decision === "L") acc.losses += 1;
-    if (g.goalsAgainst === 0) acc.shutouts += 1;
+    if (g.shutout) acc.shutouts += 1;
     const gsax = (g.xga ?? 0) - g.goalsAgainst;
     acc.gsax += gsax;
     if (g.decision === "W" && g.game) {
@@ -4893,7 +4894,7 @@ export async function getLeagueRecords(
     if (g.decision === "W") a.wins++;
     else if (g.decision === "OTL") a.otl++;
     else if (g.decision === "L") a.losses++;
-    if (g.goalsAgainst === 0) a.shutouts++;
+    if (g.shutout) a.shutouts++;
     const gsax = (g.xga ?? 0) - g.goalsAgainst;
     a.gsax += gsax;
     if (g.decision === "W" && g.game) {
@@ -4969,7 +4970,7 @@ export async function getLeagueRecords(
     if (g.decision === "W") acc.wins += 1;
     else if (g.decision === "OTL") acc.otl += 1;
     else if (g.decision === "L") acc.losses += 1;
-    if (g.goalsAgainst === 0) acc.shutouts += 1;
+    if (g.shutout) acc.shutouts += 1;
     const gsax = (g.xga ?? 0) - g.goalsAgainst;
     acc.gsax += gsax;
     if (g.decision === "W" && g.game) {
@@ -5076,7 +5077,7 @@ export async function getLeagueRecords(
         curS = 0;
       }
 
-      if (g.goalsAgainst === 0) {
+      if (g.shutout) {
         if (curSO === 0) curStartSO = seas;
         curSO++;
         if (curSO > maxSO) {

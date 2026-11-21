@@ -56,9 +56,13 @@ function situationRows(box: TeamBox, gameId: number) {
     })));
 }
 
-function goalieRows(box: TeamBox, gameId: number) {
+function goalieRows(box: TeamBox, gameId: number, endedIn?: string) {
   const lines = [box.goalie, ...(box.backupGoalie ? [box.backupGoalie] : [])];
+  // Shutout: the club conceded nothing (no shootout decider) and only this goalie faced a shot. A relief appearance
+  // with 0 GA behind a goalie who was beaten, or a split shutout between two keepers, is not one.
+  const teamGa = lines.reduce((t, g) => t + g.goalsAgainst, 0);
   return lines.map((g) => ({
+    shutout: endedIn !== "SO" && teamGa === 0 && lines.every((o) => o === g || o.shotsAgainst === 0),
     gameId, playerId: g.id, teamId: box.teamId, started: g.started,
     shotsAgainst: g.shotsAgainst, saves: g.saves, goalsAgainst: g.goalsAgainst,
     conBefore: g.conBefore, conAfter: g.conAfter, fatigued: g.fatigued,
@@ -179,7 +183,7 @@ export async function saveGameResult(result: GameResult, meta: GameMeta = {}) {
     const situations = [...situationRows(result.home, gameId), ...situationRows(result.away, gameId)];
     if (situations.length) await tx.playerSituationGameStat.createMany({ data: situations });
     await tx.goalieGameStat.createMany({
-      data: [...goalieRows(result.home, gameId), ...goalieRows(result.away, gameId)],
+      data: [...goalieRows(result.home, gameId, result.endedIn), ...goalieRows(result.away, gameId, result.endedIn)],
     });
     if (result.goals.length) await tx.gameGoal.createMany({ data: goalRows(gameId) });
     if (result.penalties.length) await tx.gamePenalty.createMany({ data: penaltyRows(gameId) });
