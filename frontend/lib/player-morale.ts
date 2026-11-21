@@ -106,10 +106,25 @@ export async function checkIceTimeMorale(opts: { dryRun?: boolean; season?: stri
       : [];
     const injDates = new Map<number, number[]>();
     for (const e of injEvents) { if (e.playerId != null && e.game?.gameDate) injDates.set(e.playerId, [...(injDates.get(e.playerId) ?? []), e.game.gameDate.getTime()]); }
+    // his AHL appearances this season: a game missed while he was down on the farm is not a snub either
+    // (he wasn't on the NHL roster). Seen last in the AHL (more recently than in the NHL) or next in the AHL
+    // (before he is next seen in the NHL) → he was on the farm for this game.
+    const ahlRows = roster.length
+      ? await prisma.playerGameStat.findMany({ where: { playerId: { in: roster.map((p) => p.id) }, game: { season, league: "AHL", status: "FINAL", seriesId: null } }, select: { playerId: true, game: { select: { gameDate: true } } } })
+      : [];
+    const ahlDates = new Map<number, number[]>();
+    for (const r of ahlRows) { const t = r.game?.gameDate?.getTime(); if (t) ahlDates.set(r.playerId, [...(ahlDates.get(r.playerId) ?? []), t]); }
+    const onFarm = (pid: number, gt: number, apDates: number[]) => {
+      const ahl = ahlDates.get(pid); if (!ahl?.length) return false;
+      const lastNhl = Math.max(0, ...apDates.filter((d) => d < gt)), lastAhl = Math.max(0, ...ahl.filter((d) => d < gt));
+      const nextNhl = Math.min(Infinity, ...apDates.filter((d) => d > gt)), nextAhl = Math.min(Infinity, ...ahl.filter((d) => d > gt));
+      return lastAhl > lastNhl || nextAhl < nextNhl;
+    };
     const excusedMiss = (pid: number, gameId: number) => {
       if (playedIn.get(pid)?.has(gameId)) return false;
       const gt = wDate.get(gameId) ?? 0;
       const apDates = [...(playedIn.get(pid) ?? [])].map((id) => gDate.get(id) ?? 0);
+      if (onFarm(pid, gt, apDates)) return true;
       // hurt in a game before this one and not back on the ice in between → out injured
       return (injDates.get(pid) ?? []).some((de) => de <= gt && !apDates.some((ad) => ad > de && ad < gt));
     };

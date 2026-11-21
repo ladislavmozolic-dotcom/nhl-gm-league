@@ -214,11 +214,16 @@ function chooseStarter(team: SeasonTeam, prevRound: number, state: Map<number, G
   // b2bFatigue penalty) and won 55-60 games. The auto-rotation below then decides,
   // and it still favours him by OVERALL on normal nights.
   const picked = team.goalies.find((g) => g.id === team.linesUsed?.situations?.others?.starter);
-  // A human GM decides who is in net — full stop. No back-to-back / workload / CON-rest
-  // rotation overrides his pick (that rotation exists for AI-run clubs); the only thing that
-  // keeps his starter out is being genuinely unfit to dress (below GOALIE_PLAY_CON), and a b2b still
-  // costs the starter a little performance via `fatigued`.
-  if (team.humanGm && picked && picked.con >= GOALIE_PLAY_CON) return picked;
+  // A human GM decides who is in net. The CON / workload rotation below is for AI-run clubs; his starter
+  // is kept out when genuinely unfit to dress (below GOALIE_PLAY_CON) or on the second night of a back-to-back.
+  if (team.humanGm && picked && picked.con >= GOALIE_PLAY_CON) {
+    // …but even a GM's #1 sits the second night of a back-to-back when a fit backup exists (he used to start every
+    // game: Sorokin 24 of 24). Nobody else's workload is touched.
+    const backup = (state.get(picked.id)?.lastStartRound ?? -99) === prevRound
+      ? [...team.goalies].filter((g) => g.id !== picked.id && g.con >= GOALIE_PLAY_CON).sort((x, y) => y.overall - x.overall)[0]
+      : undefined;
+    return backup ?? picked;
+  }
   if (picked && picked.con >= GOALIE_PLAY_CON) {
     const st = state.get(picked.id);
     const startedYesterday = (st?.lastStartRound ?? -99) === prevRound;
