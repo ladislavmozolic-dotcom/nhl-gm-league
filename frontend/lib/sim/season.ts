@@ -129,6 +129,14 @@ export function evolveChem(team: SimTeam, cfg: EngineSettings) {
 
 // ---- morale (STHS "MO"): team result, personal production, scoring droughts and
 // ice-time-vs-role all push it; mean-reverts to base so the league stays calibrated.
+/** Mean-reversion strength per game. A loss by a club riding high used to add the full pull-down on top of the −2
+ *  (a 64-morale skater lost ~4 points per defeat, while a win gave only ~+0.3); after a loss that drag is now
+ *  weaker (0.05 vs 0.12), so a defeat costs ~3 instead of ~4. Wins and low-morale players are unchanged. */
+const MORALE_PULL = 0.12, MORALE_PULL_AFTER_LOSS_ABOVE_BASE = 0.05;
+function moralePull(won: boolean, morale: number, base: number): number {
+  return !won && morale > base ? MORALE_PULL_AFTER_LOSS_ABOVE_BASE : MORALE_PULL;
+}
+
 function evolveMorale(team: SimTeam, box: TeamBox, won: boolean, cfg: EngineSettings) {
   const stat = new Map(box.skaters.map((s) => [s.id, s]));
   for (const s of [...team.forwards, ...team.defense]) {
@@ -148,7 +156,7 @@ function evolveMorale(team: SimTeam, box: TeamBox, won: boolean, cfg: EngineSett
     // strong mean-reversion so morale tracks RECENT form (~last 8-10 games), not
     // season-long dominance — this keeps hot streaks streaky and prevents a
     // winning team from snowballing to a permanent, sim-breaking morale edge.
-    s.morale = Math.max(1, Math.min(100, s.morale + d + (cfg.moraleBase - s.morale) * 0.12));
+    s.morale = Math.max(1, Math.min(100, s.morale + d + (cfg.moraleBase - s.morale) * moralePull(won, s.morale, cfg.moraleBase)));
   }
   // goalie psyche swings harder than a skater's (STHS: his morale drops first on a
   // losing streak) and a shutout / shelling colours it further.
@@ -158,7 +166,7 @@ function evolveMorale(team: SimTeam, box: TeamBox, won: boolean, cfg: EngineSett
     let gd = (won ? cfg.moraleWin : -cfg.moraleWin) * 1.5;
     if (ga === 0 && won) gd += 2;         // a shutout is a confidence boost
     else if (ga >= 5) gd -= 2;            // a shelling stings
-    gk.morale = Math.max(1, Math.min(100, gk.morale + gd + (cfg.moraleBase - gk.morale) * 0.12));
+    gk.morale = Math.max(1, Math.min(100, gk.morale + gd + (cfg.moraleBase - gk.morale) * moralePull(won, gk.morale, cfg.moraleBase)));
   }
 }
 
