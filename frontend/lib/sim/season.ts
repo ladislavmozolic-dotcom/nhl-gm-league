@@ -111,7 +111,9 @@ export function evolveChem(team: SimTeam, cfg: EngineSettings) {
     for (const [a, b] of unitPairs(u.members)) {
       const sig = pairSig(a, b); together.add(sig);
       const cur = team.chemistry[sig] ?? cfg.chemistryBase;
-      team.chemistry[sig] = Math.min(cap, cur + chemGain(cur, cfg.chemistryGrowth));
+      // The off-position cap only limits GROWTH: a bond already above it (e.g. a gelled Hyman–Marchenko 77 while a
+      // winger covers for McDavid at C) must keep its value — Math.min(cap, …) used to cut it straight down to the cap.
+      team.chemistry[sig] = cur >= cap ? cur : Math.min(cap, cur + chemGain(cur, cfg.chemistryGrowth));
     }
   }
   const fade = Math.max(0.5, cfg.chemistryGrowth * 0.5);     // bonds fade SLOWER than they build → a re-united duo keeps most of its history
